@@ -1,11 +1,3 @@
----
-name: 🐛 Bug Report
-about: Report a bug in VisaTrack
-title: 'fix: '
-labels: bug
-assignees: ''
----
-
 ### 🚨 Description
 A clear and concise description of the bug.
 
