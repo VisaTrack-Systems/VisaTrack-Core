@@ -1,20 +1,3 @@
----
-name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: ''
-assignees: ''
-
----
-
----
-name: 🚀 Feature Request
-about: Propose a new feature for VisaTrack
-title: 'feat: '
-labels: enhancement
-assignees: ''
----
-
 ### 💡 Feature Description
 A clear and concise description of what the new feature is.
 
