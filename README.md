@@ -4,7 +4,7 @@ Version: 1.0 (Initial) | Date: January 20, 2026
 
 ## 1. Project Outline
 VisaTrack is a web-based client and case management system designed for immigration and visa-processing consulting firms. The platform centralizes client information, case documents, application status, and communication into a single secure system, replacing fragmented workflows that currently rely on email, spreadsheets, and manual follow-ups.
-
+trial test
 The system enables clients to track their visa application progress, upload required documents, receive reminders, and book follow-up appointments, while consultants gain access to an administrative dashboard for managing cases, storing files, and monitoring progress. The long-term goal of VisaTrack is to evolve into an extensible platform that adapts to changing immigration requirements and supports intelligent automation such as assisted form filling and document data extraction.
 
 ## 2. Team Members and Roles
