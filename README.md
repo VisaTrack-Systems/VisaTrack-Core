@@ -11,7 +11,7 @@ The system enables clients to track their visa application progress, upload requ
 Name | Role | Primary Responsibilities
 --- | --- | ---
 Umer Qamar | Full-Stack Developer | Adapting All Software Engineering roles
-Mayoor | Full-Stack Developer | Doing Full-Stack things
+Mayoor | Full-Stack Developer | Adapting All Software Engineering roles
 Patrick Bonini | Full-Stack Developer | Adapting All Software Engineering roles
 Pavel Karmaker | Full-Stack Developer | Adapting All Software Engineering roles
 Ronit Mehta | Full-Stack Developer | Adapting All Software Engineering roles
