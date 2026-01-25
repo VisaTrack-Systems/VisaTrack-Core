@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend - VisaTrack
 
-## Getting Started
+This directory contains the frontend web application for VisaTrack, built using Next.js (React) with TypeScript and Tailwind CSS.
 
-First, run the development server:
+The frontend is a responsive web app designed to work on both desktop and mobile browsers.
+
+---
+
+## Tech Stack
+- Next.js (App Router)
+- React
+- TypeScript
+- Tailwind CSS
+
+---
+
+## Structure Overview
+- `app/` - Application routes and layouts (App Router)
+- `components/` - Reusable UI components
+- `hooks/` - Custom React hooks
+- `lib/` - API clients, helpers, and utilities
+- `public/` - Static assets
+
+---
+
+## Running the Frontend Locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app will be available at:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Backend Communication
 
-To learn more about Next.js, take a look at the following resources:
+The frontend communicates with the backend via REST APIs.
+The backend base URL is configured using:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- No direct database access occurs from the frontend
+- All sensitive operations are handled by the backend
+- Authentication and authorization will be enforced server-side

@@ -7,6 +7,12 @@ VisaTrack is a web-based client and case management system designed for immigrat
 
 The system enables clients to track their visa application progress, upload required documents, receive reminders, and book follow-up appointments, while consultants gain access to an administrative dashboard for managing cases, storing files, and monitoring progress. The long-term goal of VisaTrack is to evolve into an extensible platform that adapts to changing immigration requirements and supports intelligent automation such as assisted form filling and document data extraction.
 
+## Project Structure
+- `frontend/` - Next.js web application
+- `backend/` - FastAPI backend and database logic
+- `docs/` - Architecture and design documentation
+- `scripts/` - Development helper scripts
+
 ## 2. Team Members and Roles
 Name | Role | Primary Responsibilities
 --- | --- | ---
