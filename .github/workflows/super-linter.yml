@@ -25,6 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EXCLUDED_DIRECTORIES: "frontend/node_modules,backend/venv"
+          LINTER_RULES_PATH: ".github/linters"
 
           # Limit linting to config & docs only
           VALIDATE_MARKDOWN: true
