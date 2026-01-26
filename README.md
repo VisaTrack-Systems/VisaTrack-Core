@@ -79,7 +79,7 @@ Architecture Diagram:
 
 ![VisaTrack High-Level Architecture](./docs/assets/architecture_overview.png)
 
-*The diagram above illustrates the interaction between the Next.js frontend, 
+*The diagram above illustrates the interaction between the Next.js frontend,
 FastAPI backend, and our data persistence layers (PostgreSQL & S3).*
 
 ## 5. Anticipated Risks
