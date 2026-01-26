@@ -76,7 +76,11 @@ Hosting / Infrastructure:
 - GitHub Actions for CI/CD
 
 Architecture Diagram:
-[ Placeholder for high-level system architecture diagram ]
+
+![VisaTrack High-Level Architecture](./docs/assets/architecture_overview.png)
+
+*The diagram above illustrates the interaction between the Next.js frontend, 
+FastAPI backend, and our data persistence layers (PostgreSQL & S3).*
 
 ## 5. Anticipated Risks
 ### 5.1 Engineering Challenges
