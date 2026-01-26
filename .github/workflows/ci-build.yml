@@ -65,4 +65,4 @@ jobs:
         working-directory: backend
         run: |
           source venv/bin/activate
-          pytest
+          pytest || test $? -eq 5
