@@ -37,7 +37,7 @@ The backend is responsible for:
 ## Running the Backend Locally
 
 ```bash
-python3 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
@@ -63,6 +63,17 @@ Create a new migration:
 
 ```bash
 alembic revision --autogenerate -m "migration message"
+```
+
+---
+
+## Tests
+
+Install dev dependencies and run tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
 ```
 
 ---
