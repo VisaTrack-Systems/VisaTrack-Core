@@ -7,6 +7,7 @@ The frontend is a responsive web app designed to work on both desktop and mobile
 ---
 
 ## Tech Stack
+
 - Next.js (App Router)
 - React
 - TypeScript
@@ -15,6 +16,7 @@ The frontend is a responsive web app designed to work on both desktop and mobile
 ---
 
 ## Structure Overview
+
 - `app/` - Application routes and layouts (App Router)
 - `components/` - Reusable UI components
 - `hooks/` - Custom React hooks
@@ -32,7 +34,7 @@ npm run dev
 
 The app will be available at:
 
-```
+```text
 http://localhost:3000
 ```
 

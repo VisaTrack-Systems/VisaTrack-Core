@@ -5,6 +5,7 @@ This directory contains project documentation and design artifacts.
 ---
 
 ## Contents
+
 - Architecture decisions
 - API specifications
 - Design rationale
@@ -14,6 +15,7 @@ This directory contains project documentation and design artifacts.
 ---
 
 ## Purpose
+
 - Acts as a single source of truth for design and technical decisions
 - Helps onboard new developers quickly
 - Supports academic evaluation and project reviews
@@ -21,6 +23,7 @@ This directory contains project documentation and design artifacts.
 ---
 
 ## Examples of Documents
+
 - `architecture.md`
 - `api-spec.md`
 - `decisions.md`

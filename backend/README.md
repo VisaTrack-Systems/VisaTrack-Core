@@ -3,6 +3,7 @@
 This directory contains the backend API for VisaTrack, built using FastAPI and Python.
 
 The backend is responsible for:
+
 - Authentication and authorization
 - Business logic
 - Database interactions
@@ -12,6 +13,7 @@ The backend is responsible for:
 ---
 
 ## Tech Stack
+
 - Python
 - FastAPI
 - SQLAlchemy (ORM)
@@ -21,6 +23,7 @@ The backend is responsible for:
 ---
 
 ## Structure Overview
+
 - `app/main.py` - FastAPI application entry point
 - `app/api/` - API route definitions
 - `app/models/` - Database models
@@ -42,7 +45,7 @@ uvicorn app.main:app --reload
 
 Backend will be available at:
 
-```
+```text
 http://localhost:8000
 ```
 
