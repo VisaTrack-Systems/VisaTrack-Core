@@ -67,6 +67,17 @@ alembic revision --autogenerate -m "migration message"
 
 ---
 
+## Tests
+
+Install dev dependencies and run tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+---
+
 ## Notes
 
 - The backend is the source of truth for all data
