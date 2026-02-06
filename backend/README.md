@@ -37,7 +37,7 @@ The backend is responsible for:
 ## Running the Backend Locally
 
 ```bash
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
