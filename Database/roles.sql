@@ -28,6 +28,16 @@ CREATE UNIQUE INDEX uq_roles_system_slug ON roles(slug) WHERE organization_id IS
 -- Insert default roles
 INSERT INTO roles (organization_id, name, slug, description, is_system, permissions) VALUES
 (NULL, 'Super Admin', 'super_admin', 'Full system access', TRUE, '["*"]'),
+(NULL, 'Organization Admin', 'org_admin', 'Manages users, roles, and organization operations', TRUE, '[
+    "users:manage", "roles:manage",
+    "cases:view", "cases:create", "cases:edit", "cases:assign",
+    "clients:view", "clients:create", "clients:edit",
+    "documents:view", "documents:upload", "documents:approve",
+    "payments:view", "payments:create",
+    "messages:send", "messages:view",
+    "reports:view",
+    "settings:view", "settings:edit"
+]'),
 (NULL, 'Lawyer', 'lawyer', 'Can manage assigned cases and clients', TRUE, '[
     "cases:view", "cases:create", "cases:edit", "cases:assign",
     "clients:view", "clients:create", "clients:edit",

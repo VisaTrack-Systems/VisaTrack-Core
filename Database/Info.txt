@@ -591,19 +591,47 @@ CREATE INDEX idx_payments_invoice ON payments(invoice_id);
 CREATE INDEX idx_payments_status ON payments(status);
 ```
 
-### `trust_account_entries` - For ICCRC compliance (separate trust accounting)
+### `client_accounts` - Client (trust) account registry
+Used to register the firm's client (trust) accounts and track operational compliance items (e.g., notification timelines).
+
+```sql
+CREATE TABLE client_accounts (
+    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id                 UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    account_name                    VARCHAR(255) NOT NULL,
+    financial_institution_name      VARCHAR(255) NOT NULL,
+    financial_institution_address   TEXT,
+    account_number_masked           VARCHAR(64) NOT NULL,
+    routing_number_masked           VARCHAR(32),
+    currency                        VARCHAR(3) NOT NULL DEFAULT 'CAD',
+    is_active                       BOOLEAN NOT NULL DEFAULT TRUE,
+    opened_at                       DATE NOT NULL,
+    closed_at                       DATE,
+    college_notified_opened_at      TIMESTAMPTZ,
+    college_notified_closed_at      TIMESTAMPTZ,
+    created_by                      UUID NOT NULL REFERENCES users(id),
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (organization_id, account_number_masked, currency)
+);
+```
+
+### `trust_account_entries` - For ICCRC/CICC compliance (separate trust accounting)
 ```sql
 CREATE TABLE trust_account_entries (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     UUID NOT NULL REFERENCES organizations(id),
+    client_account_id   UUID NOT NULL REFERENCES client_accounts(id),
     case_id             UUID REFERENCES cases(id),
     client_id           UUID NOT NULL REFERENCES users(id),
+    invoice_id          UUID REFERENCES invoices(id),
     
     entry_type          VARCHAR(50) NOT NULL,  -- retainer, disbursement, refund, transfer
     amount              DECIMAL(12,2) NOT NULL,  -- Positive for deposit, negative for withdrawal
     
     description         TEXT NOT NULL,
     reference_number    VARCHAR(100),
+    occurred_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
     -- Running balance (calculated)
     running_balance     DECIMAL(12,2),
@@ -612,14 +640,21 @@ CREATE TABLE trust_account_entries (
     reconciled          BOOLEAN DEFAULT FALSE,
     reconciled_at       TIMESTAMPTZ,
     reconciled_by       UUID REFERENCES users(id),
+    reconciliation_note TEXT,
     
     created_by          UUID REFERENCES users(id),
-    created_at          TIMESTAMPTZ DEFAULT NOW()
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW(),
+    voided_at           TIMESTAMPTZ,
+    voided_by           UUID REFERENCES users(id),
+    void_reason         TEXT
 );
 
 CREATE INDEX idx_trust_org ON trust_account_entries(organization_id);
 CREATE INDEX idx_trust_case ON trust_account_entries(case_id);
 CREATE INDEX idx_trust_client ON trust_account_entries(client_id);
+CREATE INDEX idx_trust_client_account ON trust_account_entries(client_account_id);
+CREATE INDEX idx_trust_invoice ON trust_account_entries(invoice_id);
 ```
 
 ---
@@ -923,3 +958,29 @@ class Case(Base):
 | **Tokenized Payments** | PCI DSS compliance |
 
 This schema supports your FastAPI backend with SQLAlchemy and provides a solid foundation for your Next.js frontend with proper type safety and relationships.
+
+---
+
+## Compliance Notes (High Level)
+
+These notes are not legal advice, but represent concrete engineering controls this schema aims to support.
+
+### Trust Accounting (CICC / former ICCRC)
+
+Operational expectations typically include:
+- Separate client (trust) accounts, recorded by firm and currency.
+- A tamper-evident / append-only ledger for all movements in/out of the client account.
+- Ability to reconcile deposits/withdrawals, with who/when metadata.
+- Clear linkage between client funds entries and the relevant client and, where applicable, a case.
+- Auditability of actions that affect client funds.
+
+Schema controls:
+- `client_accounts` registers each client (trust) account and captures compliance timeline fields.
+- `trust_account_entries` requires `client_account_id`, `organization_id`, and `client_id` and enforces same-tenant consistency.
+- Triggers prevent edits to financial fields after insert; entries must be voided and re-entered for corrections.
+- Reconciliation metadata (`reconciled`, `reconciled_at`, `reconciled_by`, `reconciliation_note`) supports review workflows.
+
+Implementation expectations:
+- Backend must enforce RBAC so only authorized roles can create/reconcile/void entries.
+- UI should make “void + re-enter” the standard correction mechanism (no inline edits of amount/type).
+ 

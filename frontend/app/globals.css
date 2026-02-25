@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --form-background: #ffffff;
+  --form-foreground: #111827;
+  --form-placeholder: #6b7280;
 }
 
 @theme inline {
@@ -12,15 +15,39 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  color-scheme: light;
+}
+
+input,
+textarea,
+select {
+  color: var(--form-foreground);
+  background-color: var(--form-background);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--form-placeholder);
+  opacity: 1;
+}
+
+option {
+  color: var(--form-foreground);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--form-foreground);
+  transition: background-color 5000s ease-in-out 0s;
 }

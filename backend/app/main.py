@@ -1,29 +1,17 @@
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.api.router import api_router
+from app.core.config import settings
 
-app = FastAPI(title="VisaTrack API")
-
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+app = FastAPI(title=settings.app_name, version=settings.app_version)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_origin],
+    allow_origins=[settings.frontend_origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+app.include_router(api_router)

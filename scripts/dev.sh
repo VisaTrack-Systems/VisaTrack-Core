@@ -2,13 +2,17 @@
 
 echo "🚀 Starting VisaTrack local development environment..."
 
+# Resolve project root from this script's location so it works from any cwd.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 # ---- Start PostgreSQL ----
 echo "🗄️  Ensuring PostgreSQL is running..."
 brew services start postgresql >/dev/null 2>&1 || true
 
 # ---- Backend ----
 echo "🐍 Starting backend..."
-cd backend || exit
+cd "${PROJECT_ROOT}/backend" || exit
 
 if [ ! -d "venv" ]; then
   echo "❌ Python venv not found. Run backend setup first."
@@ -23,7 +27,9 @@ BACKEND_PID=$!
 
 # ---- Frontend ----
 echo "🌐 Starting frontend..."
-cd ../frontend || exit
+cd "${PROJECT_ROOT}/frontend" || exit
+# Avoid stale Next.js/Turbopack artifacts on first load in local dev.
+rm -rf .next
 npm run dev &
 
 FRONTEND_PID=$!

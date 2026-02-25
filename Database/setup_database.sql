@@ -13,8 +13,10 @@ BEGIN;
 \ir roles.sql
 \ir permissions.sql
 \ir user_roles.sql
+\ir user_invitations.sql
 
 \ir cases.sql
+\ir case_clients.sql
 \ir case_assignments.sql
 \ir case_collaborators.sql
 
@@ -30,6 +32,7 @@ BEGIN;
 \ir invoices.sql
 \ir invoice_items.sql
 \ir payments.sql
+\ir client_accounts.sql
 \ir trust_account_entries.sql
 
 \ir messages.sql
