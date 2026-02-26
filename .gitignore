@@ -1,34 +1,13 @@
-# --- System Files ---
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# --- Logs and Databases ---
-*.log
-*.sqlite
-
-# --- Environment Variables (SENSITIVE) ---
-.env
-.env.local
-.env.*.local
-
-# --- Build and Distribution ---
-dist/
-build/
-out/
-bin/
-obj/
-
-# --- IDEs and Editors ---
-.vscode/
-.idea/
-*.swp
-*.swo
-*.sublime-project
-*.sublime-workspace
-
-# --- Dependencies (Language Specific) ---
+# Node
 node_modules/
+.next/
+
+# Python
+venv/
 __pycache__/
-*.py[cod]
-target/
+
+# Env
+.env
+
+# OS
+.DS_Store

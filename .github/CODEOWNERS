@@ -1,6 +1,4 @@
 # This file automatically assigns reviewers based on file paths.
 
 # The '*' means these people are responsible for EVERY file in the repo.
-* @Patrick-Bonini @RonitMeht @DevFate @Maith062
-
-# Need to add Pavel here later but don't have his github user
+* @Patrick-Bonini @RonitMeht @DevFate @Maith062 @pxvelk

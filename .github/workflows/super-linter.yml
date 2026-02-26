@@ -1,0 +1,48 @@
+---
+name: Super Linter
+
+on:
+  pull_request:
+  push:
+    branches: ["develop"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Config & Docs
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      statuses: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Super-Linter
+        uses: github/super-linter@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXCLUDED_DIRECTORIES: "frontend/node_modules,backend/venv"
+          LINTER_RULES_PATH: ".github/linters"
+
+          # Limit linting to config & docs only
+          VALIDATE_MARKDOWN: true
+          VALIDATE_YAML: true
+          VALIDATE_JSON: true
+
+          # Disable other language linters for now
+          VALIDATE_JAVASCRIPT: false
+          VALIDATE_TYPESCRIPT: false
+          VALIDATE_PYTHON: false
+          VALIDATE_DOCKERFILE: false
+
+          # Improve DX
+          DEFAULT_BRANCH: develop
+          RUN_LOCAL: false
