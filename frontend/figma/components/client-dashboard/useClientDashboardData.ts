@@ -4,8 +4,11 @@ import {
   type CasePortalPermissions,
   type CaseWorkspace,
   type ClientCaseListItem,
+  completeCaseDocumentUpload,
   getCaseWorkspaceByNumber,
+  getCaseDocumentDownloadUrl,
   getClientCases,
+  initiateCaseDocumentUpload,
 } from '@/lib/api';
 
 import {
@@ -36,6 +39,10 @@ type ClientDashboardData = {
   requiredDocuments: number;
   completedRequiredDocuments: number;
   capabilities: ClientPortalCapabilities;
+  uploadDocument: (documentId: string, file: File) => Promise<void>;
+  downloadDocument: (documentId: string) => Promise<void>;
+  uploadingDocumentId: string | null;
+  downloadingDocumentId: string | null;
 };
 
 const fallbackBillingInfo: BillingInfo = {
@@ -75,6 +82,8 @@ export function useClientDashboardData(): ClientDashboardData {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [switchingCase, setSwitchingCase] = useState(false);
+  const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
+  const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -156,6 +165,15 @@ export function useClientDashboardData(): ClientDashboardData {
     setSelectedCaseNumberState(caseNumber);
   };
 
+  const refreshSelectedCaseWorkspace = async (): Promise<void> => {
+    if (!selectedCaseNumber) {
+      return;
+    }
+
+    const data = await getCaseWorkspaceByNumber(selectedCaseNumber);
+    setWorkspace(data);
+  };
+
   const capabilities = useMemo<ClientPortalCapabilities>(() => {
     const permissions = normalizePortalPermissions(workspace?.portal_permissions);
     const portalAccess = permissions.portal_access;
@@ -215,12 +233,67 @@ export function useClientDashboardData(): ClientDashboardData {
     }
 
     return workspace.documents.map((document) => ({
+      id: document.id,
       name: document.name,
       status: documentDisplayStatus(document.status, document.required),
       uploadedDate: formatDate(document.uploaded_at),
       required: document.required,
+      instructions: document.instructions,
+      fileName: document.file_name,
+      canDownload: document.can_download,
     }));
   }, [workspace, capabilities.canViewDocuments]);
+
+  const uploadDocument = async (documentId: string, file: File): Promise<void> => {
+    if (!selectedCaseNumber) {
+      throw new Error('No active case selected');
+    }
+
+    setUploadingDocumentId(documentId);
+    try {
+      const uploadSession = await initiateCaseDocumentUpload(selectedCaseNumber, documentId, {
+        file_name: file.name,
+        file_type: file.type || 'application/octet-stream',
+        file_size_bytes: file.size,
+      });
+
+      const uploadHeaders = new Headers(uploadSession.upload_headers);
+      const uploadResponse = await fetch(uploadSession.upload_url, {
+        method: 'PUT',
+        headers: uploadHeaders,
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Storage upload failed: ${uploadResponse.status}`);
+      }
+
+      await completeCaseDocumentUpload(selectedCaseNumber, documentId, {
+        storage_key: uploadSession.storage_key,
+        file_name: file.name,
+        file_type: file.type || 'application/octet-stream',
+        file_size_bytes: file.size,
+      });
+
+      await refreshSelectedCaseWorkspace();
+    } finally {
+      setUploadingDocumentId(null);
+    }
+  };
+
+  const downloadDocument = async (documentId: string): Promise<void> => {
+    if (!selectedCaseNumber) {
+      throw new Error('No active case selected');
+    }
+
+    setDownloadingDocumentId(documentId);
+    try {
+      const response = await getCaseDocumentDownloadUrl(selectedCaseNumber, documentId);
+      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setDownloadingDocumentId(null);
+    }
+  };
 
   const milestones = useMemo<DashboardMilestone[]>(() => {
     if (!workspace || !capabilities.canViewMilestones) {
@@ -315,5 +388,9 @@ export function useClientDashboardData(): ClientDashboardData {
     requiredDocuments,
     completedRequiredDocuments,
     capabilities,
+    uploadDocument,
+    downloadDocument,
+    uploadingDocumentId,
+    downloadingDocumentId,
   };
 }

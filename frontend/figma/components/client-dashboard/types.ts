@@ -1,10 +1,14 @@
 export type DashboardDocumentStatus = 'completed' | 'pending' | 'review' | 'optional';
 
 export type DashboardDocument = {
+  id: string;
   name: string;
   status: DashboardDocumentStatus;
   uploadedDate: string;
   required: boolean;
+  instructions: string | null;
+  fileName: string | null;
+  canDownload: boolean;
 };
 
 export type DashboardMilestone = {

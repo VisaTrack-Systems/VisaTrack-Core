@@ -24,6 +24,10 @@ export function ClientDashboard() {
     requiredDocuments,
     completedRequiredDocuments,
     capabilities,
+    uploadDocument,
+    downloadDocument,
+    uploadingDocumentId,
+    downloadingDocumentId,
   } = useClientDashboardData();
 
   if (loading) {
@@ -108,6 +112,10 @@ export function ClientDashboard() {
                 completedRequiredDocuments={completedRequiredDocuments}
                 requiredDocuments={requiredDocuments}
                 canUploadDocuments={capabilities.canUploadDocuments}
+                onUploadDocument={uploadDocument}
+                onDownloadDocument={downloadDocument}
+                uploadingDocumentId={uploadingDocumentId}
+                downloadingDocumentId={downloadingDocumentId}
               />
             ) : null}
             {capabilities.canViewMilestones ? <MilestonesPanel milestones={milestones} /> : null}

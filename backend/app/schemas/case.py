@@ -82,6 +82,9 @@ class CaseWorkspaceDocument(BaseModel):
     due_date: Optional[date]
     uploaded_at: Optional[datetime]
     instructions: Optional[str]
+    file_name: Optional[str] = None
+    latest_case_document_id: Optional[str] = None
+    can_download: bool = False
 
 
 class CaseWorkspaceDocumentSuite(BaseModel):
@@ -178,6 +181,39 @@ class CaseDocumentStatusUpdateRequest(BaseModel):
 class CaseDocumentStatusUpdateResponse(BaseModel):
     document_id: str
     status: str
+
+
+class CaseDocumentUploadInitiateRequest(BaseModel):
+    file_name: str
+    file_type: str
+    file_size_bytes: int
+
+
+class CaseDocumentUploadInitiateResponse(BaseModel):
+    document_id: str
+    upload_url: str
+    upload_headers: dict[str, str]
+    storage_key: str
+    expires_in_seconds: int
+    max_upload_bytes: int
+
+
+class CaseDocumentUploadCompleteRequest(BaseModel):
+    storage_key: str
+    file_name: str
+    file_type: str
+    file_size_bytes: int
+    file_hash: Optional[str] = None
+    issue_date: Optional[date] = None
+    expiry_date: Optional[date] = None
+
+
+class CaseDocumentDownloadResponse(BaseModel):
+    document_id: str
+    case_document_id: str
+    file_name: str
+    download_url: str
+    expires_in_seconds: int
 
 
 class CaseCustomDocumentCreateRequest(BaseModel):

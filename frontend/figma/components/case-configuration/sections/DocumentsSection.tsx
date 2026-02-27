@@ -26,6 +26,8 @@ type DocumentsSectionProps = {
   onDownloadAll: () => void;
   onRenameDocument: (documentId: string, name: string) => Promise<boolean>;
   renamingDocumentId: string | null;
+  onDownloadDocument: (documentId: string) => Promise<void>;
+  downloadingDocumentId: string | null;
   onUpdateDocumentStatus: (documentId: string, status: CaseDocumentStatus) => Promise<void>;
   updatingDocumentId: string | null;
   onSendDocumentReminder: (documentId: string) => Promise<void>;
@@ -49,6 +51,8 @@ export function DocumentsSection({
   onDownloadAll,
   onRenameDocument,
   renamingDocumentId,
+  onDownloadDocument,
+  downloadingDocumentId,
   onUpdateDocumentStatus,
   updatingDocumentId,
   onSendDocumentReminder,
@@ -267,6 +271,17 @@ export function DocumentsSection({
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                                disabled={!document.can_download || downloadingDocumentId === document.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void onDownloadDocument(document.id);
+                                }}
+                                title={document.can_download ? 'Open submitted file' : 'No file uploaded yet'}
+                              >
+                                <Download className="w-4 h-4 text-gray-600" />
+                              </button>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded"
                                 onClick={(event) => {

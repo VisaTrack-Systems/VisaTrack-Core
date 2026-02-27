@@ -1,13 +1,17 @@
+import re
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import String, cast, select, text
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_roles
+from app.core.config import settings
 from app.db.deps import get_db
 from app.models.case import Case
 from app.models.case_client import CaseClient
@@ -19,6 +23,10 @@ from app.schemas.case import (
     CaseCustomDocumentCreateRequest,
     CaseDocumentRenameRequest,
     CaseDocumentRenameResponse,
+    CaseDocumentDownloadResponse,
+    CaseDocumentUploadCompleteRequest,
+    CaseDocumentUploadInitiateRequest,
+    CaseDocumentUploadInitiateResponse,
     CaseDetailsUpdateRequest,
     CaseDetailsUpdateResponse,
     CaseMessageCreateRequest,
@@ -43,7 +51,15 @@ from app.schemas.case import (
     CaseWorkspacePaymentItem,
     MilestoneSummary,
 )
-from app.services.audit import log_activity
+from app.services.audit import log_activity, log_document_access
+from app.services.storage import (
+    StorageConfigurationError,
+    StorageOperationError,
+    create_presigned_download,
+    create_presigned_upload,
+    get_object_bytes,
+    head_object,
+)
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -260,6 +276,19 @@ def _normalized_hidden_document_ids(raw: Any) -> set[str]:
     return {str(value).strip() for value in raw if str(value).strip()}
 
 
+def _normalized_document_upload_bindings(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for key, value in raw.items():
+        logical_id = str(key).strip()
+        case_document_id = str(value).strip()
+        if logical_id and case_document_id:
+            normalized[logical_id] = case_document_id
+    return normalized
+
+
 def _normalized_iso_date(raw: Any) -> Optional[str]:
     if raw is None:
         return None
@@ -308,6 +337,212 @@ def _normalized_custom_documents(raw: Any) -> list[dict[str, Any]]:
         seen_ids.add(doc_id)
 
     return normalized
+
+
+def _sanitize_file_name(file_name: str) -> str:
+    trimmed = file_name.strip()
+    if not trimmed:
+        return "document"
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", trimmed)
+    return sanitized[:255] or "document"
+
+
+def _build_document_storage_key(*, organization_id: UUID, case_id: UUID, document_id: str, file_name: str) -> str:
+    safe_name = _sanitize_file_name(file_name)
+    return f"org/{organization_id}/case/{case_id}/documents/{document_id}/{uuid4()}-{safe_name}"
+
+
+def _client_portal_capabilities(case: Case) -> dict[str, bool | str]:
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    permissions = _normalized_portal_permissions(custom_fields.get("portal_permissions"))
+    portal_access = permissions["portal_access"]
+    can_view_documents = portal_access != "disabled" and bool(permissions["show_document_requirements"])
+    can_upload_documents = (
+        can_view_documents
+        and portal_access != "read_only"
+        and permissions["document_upload"] == "enabled"
+    )
+    return {
+        "portal_access": portal_access,
+        "can_view_documents": can_view_documents,
+        "can_upload_documents": can_upload_documents,
+    }
+
+
+def _get_case_with_access(*, case_number: str, auth: AuthContext, db: Session) -> Case:
+    stmt = select(Case).where(
+        Case.case_number == case_number,
+        Case.organization_id == auth.organization_id,
+        Case.deleted_at.is_(None),
+    )
+
+    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
+        if "lawyer" in auth.roles:
+            stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
+        elif "client" in auth.roles:
+            client_membership = (
+                select(CaseClient.id)
+                .where(
+                    CaseClient.case_id == Case.id,
+                    CaseClient.client_user_id == auth.user_id,
+                    CaseClient.removed_at.is_(None),
+                )
+                .exists()
+            )
+            stmt = stmt.where((Case.client_id == auth.user_id) | client_membership)
+
+    case = db.scalar(stmt.limit(1))
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+def _resolve_document_slot(*, case: Case, document_id: str, db: Session) -> dict[str, Any]:
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    custom_documents = _normalized_custom_documents(custom_fields.get("custom_documents"))
+    upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+
+    try:
+        document_uuid = UUID(document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid document id") from exc
+
+    template_row = db.execute(
+        text(
+            """
+            SELECT dt.id, dt.name, dt.instructions, dt.is_required
+            FROM document_templates dt
+            JOIN document_suites ds ON ds.id = dt.suite_id
+            WHERE dt.id = :template_id
+              AND dt.is_active = TRUE
+              AND ds.is_active = TRUE
+              AND (ds.organization_id IS NULL OR ds.organization_id = :organization_id)
+              AND (
+                ds.case_types IS NULL
+                OR cardinality(ds.case_types) = 0
+                OR :case_type = ANY(ds.case_types)
+              )
+            LIMIT 1
+            """
+        ),
+        {
+            "template_id": str(document_uuid),
+            "organization_id": str(case.organization_id),
+            "case_type": case.case_type,
+        },
+    ).mappings().first()
+
+    latest_case_document = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                name,
+                file_name,
+                file_path,
+                status,
+                uploaded_at,
+                version,
+                template_id
+            FROM case_documents
+            WHERE
+                case_id = :case_id
+                AND deleted_at IS NULL
+                AND (id = :document_id OR template_id = :document_id)
+            ORDER BY
+                CASE WHEN id = :document_id THEN 0 ELSE 1 END,
+                version DESC,
+                uploaded_at DESC NULLS LAST,
+                created_at DESC
+            LIMIT 1
+            """
+        ),
+        {"case_id": str(case.id), "document_id": str(document_uuid)},
+    ).mappings().first()
+
+    if template_row is not None:
+        return {
+            "kind": "template",
+            "logical_document_id": str(document_uuid),
+            "name": template_row["name"],
+            "required": bool(template_row["is_required"]),
+            "instructions": template_row["instructions"],
+            "bound_case_document": latest_case_document,
+            "previous_case_document_id": str(latest_case_document["id"]) if latest_case_document else None,
+            "next_version": int(latest_case_document["version"]) + 1 if latest_case_document else 1,
+            "template_id": str(document_uuid),
+        }
+
+    custom_document = next((doc for doc in custom_documents if doc["id"] == str(document_uuid)), None)
+    if custom_document is not None:
+        bound_case_document_id = upload_bindings.get(str(document_uuid))
+        bound_case_document = None
+        if bound_case_document_id:
+            bound_case_document = db.execute(
+                text(
+                    """
+                    SELECT id, name, file_name, file_path, status, uploaded_at, version
+                    FROM case_documents
+                    WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
+                    LIMIT 1
+                    """
+                ),
+                {"document_id": bound_case_document_id, "case_id": str(case.id)},
+            ).mappings().first()
+        return {
+            "kind": "custom_request",
+            "logical_document_id": str(document_uuid),
+            "name": custom_document["name"],
+            "required": bool(custom_document["required"]),
+            "instructions": custom_document["instructions"],
+            "bound_case_document": bound_case_document,
+            "previous_case_document_id": str(bound_case_document["id"]) if bound_case_document else None,
+            "next_version": int(bound_case_document["version"]) + 1 if bound_case_document else 1,
+            "template_id": None,
+        }
+
+    if latest_case_document is not None:
+        return {
+            "kind": "uploaded_document",
+            "logical_document_id": str(document_uuid),
+            "name": latest_case_document["name"],
+            "required": False,
+            "instructions": None,
+            "bound_case_document": latest_case_document,
+            "previous_case_document_id": str(latest_case_document["id"]),
+            "next_version": int(latest_case_document["version"]) + 1,
+            "template_id": str(latest_case_document["template_id"]) if latest_case_document["template_id"] else None,
+        }
+
+    raise HTTPException(status_code=404, detail="Document not found for this case")
+
+
+def _archive_entry_name(*, base_name: str, original_file_name: str, seen_names: dict[str, int]) -> str:
+    original_extension = ""
+    if "." in original_file_name:
+        original_extension = f".{original_file_name.rsplit('.', 1)[-1]}"
+
+    normalized_base = _sanitize_file_name(base_name).rsplit(".", 1)[0]
+    if not normalized_base:
+        normalized_base = "document"
+
+    file_name = (
+        normalized_base
+        if normalized_base.lower().endswith(original_extension.lower())
+        else f"{normalized_base}{original_extension}"
+    )
+
+    occurrence = seen_names.get(file_name, 0)
+    seen_names[file_name] = occurrence + 1
+    if occurrence == 0:
+        return file_name
+
+    if "." in file_name:
+        stem, extension = file_name.rsplit(".", 1)
+    else:
+        stem, extension = file_name, ""
+    suffix = f" ({occurrence + 1})"
+    return f"{stem}{suffix}.{extension}" if extension else f"{stem}{suffix}"
 
 
 def _get_case_with_write_access(
@@ -1211,16 +1446,20 @@ def get_case_workspace_by_number(
                 dt.name AS template_name,
                 dt.instructions,
                 dt.is_required,
+                cd.id AS latest_case_document_id,
                 COALESCE(cd.status, CASE WHEN dt.is_required THEN 'pending' ELSE 'not_requested' END) AS doc_status,
                 cd.uploaded_at,
-                cd.expiry_date
+                cd.expiry_date,
+                cd.file_name
             FROM document_suites ds
             LEFT JOIN document_templates dt ON dt.suite_id = ds.id AND dt.is_active = TRUE
             LEFT JOIN LATERAL (
                 SELECT
+                    cdx.id,
                     cdx.status,
                     cdx.uploaded_at,
-                    cdx.expiry_date
+                    cdx.expiry_date,
+                    cdx.file_name
                 FROM case_documents cdx
                 WHERE
                     cdx.case_id = :case_id
@@ -1273,8 +1512,40 @@ def get_case_workspace_by_number(
                     due_date=document_row["expiry_date"],
                     uploaded_at=document_row["uploaded_at"],
                     instructions=document_row["instructions"],
+                    file_name=document_row["file_name"],
+                    latest_case_document_id=(
+                        str(document_row["latest_case_document_id"])
+                        if document_row["latest_case_document_id"]
+                        else None
+                    ),
+                    can_download=document_row["latest_case_document_id"] is not None,
                 )
             )
+
+    upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+    bound_case_document_ids = list({bound_id for bound_id in upload_bindings.values() if bound_id})
+    bound_case_document_rows = {}
+    if bound_case_document_ids:
+        bound_case_document_rows = {
+            str(row["id"]): row
+            for row in db.execute(
+                text(
+                    """
+                    SELECT
+                        id,
+                        status,
+                        uploaded_at,
+                        expiry_date,
+                        file_name
+                    FROM case_documents
+                    WHERE case_id = :case_id
+                      AND deleted_at IS NULL
+                      AND id = ANY(CAST(:document_ids AS uuid[]))
+                    """
+                ),
+                {"case_id": str(case.id), "document_ids": bound_case_document_ids},
+            ).mappings().all()
+        }
 
     custom_document_rows = db.execute(
         text(
@@ -1284,16 +1555,21 @@ def get_case_workspace_by_number(
                 name,
                 status,
                 uploaded_at,
-                expiry_date
+                expiry_date,
+                file_name
             FROM case_documents
             WHERE
                 case_id = :case_id
                 AND template_id IS NULL
                 AND deleted_at IS NULL
+                AND (
+                    cardinality(CAST(:bound_document_ids AS uuid[])) = 0
+                    OR id <> ALL(CAST(:bound_document_ids AS uuid[]))
+                )
             ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
             """
         ),
-        {"case_id": case_id},
+        {"case_id": case_id, "bound_document_ids": bound_case_document_ids},
     ).mappings().all()
 
     custom_upload_documents = []
@@ -1314,6 +1590,9 @@ def get_case_workspace_by_number(
                 due_date=custom_document_row["expiry_date"],
                 uploaded_at=custom_document_row["uploaded_at"],
                 instructions="",
+                file_name=custom_document_row["file_name"],
+                latest_case_document_id=custom_document_id,
+                can_download=True,
             )
         )
 
@@ -1352,15 +1631,22 @@ def get_case_workspace_by_number(
             }
 
         default_status = custom_document["status"] or ("pending" if custom_document["required"] else "not_requested")
+        bound_case_document = bound_case_document_rows.get(upload_bindings.get(custom_document_id, ""))
+        bound_status = bound_case_document["status"] if bound_case_document else None
+        bound_uploaded_at = bound_case_document["uploaded_at"] if bound_case_document else None
+        bound_file_name = bound_case_document["file_name"] if bound_case_document else None
         suites_map[suite_id]["documents"].append(
             CaseWorkspaceDocument(
                 id=custom_document_id,
                 name=document_name_overrides.get(custom_document_id, custom_document["name"]),
                 required=bool(custom_document["required"]),
-                status=document_status_overrides.get(custom_document_id, default_status),
+                status=document_status_overrides.get(custom_document_id, bound_status or default_status),
                 due_date=custom_document["due_date"],
-                uploaded_at=None,
+                uploaded_at=bound_uploaded_at,
                 instructions=custom_document["instructions"],
+                file_name=bound_file_name,
+                latest_case_document_id=str(bound_case_document["id"]) if bound_case_document else None,
+                can_download=bound_case_document is not None,
             )
         )
 
@@ -1619,6 +1905,27 @@ def get_case_workspace_by_number(
         if not client_can_view_documents:
             document_suites = []
             documents = []
+        else:
+            visible_document_suites = []
+            for suite in document_suites:
+                visible_documents = [
+                    document for document in suite.documents if document.status != "not_requested"
+                ]
+                if visible_documents:
+                    visible_document_suites.append(
+                        CaseWorkspaceDocumentSuite(
+                            id=suite.id,
+                            name=suite.name,
+                            reason=suite.reason,
+                            recommended=suite.recommended,
+                            documents=visible_documents,
+                        )
+                    )
+
+            document_suites = visible_document_suites
+            documents = [
+                document for suite in document_suites for document in suite.documents
+            ]
 
         if not client_can_view_messages:
             messages = []
@@ -2107,3 +2414,380 @@ def update_case_document_status(
         document_id=str(document_uuid),
         status=normalized_status,
     )
+
+
+@router.post(
+    "/by-number/{case_number}/documents/{document_id}/upload-initiate",
+    response_model=CaseDocumentUploadInitiateResponse,
+)
+def initiate_case_document_upload(
+    case_number: str,
+    document_id: str,
+    payload: CaseDocumentUploadInitiateRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin", "client")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentUploadInitiateResponse:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    if "client" in auth.roles:
+        client_capabilities = _client_portal_capabilities(case)
+        if not client_capabilities["can_upload_documents"]:
+            raise HTTPException(status_code=403, detail="Document uploads are disabled for this portal")
+
+    file_name = payload.file_name.strip()
+    file_type = payload.file_type.strip().lower()
+    if not file_name:
+        raise HTTPException(status_code=400, detail="File name is required")
+    if payload.file_size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="File size must be greater than zero")
+    if payload.file_size_bytes > settings.s3_max_upload_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File exceeds upload limit of {settings.s3_max_upload_bytes} bytes",
+        )
+    if not file_type:
+        file_type = "application/octet-stream"
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    storage_key = _build_document_storage_key(
+        organization_id=case.organization_id,
+        case_id=case.id,
+        document_id=slot["logical_document_id"],
+        file_name=file_name,
+    )
+
+    try:
+        upload = create_presigned_upload(object_key=storage_key, content_type=file_type)
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return CaseDocumentUploadInitiateResponse(
+        document_id=slot["logical_document_id"],
+        upload_url=upload.url,
+        upload_headers=upload.headers,
+        storage_key=storage_key,
+        expires_in_seconds=upload.expires_in_seconds,
+        max_upload_bytes=settings.s3_max_upload_bytes,
+    )
+
+
+@router.post(
+    "/by-number/{case_number}/documents/{document_id}/upload-complete",
+    response_model=CaseWorkspaceDocument,
+)
+def complete_case_document_upload(
+    case_number: str,
+    document_id: str,
+    payload: CaseDocumentUploadCompleteRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin", "client")),
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceDocument:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    if "client" in auth.roles:
+        client_capabilities = _client_portal_capabilities(case)
+        if not client_capabilities["can_upload_documents"]:
+            raise HTTPException(status_code=403, detail="Document uploads are disabled for this portal")
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    expected_prefix = (
+        f"org/{case.organization_id}/case/{case.id}/documents/{slot['logical_document_id']}/"
+    )
+    if not payload.storage_key.startswith(expected_prefix):
+        raise HTTPException(status_code=400, detail="Storage key does not match document upload scope")
+
+    try:
+        head_response = head_object(object_key=payload.storage_key)
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    actual_file_size = int(head_response.get("ContentLength") or payload.file_size_bytes)
+    actual_file_type = str(head_response.get("ContentType") or payload.file_type or "application/octet-stream")
+    actual_file_name = payload.file_name.strip()
+    if not actual_file_name:
+        raise HTTPException(status_code=400, detail="File name is required")
+
+    insert_result = db.execute(
+        text(
+            """
+            INSERT INTO case_documents (
+                case_id,
+                template_id,
+                name,
+                file_name,
+                file_path,
+                file_size_bytes,
+                file_type,
+                file_hash,
+                version,
+                previous_version_id,
+                status,
+                issue_date,
+                expiry_date,
+                uploaded_by
+            ) VALUES (
+                :case_id,
+                CAST(:template_id AS uuid),
+                :name,
+                :file_name,
+                :file_path,
+                :file_size_bytes,
+                :file_type,
+                :file_hash,
+                :version,
+                CAST(:previous_version_id AS uuid),
+                'received',
+                :issue_date,
+                :expiry_date,
+                :uploaded_by
+            )
+            RETURNING id, uploaded_at
+            """
+        ),
+        {
+            "case_id": str(case.id),
+            "template_id": slot["template_id"],
+            "name": slot["name"],
+            "file_name": actual_file_name,
+            "file_path": payload.storage_key,
+            "file_size_bytes": actual_file_size,
+            "file_type": actual_file_type,
+            "file_hash": (payload.file_hash or "").strip() or None,
+            "version": slot["next_version"],
+            "previous_version_id": slot["previous_case_document_id"],
+            "issue_date": payload.issue_date,
+            "expiry_date": payload.expiry_date,
+            "uploaded_by": str(auth.user_id),
+        },
+    ).mappings().first()
+
+    if insert_result is None:
+        raise HTTPException(status_code=500, detail="Failed to record uploaded document")
+
+    if slot["kind"] == "custom_request":
+        custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+        upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+        upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
+        status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
+        status_overrides.pop(slot["logical_document_id"], None)
+        case.custom_fields = {
+            **custom_fields,
+            "document_upload_bindings": upload_bindings,
+            "document_status_overrides": status_overrides,
+        }
+        db.add(case)
+
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="uploaded",
+        entity_type="document",
+        entity_id=insert_result["id"],
+        case_id=case.id,
+        client_id=case.client_id,
+        new_values={
+            "document_id": slot["logical_document_id"],
+            "case_document_id": str(insert_result["id"]),
+            "file_name": actual_file_name,
+            "file_type": actual_file_type,
+            "file_size_bytes": actual_file_size,
+        },
+    )
+    log_document_access(
+        db,
+        document_id=insert_result["id"],
+        user_id=auth.user_id,
+        action="upload",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+    db.commit()
+
+    return CaseWorkspaceDocument(
+        id=slot["logical_document_id"],
+        name=slot["name"],
+        required=bool(slot["required"]),
+        status="received",
+        due_date=payload.expiry_date,
+        uploaded_at=insert_result["uploaded_at"],
+        instructions=slot["instructions"],
+        file_name=actual_file_name,
+        latest_case_document_id=str(insert_result["id"]),
+        can_download=True,
+    )
+
+
+@router.get(
+    "/by-number/{case_number}/documents/{document_id}/download-url",
+    response_model=CaseDocumentDownloadResponse,
+)
+def get_case_document_download_url(
+    case_number: str,
+    document_id: str,
+    request: Request,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin", "client")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentDownloadResponse:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    if "client" in auth.roles:
+        client_capabilities = _client_portal_capabilities(case)
+        if not client_capabilities["can_view_documents"]:
+            raise HTTPException(status_code=403, detail="Document viewing is disabled for this portal")
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    case_document = slot["bound_case_document"]
+    if case_document is None:
+        raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+
+    try:
+        download_url = create_presigned_download(
+            object_key=str(case_document["file_path"]),
+            download_name=str(case_document["file_name"] or slot["name"]),
+        )
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    log_document_access(
+        db,
+        document_id=case_document["id"],
+        user_id=auth.user_id,
+        action="view",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    db.commit()
+
+    return CaseDocumentDownloadResponse(
+        document_id=slot["logical_document_id"],
+        case_document_id=str(case_document["id"]),
+        file_name=str(case_document["file_name"] or slot["name"]),
+        download_url=download_url,
+        expires_in_seconds=settings.s3_presign_expires_seconds,
+    )
+
+
+@router.get("/by-number/{case_number}/documents/download-all")
+def download_all_case_documents(
+    case_number: str,
+    request: Request,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> Response:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+    bound_case_document_ids = list({bound_id for bound_id in upload_bindings.values() if bound_id})
+
+    latest_template_rows = db.execute(
+        text(
+            """
+            SELECT DISTINCT ON (template_id)
+                id,
+                name,
+                file_name,
+                file_path,
+                uploaded_at
+            FROM case_documents
+            WHERE
+                case_id = :case_id
+                AND deleted_at IS NULL
+                AND template_id IS NOT NULL
+            ORDER BY template_id, uploaded_at DESC NULLS LAST, created_at DESC
+            """
+        ),
+        {"case_id": str(case.id)},
+    ).mappings().all()
+
+    bound_custom_rows = []
+    if bound_case_document_ids:
+        bound_custom_rows = db.execute(
+            text(
+                """
+                SELECT
+                    id,
+                    name,
+                    file_name,
+                    file_path,
+                    uploaded_at
+                FROM case_documents
+                WHERE
+                    case_id = :case_id
+                    AND deleted_at IS NULL
+                    AND id = ANY(CAST(:document_ids AS uuid[]))
+                ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
+                """
+            ),
+            {"case_id": str(case.id), "document_ids": bound_case_document_ids},
+        ).mappings().all()
+
+    unbound_upload_rows = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                name,
+                file_name,
+                file_path,
+                uploaded_at
+            FROM case_documents
+            WHERE
+                case_id = :case_id
+                AND deleted_at IS NULL
+                AND template_id IS NULL
+                AND (
+                    cardinality(CAST(:bound_document_ids AS uuid[])) = 0
+                    OR id <> ALL(CAST(:bound_document_ids AS uuid[]))
+                )
+            ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
+            """
+        ),
+        {"case_id": str(case.id), "bound_document_ids": bound_case_document_ids},
+    ).mappings().all()
+
+    archive_rows = latest_template_rows + bound_custom_rows + unbound_upload_rows
+    if not archive_rows:
+        raise HTTPException(status_code=404, detail="No uploaded documents are available for this case")
+
+    zip_buffer = BytesIO()
+    seen_names: dict[str, int] = {}
+    try:
+        with ZipFile(zip_buffer, mode="w", compression=ZIP_DEFLATED) as archive:
+            for row in archive_rows:
+                file_bytes = get_object_bytes(object_key=str(row["file_path"]))
+                archive_name = _archive_entry_name(
+                    base_name=str(row["name"] or "document"),
+                    original_file_name=str(row["file_name"] or "document"),
+                    seen_names=seen_names,
+                )
+                archive.writestr(archive_name, file_bytes)
+                log_document_access(
+                    db,
+                    document_id=row["id"],
+                    user_id=auth.user_id,
+                    action="download",
+                    ip_address=request.client.host if request.client else None,
+                    user_agent=request.headers.get("user-agent"),
+                )
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    db.commit()
+
+    archive_file_name = f"{_sanitize_file_name(case.case_number)}-documents.zip"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{archive_file_name}"',
+    }
+    return Response(content=zip_buffer.getvalue(), media_type="application/zip", headers=headers)

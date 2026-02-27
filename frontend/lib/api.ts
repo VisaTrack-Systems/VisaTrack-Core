@@ -234,6 +234,9 @@ export type CaseWorkspace = {
       due_date: string | null;
       uploaded_at: string | null;
       instructions: string | null;
+      file_name: string | null;
+      latest_case_document_id: string | null;
+      can_download: boolean;
     }>;
   }>;
   documents: Array<{
@@ -244,6 +247,9 @@ export type CaseWorkspace = {
     due_date: string | null;
     uploaded_at: string | null;
     instructions: string | null;
+    file_name: string | null;
+    latest_case_document_id: string | null;
+    can_download: boolean;
   }>;
   milestones: Array<{
     id: string;
@@ -382,6 +388,39 @@ export type CaseDocumentRenameResponse = {
   name: string;
 };
 
+export type CaseDocumentUploadInitiateInput = {
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+};
+
+export type CaseDocumentUploadInitiateResponse = {
+  document_id: string;
+  upload_url: string;
+  upload_headers: Record<string, string>;
+  storage_key: string;
+  expires_in_seconds: number;
+  max_upload_bytes: number;
+};
+
+export type CaseDocumentUploadCompleteInput = {
+  storage_key: string;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  file_hash?: string | null;
+  issue_date?: string | null;
+  expiry_date?: string | null;
+};
+
+export type CaseDocumentDownloadResponse = {
+  document_id: string;
+  case_document_id: string;
+  file_name: string;
+  download_url: string;
+  expires_in_seconds: number;
+};
+
 export type AuthLoginInput = {
   organization_slug: string;
   email: string;
@@ -439,6 +478,11 @@ let inMemoryAccessToken: string | null = null;
 
 type RequestOptions = {
   includeAuth?: boolean;
+};
+
+type BlobResponse = {
+  blob: Blob;
+  filename: string | null;
 };
 
 function readStoredAccessToken(): string | null {
@@ -538,6 +582,40 @@ async function requestVoid(
     const detail = await parseErrorDetail(response);
     throw new Error(`Request failed: ${response.status}${detail}`);
   }
+}
+
+async function requestBlob(
+  path: string,
+  init: RequestInit = {},
+  options: RequestOptions = { includeAuth: true }
+): Promise<BlobResponse> {
+  const headers = new Headers(init.headers);
+
+  if (options.includeAuth !== false) {
+    const token = readStoredAccessToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers,
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const detail = await parseErrorDetail(response);
+    throw new Error(`Request failed: ${response.status}${detail}`);
+  }
+
+  const disposition = response.headers.get('Content-Disposition');
+  const filenameMatch = disposition?.match(/filename="([^"]+)"/i);
+
+  return {
+    blob: await response.blob(),
+    filename: filenameMatch?.[1] ?? null,
+  };
 }
 
 export async function login(input: AuthLoginInput): Promise<AuthTokenResponse> {
@@ -817,5 +895,50 @@ export async function updateCaseDocumentStatus(
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }
+  );
+}
+
+export async function initiateCaseDocumentUpload(
+  caseNumber: string,
+  documentId: string,
+  payload: CaseDocumentUploadInitiateInput
+): Promise<CaseDocumentUploadInitiateResponse> {
+  return requestJson<CaseDocumentUploadInitiateResponse>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/upload-initiate`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function completeCaseDocumentUpload(
+  caseNumber: string,
+  documentId: string,
+  payload: CaseDocumentUploadCompleteInput
+): Promise<CaseWorkspace['documents'][number]> {
+  return requestJson<CaseWorkspace['documents'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/upload-complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function getCaseDocumentDownloadUrl(
+  caseNumber: string,
+  documentId: string
+): Promise<CaseDocumentDownloadResponse> {
+  return requestJson<CaseDocumentDownloadResponse>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/download-url`
+  );
+}
+
+export async function downloadCaseDocumentsArchive(
+  caseNumber: string
+): Promise<BlobResponse> {
+  return requestBlob(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/download-all`
   );
 }

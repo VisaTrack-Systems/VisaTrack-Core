@@ -6,7 +6,9 @@ import {
   createCaseCustomDocumentSuite,
   deleteCaseDocument,
   deleteCaseMilestone,
+  downloadCaseDocumentsArchive,
   type CaseDocumentStatus,
+  getCaseDocumentDownloadUrl,
   type CasePortalPermissions,
   type CaseWorkspace,
   renameCaseDocument,
@@ -115,6 +117,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [sendingDocumentReminderId, setSendingDocumentReminderId] = useState<string | null>(null);
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+  const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
   const [updatingDocumentId, setUpdatingDocumentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -419,26 +422,23 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return;
     }
 
-    const snapshot = workspace.documents.map((document) => ({
-      name: document.name,
-      status: document.status,
-      required: document.required,
-      due_date: document.due_date,
-      uploaded_at: document.uploaded_at,
-      instructions: document.instructions,
-    }));
-
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${workspace.case.case_number}-documents.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    window.URL.revokeObjectURL(url);
-
-    showNotice('success', 'Document snapshot downloaded.');
+    void (async () => {
+      try {
+        const response = await downloadCaseDocumentsArchive(workspace.case.case_number);
+        const url = window.URL.createObjectURL(response.blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = response.filename ?? `${workspace.case.case_number}-documents.zip`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        window.URL.revokeObjectURL(url);
+        showNotice('success', 'Downloaded case documents archive.');
+      } catch (downloadError) {
+        const message = downloadError instanceof Error ? downloadError.message : 'Unknown error';
+        showNotice('error', `Failed to download archive: ${message}`);
+      }
+    })();
   };
 
   const handleRenameDocument = async (documentId: string, name: string): Promise<boolean> => {
@@ -458,6 +458,30 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return false;
     } finally {
       setRenamingDocumentId(null);
+    }
+  };
+
+  const handleDownloadDocument = async (documentId: string): Promise<void> => {
+    if (!workspace) {
+      return;
+    }
+
+    const targetDocument = workspace.documents.find((document) => document.id === documentId);
+    if (!targetDocument?.can_download) {
+      showNotice('info', 'No uploaded file is available for this document yet.');
+      return;
+    }
+
+    setDownloadingDocumentId(documentId);
+    try {
+      const response = await getCaseDocumentDownloadUrl(workspace.case.case_number, documentId);
+      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+      showNotice('success', `Opened ${response.file_name}.`);
+    } catch (downloadError) {
+      const message = downloadError instanceof Error ? downloadError.message : 'Unknown error';
+      showNotice('error', `Failed to open document: ${message}`);
+    } finally {
+      setDownloadingDocumentId(null);
     }
   };
 
@@ -752,6 +776,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onDownloadAll={handleDownloadAllDocuments}
           onRenameDocument={handleRenameDocument}
           renamingDocumentId={renamingDocumentId}
+          onDownloadDocument={handleDownloadDocument}
+          downloadingDocumentId={downloadingDocumentId}
           onUpdateDocumentStatus={handleUpdateDocumentStatus}
           updatingDocumentId={updatingDocumentId}
           onSendDocumentReminder={handleSendDocumentReminder}

@@ -67,6 +67,43 @@ def log_activity(
     )
 
 
+def log_document_access(
+    db: Session,
+    *,
+    document_id: UUID,
+    user_id: Optional[UUID],
+    action: str,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO document_access_log (
+                document_id,
+                user_id,
+                action,
+                ip_address,
+                user_agent
+            ) VALUES (
+                :document_id,
+                :user_id,
+                :action,
+                CAST(:ip_address AS inet),
+                :user_agent
+            )
+            """
+        ),
+        {
+            "document_id": str(document_id),
+            "user_id": str(user_id) if user_id else None,
+            "action": action,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+        },
+    )
+
+
 def _json_or_none(value: Optional[dict[str, Any]]) -> Optional[str]:
     if value is None:
         return None
