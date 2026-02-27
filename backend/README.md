@@ -26,7 +26,8 @@ The backend is responsible for:
 
 - `app/main.py` - FastAPI application entry point
 - `app/api/` - API route definitions
-- `app/models/` - Database models
+- `app/models/` - Database models (place your `SQLAlchemy` models
+  here; a simple `Test` model is included as a starting point)
 - `app/schemas/` - Pydantic request/response schemas
 - `app/services/` - Business logic layer
 - `app/db/` - Database session and base configuration
@@ -37,9 +38,18 @@ The backend is responsible for:
 ## Running the Backend Locally
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+cd backend/
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+
+# configure your database URL (copy example and edit credentials)
+# e.g. from project root: `cp ../.env.example ../.env`
+# the dev script and Alembic will load this file automatically.  The
+# script will also verify that the URL is well-formed and attempt a
+# quick connection before running migrations, so errors are raised
+# early with a concise message.
+
 uvicorn app.main:app --reload
 ```
 

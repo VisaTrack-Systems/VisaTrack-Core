@@ -4,6 +4,7 @@ node_modules/
 
 # Python
 venv/
+backend/.venv/
 __pycache__/
 
 # Env

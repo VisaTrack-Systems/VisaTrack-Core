@@ -1,6 +1,19 @@
 from app.db.base import Base
 from logging.config import fileConfig
 
+# load environment variables (including DATABASE_URL) so Alembic can
+# connect to the same database as the application.  This mirrors the
+# behavior in `app/main.py` and allows running migrations from the
+# dev script without extra configuration.  We'll look for a .env file
+# at the repository root (two levels up from this file).
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+
+repo_root = Path(__file__).resolve().parent.parent.parent
+dotenv_path = repo_root / ".env"
+load_dotenv(dotenv_path=dotenv_path)
+
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
@@ -9,6 +22,23 @@ from alembic import context
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# override the URL from the .ini file if DATABASE_URL is set. alembic
+# uses `sqlalchemy.url` from the config during migrations, so we update
+# it here after loading env variables.
+env_url = os.getenv("DATABASE_URL")
+if env_url:
+    config.set_main_option("sqlalchemy.url", env_url)
+else:
+    # warn if we're still using the hard-coded value, as running migrations
+    # without a proper URL usually means the developer forgot to configure
+    # their environment.
+    import logging
+
+    logging.getLogger("alembic.env").warning(
+        "DATABASE_URL not set; using url from alembic.ini. "
+        "set DATABASE_URL to avoid connection errors."
+    )
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
