@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+
+from app.api.routes import auth
+from app.schemas.auth import AcceptInvitationRequest, ChangePasswordRequest, LoginRequest, UpdateCurrentUserSettingsRequest
+from tests.support import FakeResult, row
+
+
+def test_auth_helpers_normalize_and_detect_onboarding(make_user):
+    user = make_user()
+    db = MagicMock()
+    db.scalar.return_value = None
+
+    assert auth._normalize_email(' USER@EXAMPLE.COM ') == 'user@example.com'
+    assert auth._lawyer_onboarding_required(db, user, ['lawyer']) is True
+
+
+def test_login_rejects_locked_account(monkeypatch, make_user):
+    organization = row(id=uuid4(), slug='acme')
+    user = make_user(organization_id=organization.id, locked_until=datetime.now(timezone.utc) + timedelta(minutes=5))
+    db = MagicMock()
+    db.scalar.side_effect = [organization, user]
+
+    with pytest.raises(HTTPException) as exc:
+        auth.login(payload=row(organization_slug='acme', email='user@example.com', password='secret'), db=db)
+
+    assert exc.value.status_code == 423
+
+
+def test_login_invalid_password_increments_attempts(monkeypatch, make_user):
+    organization = row(id=uuid4(), slug='acme')
+    user = make_user(organization_id=organization.id, login_attempts=1)
+    db = MagicMock()
+    db.scalar.side_effect = [organization, user]
+    monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: False)
+
+    with pytest.raises(HTTPException) as exc:
+        auth.login(payload=row(organization_slug='acme', email='user@example.com', password='bad'), db=db)
+
+    assert exc.value.status_code == 401
+    assert user.login_attempts == 2
+    db.commit.assert_called_once()
+
+
+def test_me_returns_current_user_payload(monkeypatch, make_auth_context):
+    auth_context = make_auth_context(roles=['lawyer'])
+    db = MagicMock()
+    monkeypatch.setattr(auth, '_lawyer_onboarding_required', lambda db, user, roles: True)
+
+    result = auth.me(auth=auth_context, db=db)
+
+    assert result.email == auth_context.user.email
+    assert result.onboarding_required is True
+
+
+def test_update_me_settings_rejects_duplicate_email(make_auth_context):
+    auth_context = make_auth_context()
+    db = MagicMock()
+    db.scalar.return_value = uuid4()
+    payload = row(email='taken@example.com', first_name=None, last_name=None, phone=None, avatar_url=None, mfa_enabled=None, timezone=None, locale=None)
+
+    with pytest.raises(HTTPException) as exc:
+        auth.update_me_settings(payload=payload, auth=auth_context, db=db)
+
+    assert exc.value.status_code == 409
+
+
+def test_login_success_returns_access_token(monkeypatch, make_user):
+    organization = row(id=uuid4(), slug='acme')
+    user = make_user(organization_id=organization.id, status='active')
+    db = MagicMock()
+    db.scalar.side_effect = [organization, user]
+    db.execute.return_value = FakeResult(rows=['lawyer'])
+    monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: True)
+    monkeypatch.setattr(auth, 'create_access_token', lambda user_id, org_id, roles: 'token-123')
+
+    result = auth.login(
+        payload=LoginRequest(organization_slug='acme', email='user@example.com', password='secret'),
+        db=db,
+    )
+
+    assert result.access_token == 'token-123'
+    assert user.login_attempts == 0
+    db.commit.assert_called_once()
+
+
+def test_me_settings_returns_current_user_settings(make_auth_context):
+    auth_context = make_auth_context()
+
+    result = auth.me_settings(auth=auth_context)
+
+    assert result.email == auth_context.user.email
+    assert result.timezone == auth_context.user.timezone
+
+
+def test_update_me_settings_updates_fields_and_clears_mfa_secret(monkeypatch, make_auth_context):
+    auth_context = make_auth_context()
+    auth_context.user.mfa_secret = 'secret'
+    db = MagicMock()
+    db.scalar.return_value = None
+    db.refresh.side_effect = lambda obj: None
+    monkeypatch.setattr(auth, 'log_activity', lambda *args, **kwargs: None)
+
+    result = auth.update_me_settings(
+        payload=UpdateCurrentUserSettingsRequest(
+            email='updated@example.com',
+            first_name='Updated',
+            last_name='User',
+            phone='555-0100',
+            avatar_url='https://example.com/a.png',
+            mfa_enabled=False,
+            timezone='America/Vancouver',
+            locale='fr-CA',
+        ),
+        auth=auth_context,
+        db=db,
+    )
+
+    assert result.email == 'updated@example.com'
+    assert auth_context.user.mfa_secret is None
+    db.commit.assert_called_once()
+
+
+def test_change_password_updates_hash(monkeypatch, make_auth_context):
+    auth_context = make_auth_context()
+    db = MagicMock()
+    monkeypatch.setattr(auth, 'verify_password', lambda current, stored: True)
+    monkeypatch.setattr(auth, 'hash_password', lambda password: f'hashed:{password}')
+
+    auth.change_password(
+        payload=ChangePasswordRequest(current_password='old-password', new_password='NewPassword123'),
+        auth=auth_context,
+        db=db,
+    )
+
+    assert auth_context.user.password_hash == 'hashed:NewPassword123'
+    db.commit.assert_called_once()
+
+
+def test_accept_invitation_activates_user_and_creates_profile(monkeypatch, make_user):
+    invitation = row(
+        organization_id=uuid4(),
+        user_id=uuid4(),
+        role_slug='client',
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        accepted_at=None,
+        revoked_at=None,
+    )
+    user = make_user(id=invitation.user_id, organization_id=invitation.organization_id, status='invited')
+    db = MagicMock()
+    db.scalar.side_effect = [invitation, user, None]
+    monkeypatch.setattr(auth, 'hash_invitation_token', lambda token: 'token-hash')
+    monkeypatch.setattr(auth, 'hash_password', lambda password: 'hashed-password')
+
+    result = auth.accept_invitation(
+        payload=AcceptInvitationRequest(token='a' * 16, password='Password123'),
+        db=db,
+    )
+
+    assert result.email == user.email
+    assert user.status == 'active'
+    db.commit.assert_called_once()
