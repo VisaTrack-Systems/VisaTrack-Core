@@ -2,5 +2,15 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-# 👇 IMPORTANT: import all models here
-from app.models import test
+# Import model modules so Alembic can discover metadata.
+from app.models import (  # noqa: F401,E402
+    case,
+    case_client,
+    milestone,
+    organization,
+    role,
+    user,
+    user_invitation,
+    user_profile,
+    user_role,
+)
