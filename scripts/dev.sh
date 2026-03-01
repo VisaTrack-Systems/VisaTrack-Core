@@ -3,118 +3,220 @@
 # exit on any error, undefined variable, or pipeline failure
 set -euo pipefail
 
-echo "🚀 Starting VisaTrack local development environment..."
+echo "Starting VisaTrack local development environment..."
 
 # Resolve project root from this script's location so it works from any cwd.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LOG_DIR="${PROJECT_ROOT}/.logs"
 
-# ---- Start PostgreSQL ----
-echo "🗄️  Ensuring PostgreSQL is running..."
-brew services start postgresql >/dev/null 2>&1 || true
-
-# ---- Backend ----
-echo "🐍 Starting backend..."
-cd "${PROJECT_ROOT}/backend" || exit
-
-# create virtual environment and install dependencies if needed
-if [ ! -d ".venv" ]; then
-  echo "⚙️  Creating Python virtual environment and installing dependencies..."
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install --upgrade pip
-  pip install -r requirements.txt
-  # install dev requirements too so tests/migrations work
-  if [ -f requirements-dev.txt ]; then
-    pip install -r requirements-dev.txt
+find_python() {
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return
   fi
-else
-  source .venv/bin/activate
+
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return
+  fi
+
+  echo "Python is not installed or not on PATH."
+  exit 1
+}
+
+activate_venv() {
+  if [ -f ".venv/bin/activate" ]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+    return
+  fi
+
+  if [ -f ".venv/Scripts/activate" ]; then
+    # shellcheck disable=SC1091
+    source .venv/Scripts/activate
+    return
+  fi
+
+  echo "Could not locate the backend virtualenv activation script."
+  exit 1
+}
+
+resolve_backend_python() {
+  if [ -x ".venv/bin/python" ]; then
+    printf '%s\n' ".venv/bin/python"
+    return
+  fi
+
+  if [ -x ".venv/Scripts/python.exe" ]; then
+    printf '%s\n' ".venv/Scripts/python.exe"
+    return
+  fi
+
+  echo "Could not locate the backend Python executable."
+  exit 1
+}
+
+extract_db_host() {
+  local db_url="$1"
+  printf '%s' "$db_url" | sed -E 's#^postgresql://[^@]+@\[?([^]/:]+)\]?:[0-9]+/.*#\1#'
+}
+
+ensure_local_postgres() {
+  echo "Ensuring PostgreSQL is running..."
+
+  if command -v brew >/dev/null 2>&1; then
+    brew services start postgresql >/dev/null 2>&1 || true
+    return
+  fi
+
+  if command -v psql >/dev/null 2>&1; then
+    echo "Local PostgreSQL startup is not automated on this platform. Ensure the PostgreSQL service is already running."
+    return
+  fi
+
+  echo "Local PostgreSQL tooling was not found. If you intend to use a local database, start PostgreSQL manually before continuing."
+}
+
+if [ ! -f "${PROJECT_ROOT}/.env" ] && [ -f "${PROJECT_ROOT}/.env.example" ]; then
+  echo ".env not found; copying from .env.example."
+  cp "${PROJECT_ROOT}/.env.example" "${PROJECT_ROOT}/.env"
 fi
 
-echo "🐍 Backend venv ready"
-# extend PYTHONPATH safely (empty if unset)
-export PYTHONPATH="${PYTHONPATH:-}:."
-
-# ensure there is an .env file (copy example automatically)
-if [ ! -f "../.env" ] && [ -f "../.env.example" ]; then
-  echo "⚠️  .env not found; copying from .env.example."
-  echo "    Please review and update credentials before running again."
-  cp ../.env.example ../.env
-fi
-if [ -f "../.env" ]; then
+if [ -f "${PROJECT_ROOT}/.env" ]; then
   # shellcheck disable=SC1090
   set -a
-  source ../.env
+  source "${PROJECT_ROOT}/.env"
   set +a
 fi
 
-# ensure DATABASE_URL is configured so alembic can connect
-if [ -z "$DATABASE_URL" ]; then
-  echo "❌ DATABASE_URL is not set. Copy .env.example to .env and fill in your credentials."
+mkdir -p "${LOG_DIR}"
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "DATABASE_URL is not set. Copy .env.example to .env and fill in your credentials."
   exit 1
 fi
 
-# basic validation: require user, password, host, port, and database name
-# a valid example is postgresql://user:password@host:5432/dbname
 if ! echo "$DATABASE_URL" | grep -qE '^postgresql://[^:]+:[^@]+@[^:]+:[0-9]+/.+'; then
-  echo "❌ DATABASE_URL appears to be malformed: $DATABASE_URL"
-  echo "   Expected format: postgresql://user:password@host:port/dbname"
+  echo "DATABASE_URL appears to be malformed: $DATABASE_URL"
+  echo "Expected format: postgresql://user:password@host:port/dbname"
   exit 1
 fi
 
-# try to make a quick connection and report a clean error if it fails
-if ! python - <<'PYCODE'
-import os, sys
+DB_HOST="$(extract_db_host "$DATABASE_URL")"
+case "$DB_HOST" in
+  localhost|127.0.0.1|::1)
+    ensure_local_postgres
+    ;;
+  *)
+    echo "Using remote PostgreSQL at ${DB_HOST}; skipping local PostgreSQL startup."
+    ;;
+esac
+
+echo "Starting backend..."
+cd "${PROJECT_ROOT}/backend" || exit
+
+if [ ! -d ".venv" ]; then
+  echo "Creating Python virtual environment and installing dependencies..."
+  PYTHON_BIN="$(find_python)"
+  "$PYTHON_BIN" -m venv .venv
+  activate_venv
+  BACKEND_PYTHON="$(resolve_backend_python)"
+  "$BACKEND_PYTHON" -m pip install --upgrade pip
+  "$BACKEND_PYTHON" -m pip install -r requirements.txt
+  if [ -f requirements-dev.txt ]; then
+    "$BACKEND_PYTHON" -m pip install -r requirements-dev.txt
+  fi
+else
+  activate_venv
+fi
+
+echo "Backend venv ready"
+BACKEND_PYTHON="${BACKEND_PYTHON:-$(resolve_backend_python)}"
+export PYTHONPATH="${PYTHONPATH:-}:."
+
+if ! "$BACKEND_PYTHON" - <<'PYCODE'
+import os
+import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
+repo_root = Path.cwd().parent
+load_dotenv(repo_root / ".env")
 url = os.getenv("DATABASE_URL")
+
 try:
     engine = create_engine(url)
     with engine.connect():
         pass
 except OperationalError as e:
-    print("❌ Failed to connect to database:", e.orig)
+    print("Failed to connect to database:", e.orig)
     sys.exit(1)
 except Exception as e:
-    print("❌ Error validating DATABASE_URL:", e)
+    print("Error validating DATABASE_URL:", e)
     sys.exit(1)
 PYCODE
 then
   exit 1
 fi
 
-alembic upgrade head
-uvicorn app.main:app --reload &
+"$BACKEND_PYTHON" -m alembic upgrade head
+BACKEND_LOG="${LOG_DIR}/backend-dev.log"
+FRONTEND_LOG="${LOG_DIR}/frontend-dev.log"
 
+"$BACKEND_PYTHON" -m uvicorn app.main:app --reload >"${BACKEND_LOG}" 2>&1 &
 BACKEND_PID=$!
 
-# ---- Frontend ----
-echo "🌐 Preparing frontend..."
+echo "Waiting for backend to become healthy..."
+if ! "$BACKEND_PYTHON" - <<'PYCODE'
+import sys
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+
+deadline = time.time() + 30
+url = "http://127.0.0.1:8000/health"
+
+while time.time() < deadline:
+    try:
+        with urlopen(url, timeout=2) as response:
+            if response.status == 200:
+                sys.exit(0)
+    except URLError:
+        time.sleep(1)
+
+print("Backend did not become healthy within 30 seconds.")
+sys.exit(1)
+PYCODE
+then
+  echo "Backend log:"
+  tail -n 50 "${BACKEND_LOG}" || true
+  kill "${BACKEND_PID}" >/dev/null 2>&1 || true
+  exit 1
+fi
+
+echo "Preparing frontend..."
 cd "${PROJECT_ROOT}/frontend" || exit
 
-# install node dependencies if necessary
 if [ ! -d "node_modules" ]; then
-  echo "📦 Installing frontend dependencies..."
+  echo "Installing frontend dependencies..."
   npm install
 fi
 
-# Avoid stale Next.js/Turbopack artifacts on first load in local dev.
 rm -rf .next
 
-echo "🌐 Frontend ready, launching..."
-npm run dev &
-
+echo "Frontend ready, launching..."
+npm run dev >"${FRONTEND_LOG}" 2>&1 &
 FRONTEND_PID=$!
 
-# ---- Info ----
-echo "✅ VisaTrack is running"
-echo "   Backend:  http://localhost:8000"
-echo "   Frontend: http://localhost:3000"
+echo "VisaTrack is running"
+echo "Backend:  http://localhost:8000"
+echo "Frontend: http://localhost:3000"
 echo ""
 echo "Press CTRL+C to stop all services"
 
-# ---- Graceful shutdown ----
 trap "kill $BACKEND_PID $FRONTEND_PID" SIGINT
 wait
