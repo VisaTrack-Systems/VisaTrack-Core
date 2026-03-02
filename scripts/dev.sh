@@ -116,19 +116,24 @@ esac
 echo "Starting backend..."
 cd "${PROJECT_ROOT}/backend" || exit
 
+# 1. Create venv if it doesn't exist
 if [ ! -d ".venv" ]; then
-  echo "Creating Python virtual environment and installing dependencies..."
+  echo "Creating Python virtual environment..."
   PYTHON_BIN="$(find_python)"
   "$PYTHON_BIN" -m venv .venv
-  activate_venv
-  BACKEND_PYTHON="$(resolve_backend_python)"
-  "$BACKEND_PYTHON" -m pip install --upgrade pip
-  "$BACKEND_PYTHON" -m pip install -r requirements.txt
-  if [ -f requirements-dev.txt ]; then
-    "$BACKEND_PYTHON" -m pip install -r requirements-dev.txt
-  fi
-else
-  activate_venv
+fi
+
+# 2. Always activate the venv
+activate_venv
+BACKEND_PYTHON="$(resolve_backend_python)"
+
+# 3. Always sync dependencies (even if venv existed)
+echo "Syncing backend dependencies..."
+"$BACKEND_PYTHON" -m pip install --upgrade pip --quiet
+"$BACKEND_PYTHON" -m pip install -r requirements.txt
+
+if [ -f requirements-dev.txt ]; then
+  "$BACKEND_PYTHON" -m pip install -r requirements-dev.txt
 fi
 
 echo "Backend venv ready"
