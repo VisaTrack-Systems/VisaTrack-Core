@@ -130,10 +130,10 @@ BACKEND_PYTHON="$(resolve_backend_python)"
 # 3. Always sync dependencies (even if venv existed)
 echo "Syncing backend dependencies..."
 "$BACKEND_PYTHON" -m pip install --upgrade pip --quiet
-"$BACKEND_PYTHON" -m pip install -r requirements.txt
+"$BACKEND_PYTHON" -m pip install --quiet -r requirements.txt
 
 if [ -f requirements-dev.txt ]; then
-  "$BACKEND_PYTHON" -m pip install -r requirements-dev.txt
+  "$BACKEND_PYTHON" -m pip install --quiet -r requirements-dev.txt
 fi
 
 echo "Backend venv ready"
@@ -206,11 +206,17 @@ fi
 echo "Preparing frontend..."
 cd "${PROJECT_ROOT}/frontend" || exit
 
-if [ ! -d "node_modules" ]; then
-  echo "Installing frontend dependencies..."
-  npm install
+# 1. Ensure node_modules exists and is up to date
+echo "Syncing frontend dependencies..."
+if [ -f "package-lock.json" ]; then
+  # npm ci is faster and cleaner for dev environments with a lockfile
+  npm install --silent
+else
+  npm install --silent
 fi
 
+# 2. Clean up previous build artifacts
+echo "Cleaning build cache..."
 rm -rf .next
 
 echo "Frontend ready, launching..."
