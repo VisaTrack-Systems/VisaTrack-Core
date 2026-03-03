@@ -8,7 +8,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
@@ -16,6 +16,16 @@ from app.db.deps import get_db
 from app.models.role import Role
 from app.models.user import User
 from app.models.user_role import UserRole
+
+# RLS: session variables set per-request (Phase 2 pattern).
+# app.org_id / app.user_id / app.role drive tenant + client/lawyer policies.
+# Super-admin can bypass with app.bypass_rls = true.
+RLS_ORG_ID_VAR = "app.org_id"
+RLS_USER_ID_VAR = "app.user_id"
+RLS_ROLE_VAR = "app.role"
+RLS_BYPASS_VAR = "app.bypass_rls"
+# Legacy name (downgraded RLS migration may still reference this)
+RLS_LEGACY_ORG_VAR = "app.current_organization_id"
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -93,6 +103,36 @@ def get_auth_context(
     # treat it as full access (DB should still be source of truth).
     if "super_admin" in normalized_roles:
         permissions.add("*")
+
+    # Set RLS session variables (Phase 2: app.org_id, app.user_id, app.role, app.bypass_rls).
+    # set_config(..., true) = transaction-local; resets at commit/rollback, safe for connection pooling.
+    db.execute(
+        text("SELECT set_config(:var, :val, true)"),
+        {"var": RLS_ORG_ID_VAR, "val": str(user.organization_id)},
+    )
+    db.execute(
+        text("SELECT set_config(:var, :val, true)"),
+        {"var": RLS_USER_ID_VAR, "val": str(user.id)},
+    )
+    # Primary role for RLS policy: client > lawyer > org_admin > super_admin (most restrictive first).
+    rls_role = "client" if "client" in normalized_roles else (
+        "lawyer" if "lawyer" in normalized_roles else (
+            "org_admin" if "org_admin" in normalized_roles else "super_admin"
+        )
+    )
+    db.execute(
+        text("SELECT set_config(:var, :val, true)"),
+        {"var": RLS_ROLE_VAR, "val": rls_role},
+    )
+    db.execute(
+        text("SELECT set_config(:var, :val, true)"),
+        {"var": RLS_BYPASS_VAR, "val": "true" if "super_admin" in normalized_roles else "false"},
+    )
+    # Legacy: some environments may still use app.current_organization_id (e.g. before Phase 2 migration).
+    db.execute(
+        text("SELECT set_config(:var, :val, true)"),
+        {"var": RLS_LEGACY_ORG_VAR, "val": str(user.organization_id)},
+    )
 
     return AuthContext(
         user=user,

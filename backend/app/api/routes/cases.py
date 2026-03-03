@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import String, cast, select, text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_roles
@@ -661,6 +662,7 @@ def create_case(
     db.flush()
     db.add(
         CaseClient(
+            organization_id=new_case.organization_id,
             case_id=new_case.id,
             client_user_id=payload.client_id,
             relationship_type="primary",
@@ -951,6 +953,7 @@ def create_case_milestone(
         text(
             """
             INSERT INTO milestones (
+                organization_id,
                 case_id,
                 name,
                 description,
@@ -966,6 +969,7 @@ def create_case_milestone(
                 updated_at
             )
             VALUES (
+                :organization_id,
                 :case_id,
                 :name,
                 :description,
@@ -993,6 +997,7 @@ def create_case_milestone(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "name": name,
             "description": (payload.description or "").strip() or None,
@@ -1255,6 +1260,7 @@ def create_case_message(
         text(
             """
             INSERT INTO messages (
+                organization_id,
                 case_id,
                 sender_id,
                 recipient_id,
@@ -1267,6 +1273,7 @@ def create_case_message(
                 updated_at
             )
             VALUES (
+                :organization_id,
                 :case_id,
                 :sender_id,
                 :recipient_id,
@@ -1282,6 +1289,7 @@ def create_case_message(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "sender_id": str(auth.user_id),
             "recipient_id": str(case.client_id),
@@ -2246,6 +2254,37 @@ def delete_case_document(
     custom_documents = [doc for doc in custom_documents if doc["id"] != str(document_uuid)]
     removed_custom_document = len(custom_documents) != previous_count
 
+    # Enforce retention/legal hold: block soft-delete if document is under legal_hold or before retain_until
+    try:
+        doc_row = db.execute(
+            text(
+                """
+                SELECT id, legal_hold, retain_until
+                FROM case_documents
+                WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
+                """
+            ),
+            {"document_id": str(document_uuid), "case_id": str(case.id)},
+        ).first()
+    except ProgrammingError as e:
+        if "does not exist" in str(e).lower() or "undefined_column" in str(e).lower():
+            doc_row = None
+        else:
+            raise
+    if doc_row is not None:
+        legal_hold = getattr(doc_row, "legal_hold", None)
+        retain_until = getattr(doc_row, "retain_until", None)
+        if legal_hold:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Document is under legal hold and cannot be deleted",
+            )
+        if retain_until is not None and retain_until > date.today():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Document cannot be deleted before retention date {retain_until.isoformat()}",
+            )
+
     removed_case_document = db.execute(
         text(
             """
@@ -2340,19 +2379,21 @@ def update_case_document_status(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid document id") from exc
 
-    case_document_exists = db.execute(
+    case_document_row = db.execute(
         text(
             """
-            SELECT 1
+            SELECT id
             FROM case_documents
-            WHERE id = :document_id
-              AND case_id = :case_id
+            WHERE case_id = :case_id
+              AND (id = :document_id OR template_id = :document_id)
               AND deleted_at IS NULL
+            ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
             LIMIT 1
             """
         ),
         {"document_id": str(document_uuid), "case_id": str(case.id)},
-    ).first()
+    ).mappings().first()
+    case_document_exists = case_document_row is not None
 
     template_exists = db.execute(
         text(
@@ -2408,6 +2449,20 @@ def update_case_document_status(
         case.custom_fields = {**custom_fields, "document_status_overrides": status_overrides}
 
     db.add(case)
+
+    # document_access_log required for approve/reject (Phase 3)
+    if case_document_row and normalized_status in ("approved", "rejected"):
+        doc_action = "approve" if normalized_status == "approved" else "reject"
+        log_document_access(
+            db,
+            organization_id=case.organization_id,
+            document_id=UUID(case_document_row["id"]),
+            user_id=auth.user_id,
+            action=doc_action,
+            ip_address=None,
+            user_agent=None,
+        )
+
     db.commit()
 
     return CaseDocumentStatusUpdateResponse(
@@ -2516,6 +2571,7 @@ def complete_case_document_upload(
         text(
             """
             INSERT INTO case_documents (
+                organization_id,
                 case_id,
                 template_id,
                 name,
@@ -2531,6 +2587,7 @@ def complete_case_document_upload(
                 expiry_date,
                 uploaded_by
             ) VALUES (
+                :organization_id,
                 :case_id,
                 CAST(:template_id AS uuid),
                 :name,
@@ -2550,6 +2607,7 @@ def complete_case_document_upload(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "template_id": slot["template_id"],
             "name": slot["name"],
@@ -2601,6 +2659,7 @@ def complete_case_document_upload(
     )
     log_document_access(
         db,
+        organization_id=case.organization_id,
         document_id=insert_result["id"],
         user_id=auth.user_id,
         action="upload",
@@ -2659,6 +2718,7 @@ def get_case_document_download_url(
 
     log_document_access(
         db,
+        organization_id=case.organization_id,
         document_id=case_document["id"],
         user_id=auth.user_id,
         action="view",
@@ -2773,6 +2833,7 @@ def download_all_case_documents(
                 archive.writestr(archive_name, file_bytes)
                 log_document_access(
                     db,
+                    organization_id=case.organization_id,
                     document_id=row["id"],
                     user_id=auth.user_id,
                     action="download",

@@ -492,7 +492,15 @@ def test_delete_case_document_hides_document(monkeypatch, make_auth_context):
         custom_fields={'custom_documents': [{'id': document_id, 'name': 'Old Name', 'required': True}]},
     )
     db = MagicMock()
-    db.execute.side_effect = [FakeResult(rows=[]), FakeResult(rows=[])]
+    # 1) retention/legal_hold SELECT (allow delete: no hold, no future retain_until)
+    # 2) UPDATE case_documents RETURNING id
+    # 3) template_exists SELECT
+    doc_retention_row = row(id=uuid4(), legal_hold=False, retain_until=None)
+    db.execute.side_effect = [
+        FakeResult(rows=[doc_retention_row]),
+        FakeResult(rows=[row(id=document_id)]),
+        FakeResult(rows=[]),
+    ]
     monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
     monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
 
