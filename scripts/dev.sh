@@ -116,6 +116,21 @@ esac
 echo "Starting backend..."
 cd "${PROJECT_ROOT}/backend" || exit
 
+# Check if we're on a Windows filesystem in WSL (can't create venvs there)
+if [[ "$(pwd)" == /mnt/* ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  echo ""
+  echo "WARNING: You're running this script from a Windows filesystem in WSL."
+  echo "Python virtual environments cannot be created on /mnt/c due to permission restrictions."
+  echo ""
+  echo "Please choose one of these solutions:"
+  echo ""
+  echo "1. Move your project to the WSL filesystem (e.g. /home/username/visatrack) and run this script again from there"
+  echo ""
+  echo "2. Or run the dev.ps1 script from Windows PowerShell instead of WSL"
+  echo ""
+  exit 1
+fi
+
 # 1. Create venv if it doesn't exist
 if [ ! -d ".venv" ]; then
   echo "Creating Python virtual environment..."
