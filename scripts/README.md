@@ -1,39 +1,59 @@
-# Scripts - VisaTrack
+# VisaTrack Scripts
 
-This directory contains helper scripts for local development and maintenance.
+Simple setup instructions for running VisaTrack locally.
 
----
+## Windows (PowerShell)
 
-## Available Scripts
+### 1) Prerequisites
+- Install **Node.js (LTS)** (includes `npm`)
+- Install **Python 3.11+** from python.org (full installer)
 
-### `dev.sh`
+### 2) Configure environment
+From the repo root:
 
-Bootstraps and runs the full local development environment.  The
-script runs in strict mode (`set -euo pipefail`), so any failure in the
-setup steps will cause it to abort before starting services.  It will
-automatically perform any one‑time setup steps before
-starting services:
+```powershell
+Copy-Item .env.example .env -ErrorAction SilentlyContinue
+```
 
-1. copy `.env.example` to `.env` if needed
-2. create & populate a Python virtualenv for the backend and install
-   both production and development requirements
-3. install Node dependencies for the frontend if `node_modules` is
-   missing
+Edit `.env` and set your `DATABASE_URL`.
 
-Once the environment is prepared it launches:
+### 3) Start everything
+From the repo root:
 
-- PostgreSQL (via `brew services`)
-- Backend API (FastAPI/uvicorn)
-- Frontend web app (Next.js)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
+```
+
+The script will:
+- prepare backend virtual environment + dependencies
+- run database migrations
+- start backend on http://localhost:8000
+- start frontend on http://localhost:3000
+
+Stop services with `Ctrl+C`.
+
+## Unix / macOS (bash or zsh)
+
+### 1) Prerequisites
+- Install **Node.js (LTS)** (includes `npm`)
+- Install **Python 3.11+**
+
+### 2) Configure environment
+From the repo root:
 
 ```bash
+cp -n .env.example .env
+```
+
+Edit `.env` and set your `DATABASE_URL`.
+
+### 3) Start everything
+From the repo root:
+
+```bash
+chmod +x ./scripts/dev.sh
 ./scripts/dev.sh
 ```
 
----
-
-## Notes
-
-- Scripts are intended for developer convenience
-- They assume required dependencies are already installed
-- Scripts should not contain secrets or environment-specific credentials
+The script prepares dependencies, runs migrations, and launches backend + frontend.
+Stop services with `Ctrl+C`.
