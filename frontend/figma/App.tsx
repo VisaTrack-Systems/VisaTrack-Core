@@ -159,8 +159,8 @@ export default function App() {
     setCurrentView('case-config');
   };
 
-  const handleBackToCases = () => {
-    setCurrentView('active-cases');
+  const handleBackToDashboard = () => {
+    setCurrentView('lawyer');
     setSelectedCaseId(null);
   };
 
@@ -342,18 +342,35 @@ export default function App() {
       {renderDashboardHeader()}
 
       {currentView === 'lawyer' ? (
-        <LawyerDashboard onViewActiveCases={handleViewActiveCases} onCreateCase={handleOpenNewCaseDialog} />
+        <LawyerDashboard
+          onViewActiveCases={handleViewActiveCases}
+          onSelectCase={handleSelectCase}
+          onCreateCase={handleOpenNewCaseDialog}
+          onAddClient={handleOpenNewCaseDialog}
+          onViewMessages={handleViewActiveCases}
+          onScheduleAppointment={handleViewActiveCases}
+          lawyerName={currentUser?.full_name}
+        />
       ) : null}
 
       {currentView === 'active-cases' ? (
-        <ActiveCases onSelectCase={handleSelectCase} />
+        <ActiveCases onSelectCase={handleSelectCase} onBack={handleBackToDashboard} />
       ) : null}
 
       {currentView === 'case-config' ? (
         selectedCaseId ? (
-          <CaseConfiguration caseId={selectedCaseId} onBack={handleBackToCases} />
+          <CaseConfiguration caseId={selectedCaseId} onBack={handleBackToDashboard} />
         ) : (
-          <div className="min-h-screen bg-gray-50 p-10 text-gray-600">Select a case first.</div>
+          <div className="min-h-screen bg-gray-50 p-10 text-gray-600">
+            <p className="mb-4">Select a case first.</p>
+            <button
+              onClick={handleBackToDashboard}
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+              type="button"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         )
       ) : null}
 
