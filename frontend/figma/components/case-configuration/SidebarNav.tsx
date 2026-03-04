@@ -43,7 +43,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm">Back to Cases</span>
+          <span className="text-sm">Back to Dashboard</span>
         </button>
         <div>
           <h2 className="font-semibold text-gray-900">{workspace?.case.client_name ?? 'Loading...'}</h2>

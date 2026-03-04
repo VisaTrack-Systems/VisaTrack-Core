@@ -5,37 +5,8 @@ import { getLawyerCases } from '@/lib/api';
 import type { UiCase } from './types';
 import { completionFromStatus, relativeTime, titleize } from './utils';
 
-const fallbackCases: UiCase[] = [
-  {
-    id: 'C-2024-001',
-    clientName: 'Sarah Chen',
-    caseType: 'Express Entry',
-    status: 'Document Review',
-    priority: 'high',
-    lastActivity: '2 hours ago',
-    nextMilestone: 'Submit to IRCC',
-    nextDeadline: 'Feb 15, 2026',
-    outstandingDocs: 3,
-    outstandingPayments: 1,
-    completionPercent: 65,
-  },
-  {
-    id: 'C-2024-002',
-    clientName: 'Michael Rodriguez',
-    caseType: 'Work Permit',
-    status: 'Awaiting Client',
-    priority: 'medium',
-    lastActivity: '5 hours ago',
-    nextMilestone: 'Document Collection',
-    nextDeadline: 'Feb 20, 2026',
-    outstandingDocs: 7,
-    outstandingPayments: 0,
-    completionPercent: 30,
-  },
-];
-
 export function useActiveCasesData() {
-  const [cases, setCases] = useState<UiCase[]>(fallbackCases);
+  const [cases, setCases] = useState<UiCase[]>([]);
 
   useEffect(() => {
     let ignore = false;
@@ -43,7 +14,7 @@ export function useActiveCasesData() {
     async function loadCases() {
       try {
         const data = await getLawyerCases(100);
-        if (ignore || data.length === 0) {
+        if (ignore) {
           return;
         }
 
@@ -69,11 +40,13 @@ export function useActiveCasesData() {
           }))
         );
       } catch {
-        // Keep fallback mock data when API is unavailable.
+        if (!ignore) {
+          setCases([]);
+        }
       }
     }
 
-    loadCases();
+    void loadCases();
 
     return () => {
       ignore = true;

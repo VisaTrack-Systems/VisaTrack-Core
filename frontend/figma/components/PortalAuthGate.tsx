@@ -29,6 +29,9 @@ export function PortalAuthGate({
     if (!currentUser) {
       return false;
     }
+    if (requiredRoles.length === 0) {
+      return true;
+    }
     return requiredRoles.some((role) => currentUser.roles.includes(role));
   }, [currentUser, requiredRoles]);
 

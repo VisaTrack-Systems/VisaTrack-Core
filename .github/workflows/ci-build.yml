@@ -24,7 +24,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
 
       - name: Build frontend
         working-directory: frontend
@@ -61,8 +65,14 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Compile backend
+        working-directory: backend
+        run: |
+          source venv/bin/activate
+          python -m compileall app
+
       - name: Run backend tests
         working-directory: backend
         run: |
           source venv/bin/activate
-          pytest || test $? -eq 5
+          pytest tests -q
