@@ -38,6 +38,7 @@ export const mockCurrentUserLawyer: CurrentUser = {
   full_name: 'Avery Counsel',
   status: 'active',
   roles: ['lawyer'],
+  active_role: 'lawyer',
   onboarding_required: false,
   last_login_at: '2026-02-27T14:00:00Z',
 };
@@ -49,6 +50,7 @@ export const mockCurrentUserClient: CurrentUser = {
   full_name: 'Jordan Client',
   status: 'active',
   roles: ['client'],
+  active_role: 'client',
   onboarding_required: false,
   last_login_at: '2026-02-27T14:05:00Z',
 };
@@ -60,6 +62,7 @@ export const mockCurrentUserAdmin: CurrentUser = {
   full_name: 'Morgan Admin',
   status: 'active',
   roles: ['org_admin'],
+  active_role: 'org_admin',
   onboarding_required: false,
   last_login_at: '2026-02-27T13:45:00Z',
 };
@@ -88,6 +91,7 @@ export const mockLawyerClients: UserListItem[] = [
     status: 'active',
     organization_id: organizationId,
     created_at: '2026-02-01T12:00:00Z',
+    roles: ['client'],
   },
   {
     id: '5b8a7167-c5d2-4352-a7a0-6a1a58e4f211',
@@ -96,6 +100,7 @@ export const mockLawyerClients: UserListItem[] = [
     status: 'invited',
     organization_id: organizationId,
     created_at: '2026-02-03T10:00:00Z',
+    roles: ['client'],
   },
 ];
 
@@ -564,6 +569,7 @@ export const mockAdminUsers: UserListItem[] = [
     status: 'active',
     organization_id: organizationId,
     created_at: '2026-01-12T09:30:00Z',
+    roles: ['lawyer'],
   },
   {
     id: clientUserId,
@@ -572,6 +578,7 @@ export const mockAdminUsers: UserListItem[] = [
     status: 'active',
     organization_id: organizationId,
     created_at: '2026-01-15T11:15:00Z',
+    roles: ['client'],
   },
 ];
 

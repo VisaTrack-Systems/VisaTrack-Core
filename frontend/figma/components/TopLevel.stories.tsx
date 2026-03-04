@@ -16,6 +16,7 @@ import {
   mockCaseWorkspace,
   mockCaseWorkspaceSecondary,
   mockClientCases,
+  mockCurrentUserAdmin,
   mockCurrentUserLawyer,
   mockCurrentUserSettings,
   mockLawyerCases,
@@ -52,7 +53,7 @@ export const ActiveCasesPage: Story = {
     layout: 'fullscreen',
     mockApi: [jsonRoute('GET', '/api/v1/lawyer/cases', mockLawyerCases)],
   },
-  render: () => <ActiveCases onSelectCase={async () => {}} />,
+  render: () => <ActiveCases onSelectCase={async () => {}} onBack={() => {}} />,
 };
 
 export const AdminDashboardPage: Story = {
@@ -65,7 +66,7 @@ export const AdminDashboardPage: Story = {
       jsonRoute('GET', '/api/v1/admin/roles', mockAdminRoles),
     ],
   },
-  render: () => <AdminDashboard />,
+  render: () => <AdminDashboard currentUser={mockCurrentUserAdmin} />,
 };
 
 export const CaseConfigurationPage: Story = {
