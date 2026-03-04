@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -13,11 +14,18 @@ from app.models.case import Case
 from app.models.organization import Organization
 from app.models.role import Role
 from app.models.user import User
+from app.models.user_invitation import UserInvitation
 from app.models.user_role import UserRole
 from app.schemas.admin import (
     AdminAssignRoleRequest,
+    AdminCaseAssignmentRequest,
+    AdminCaseAssignmentResponse,
     AdminCreateOrganizationRequest,
     AdminCreateUserRequest,
+    AdminOperationsResponse,
+    AdminOpsCaseItem,
+    AdminOpsInvitationItem,
+    AdminOpsLawyerWorkloadItem,
     AdminOverviewCase,
     AdminOverviewOrganization,
     AdminOverviewResponse,
@@ -28,7 +36,7 @@ from app.schemas.admin import (
 from app.schemas.organization import OrganizationRead
 from app.schemas.user import UserListItem
 from app.services.audit import log_activity
-from app.services.rbac import assign_role_to_user
+from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -47,7 +55,12 @@ def _normalize_email(value: str) -> str:
 
 
 def _is_super_admin(auth: AuthContext) -> bool:
-    return "super_admin" in auth.roles
+    return auth.active_role == "super_admin"
+
+
+def _require_active_super_admin(auth: AuthContext) -> None:
+    if not _is_super_admin(auth):
+        raise HTTPException(status_code=403, detail="Super admin role is required for this action")
 
 
 def _require_org_scope(auth: AuthContext, organization_id: UUID) -> None:
@@ -55,6 +68,44 @@ def _require_org_scope(auth: AuthContext, organization_id: UUID) -> None:
         return
     if auth.organization_id != organization_id:
         raise HTTPException(status_code=403, detail="Cross-organization access is not allowed")
+
+
+def _list_user_roles(
+    db: Session,
+    *,
+    user_ids: list[UUID],
+) -> dict[UUID, list[str]]:
+    if not user_ids:
+        return {}
+
+    now = datetime.now(timezone.utc)
+    rows = db.execute(
+        select(UserRole.user_id, Role.slug)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(User, User.id == UserRole.user_id)
+        .where(
+            UserRole.user_id.in_(user_ids),
+            (UserRole.expires_at.is_(None) | (UserRole.expires_at > now)),
+            (Role.organization_id.is_(None) | (Role.organization_id == User.organization_id)),
+        )
+    ).all()
+
+    roles_by_user: dict[UUID, set[str]] = {user_id: set() for user_id in user_ids}
+    for row in rows:
+        roles_by_user.setdefault(row.user_id, set()).add(canonical_role_slug(str(row.slug)))
+
+    return {user_id: sorted(roles) for user_id, roles in roles_by_user.items()}
+
+
+def _is_active_case_status(value: str) -> bool:
+    return str(value).lower() not in {"approved", "refused", "withdrawn", "closed"}
+
+
+def _resolve_admin_org_scope(auth: AuthContext, organization_id: Optional[UUID]) -> UUID:
+    if not isinstance(organization_id, UUID):
+        return auth.organization_id
+    _require_org_scope(auth, organization_id)
+    return organization_id
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -192,10 +243,12 @@ def list_admin_organizations(
 @router.post("/organizations", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 def create_organization(
     payload: AdminCreateOrganizationRequest,
-    auth: AuthContext = Depends(require_permissions("*")),
+    auth: AuthContext = Depends(require_roles("super_admin")),
     db: Session = Depends(get_db),
 ) -> OrganizationRead:
-    slug = payload.slug.strip().lower() if payload.slug else _slugify(payload.name)
+    _require_active_super_admin(auth)
+
+    slug = _slugify(payload.slug)
     if not slug:
         raise HTTPException(status_code=400, detail="Invalid organization slug")
 
@@ -230,7 +283,284 @@ def create_organization(
 
     db.commit()
     db.refresh(new_org)
-    return OrganizationRead.model_validate(new_org)
+    return new_org
+
+
+@router.delete("/organizations/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_organization(
+    organization_id: UUID,
+    auth: AuthContext = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    _require_active_super_admin(auth)
+
+    organization = db.scalar(
+        select(Organization).where(Organization.id == organization_id, Organization.deleted_at.is_(None))
+    )
+    if organization is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    if organization.id == auth.organization_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your active organization")
+
+    now = datetime.now(timezone.utc)
+    organization.deleted_at = now
+    db.add(organization)
+
+    log_activity(
+        db,
+        organization_id=organization.id,
+        user_id=auth.user_id,
+        action="deleted",
+        entity_type="organization",
+        entity_id=organization.id,
+        new_values={"name": organization.name, "slug": organization.slug},
+    )
+
+    db.commit()
+
+
+@router.get("/operations", response_model=AdminOperationsResponse)
+def get_admin_operations(
+    organization_id: Optional[UUID] = Query(default=None),
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> AdminOperationsResponse:
+    scoped_org_id = _resolve_admin_org_scope(auth, organization_id)
+    now = datetime.now(timezone.utc)
+
+    primary_lawyer = aliased(User)
+    active_case_rows = db.execute(
+        select(
+            Case.id,
+            Case.case_number,
+            Case.case_type,
+            Case.status,
+            Case.priority,
+            Case.created_at,
+            Case.primary_lawyer_id,
+            primary_lawyer.first_name,
+            primary_lawyer.last_name,
+        )
+        .outerjoin(primary_lawyer, primary_lawyer.id == Case.primary_lawyer_id)
+        .where(
+            Case.organization_id == scoped_org_id,
+            Case.deleted_at.is_(None),
+        )
+        .order_by(Case.created_at.asc())
+    ).all()
+
+    active_case_items = []
+    for row in active_case_rows:
+        if not _is_active_case_status(row.status):
+            continue
+        days_open = max(0, (now - row.created_at).days)
+        lawyer_name = None
+        if row.first_name and row.last_name:
+            lawyer_name = f"{row.first_name} {row.last_name}"
+        active_case_items.append(
+            AdminOpsCaseItem(
+                case_id=row.id,
+                case_number=row.case_number,
+                case_type=row.case_type,
+                status=row.status,
+                priority=row.priority,
+                created_at=row.created_at,
+                days_open=days_open,
+                primary_lawyer_id=row.primary_lawyer_id,
+                primary_lawyer_name=lawyer_name,
+            )
+        )
+
+    unassigned_cases = sorted(
+        [item for item in active_case_items if item.primary_lawyer_id is None],
+        key=lambda item: item.created_at,
+    )[:20]
+    aging_cases = sorted(active_case_items, key=lambda item: item.days_open, reverse=True)[:20]
+
+    lawyer_rows = db.execute(
+        select(User.id, User.first_name, User.last_name)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(
+            User.organization_id == scoped_org_id,
+            User.deleted_at.is_(None),
+            cast(User.status, String) == "active",
+            cast(Role.slug, String) == "lawyer",
+            (UserRole.expires_at.is_(None) | (UserRole.expires_at > now)),
+            (Role.organization_id.is_(None) | (Role.organization_id == scoped_org_id)),
+        )
+        .distinct()
+        .order_by(User.first_name.asc(), User.last_name.asc())
+    ).all()
+    case_count_by_lawyer: dict[UUID, int] = {}
+    for item in active_case_items:
+        if item.primary_lawyer_id is None:
+            continue
+        case_count_by_lawyer[item.primary_lawyer_id] = case_count_by_lawyer.get(item.primary_lawyer_id, 0) + 1
+
+    lawyer_workload = [
+        AdminOpsLawyerWorkloadItem(
+            lawyer_user_id=row.id,
+            full_name=f"{row.first_name} {row.last_name}",
+            active_cases=case_count_by_lawyer.get(row.id, 0),
+        )
+        for row in lawyer_rows
+    ]
+
+    invited_by_user = aliased(User)
+    invitation_rows = db.execute(
+        select(
+            UserInvitation.id,
+            UserInvitation.user_id,
+            UserInvitation.email,
+            UserInvitation.role_slug,
+            UserInvitation.created_at,
+            UserInvitation.expires_at,
+            UserInvitation.accepted_at,
+            UserInvitation.revoked_at,
+            invited_by_user.first_name,
+            invited_by_user.last_name,
+        )
+        .outerjoin(invited_by_user, invited_by_user.id == UserInvitation.invited_by)
+        .where(UserInvitation.organization_id == scoped_org_id)
+        .order_by(UserInvitation.created_at.desc())
+        .limit(100)
+    ).all()
+
+    pending_invitations: list[AdminOpsInvitationItem] = []
+    for row in invitation_rows:
+        if row.accepted_at is not None:
+            status_value = "accepted"
+        elif row.revoked_at is not None:
+            status_value = "revoked"
+        elif row.expires_at < now:
+            status_value = "expired"
+        else:
+            status_value = "pending"
+
+        if status_value != "pending":
+            continue
+
+        invited_by_name = None
+        if row.first_name and row.last_name:
+            invited_by_name = f"{row.first_name} {row.last_name}"
+
+        pending_invitations.append(
+            AdminOpsInvitationItem(
+                invitation_id=row.id,
+                user_id=row.user_id,
+                email=row.email,
+                role_slug=row.role_slug,
+                created_at=row.created_at,
+                expires_at=row.expires_at,
+                status=status_value,
+                invited_by_name=invited_by_name,
+            )
+        )
+
+    return AdminOperationsResponse(
+        organization_id=scoped_org_id,
+        unassigned_cases=unassigned_cases,
+        aging_cases=aging_cases,
+        lawyer_workload=lawyer_workload,
+        pending_invitations=pending_invitations,
+    )
+
+
+@router.post("/cases/{case_number}/assign", response_model=AdminCaseAssignmentResponse)
+def assign_case_lawyer(
+    case_number: str,
+    payload: AdminCaseAssignmentRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> AdminCaseAssignmentResponse:
+    case_stmt = select(Case).where(Case.case_number == case_number, Case.deleted_at.is_(None))
+    if not _is_super_admin(auth):
+        case_stmt = case_stmt.where(Case.organization_id == auth.organization_id)
+
+    case = db.scalar(case_stmt)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    _require_org_scope(auth, case.organization_id)
+
+    assigned_lawyer_name: Optional[str] = None
+    if payload.lawyer_user_id is not None:
+        now = datetime.now(timezone.utc)
+        lawyer = db.scalar(
+            select(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(
+                User.id == payload.lawyer_user_id,
+                User.organization_id == case.organization_id,
+                User.deleted_at.is_(None),
+                cast(User.status, String) == "active",
+                cast(Role.slug, String) == "lawyer",
+                (UserRole.expires_at.is_(None) | (UserRole.expires_at > now)),
+                (Role.organization_id.is_(None) | (Role.organization_id == case.organization_id)),
+            )
+        )
+        if lawyer is None:
+            raise HTTPException(status_code=400, detail="Selected user is not an active lawyer in this organization")
+        case.primary_lawyer_id = lawyer.id
+        assigned_lawyer_name = f"{lawyer.first_name} {lawyer.last_name}"
+    else:
+        case.primary_lawyer_id = None
+
+    db.add(case)
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="assigned",
+        entity_type="case",
+        entity_id=case.id,
+        new_values={
+            "case_number": case.case_number,
+            "primary_lawyer_id": str(case.primary_lawyer_id) if case.primary_lawyer_id else None,
+        },
+    )
+    db.commit()
+
+    return AdminCaseAssignmentResponse(
+        case_id=case.id,
+        case_number=case.case_number,
+        primary_lawyer_id=case.primary_lawyer_id,
+        primary_lawyer_name=assigned_lawyer_name,
+    )
+
+
+@router.post("/invitations/{invitation_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_invitation(
+    invitation_id: UUID,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    invitation = db.scalar(select(UserInvitation).where(UserInvitation.id == invitation_id))
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    _require_org_scope(auth, invitation.organization_id)
+
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=400, detail="Accepted invitation cannot be revoked")
+    if invitation.revoked_at is not None:
+        return
+
+    invitation.revoked_at = datetime.now(timezone.utc)
+    db.add(invitation)
+    log_activity(
+        db,
+        organization_id=invitation.organization_id,
+        user_id=auth.user_id,
+        action="revoked",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        new_values={"email": invitation.email, "role_slug": invitation.role_slug},
+    )
+    db.commit()
 
 
 @router.get("/roles", response_model=list[AdminRoleItem])
@@ -264,7 +594,7 @@ def list_admin_users(
 ) -> list[UserListItem]:
     stmt = select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
 
-    requested_org_id = organization_id if organization_id is not None else auth.organization_id
+    requested_org_id = organization_id if isinstance(organization_id, UUID) else auth.organization_id
     if _is_super_admin(auth):
         if organization_id is not None:
             stmt = stmt.where(User.organization_id == organization_id)
@@ -273,6 +603,10 @@ def list_admin_users(
         stmt = stmt.where(User.organization_id == auth.organization_id)
 
     users = db.scalars(stmt.limit(limit).offset(offset)).all()
+    roles_by_user = _list_user_roles(
+        db,
+        user_ids=[user.id for user in users],
+    )
     return [
         UserListItem(
             id=user.id,
@@ -281,6 +615,7 @@ def list_admin_users(
             status=user.status,
             organization_id=user.organization_id,
             created_at=user.created_at,
+            roles=roles_by_user.get(user.id, []),
         )
         for user in users
     ]
@@ -357,7 +692,42 @@ def create_user(
         status=new_user.status,
         organization_id=new_user.organization_id,
         created_at=new_user.created_at,
+        roles=[payload.role_slug.strip().lower()],
     )
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: UUID,
+    auth: AuthContext = Depends(require_permissions("users:manage")),
+    db: Session = Depends(get_db),
+) -> None:
+    user = db.scalar(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _require_org_scope(auth, user.organization_id)
+
+    if user.id == auth.user_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    now = datetime.now(timezone.utc)
+    user.deleted_at = now
+    user.status = "disabled"
+    user.updated_at = now
+    db.add(user)
+
+    log_activity(
+        db,
+        organization_id=user.organization_id,
+        user_id=auth.user_id,
+        action="deleted",
+        entity_type="user",
+        entity_id=user.id,
+        new_values={"email": user.email},
+    )
+
+    db.commit()
 
 
 @router.post("/users/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
@@ -388,6 +758,44 @@ def assign_user_role(
         entity_type="role",
         entity_id=user.id,
         new_values={"role_slug": payload.role_slug.strip().lower()},
+    )
+
+    db.commit()
+
+
+@router.delete("/users/{user_id}/roles/{role_slug}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_user_role(
+    user_id: UUID,
+    role_slug: str,
+    auth: AuthContext = Depends(require_permissions("users:manage", "roles:manage")),
+    db: Session = Depends(get_db),
+) -> None:
+    user = db.scalar(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    _require_org_scope(auth, user.organization_id)
+
+    normalized_role = role_slug.strip().lower()
+    if user.id == auth.user_id and normalized_role in {"org_admin", "super_admin"}:
+        raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
+
+    removed = revoke_role_from_user(
+        db,
+        user_id=user.id,
+        role_slug=normalized_role,
+    )
+    if not removed:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+
+    log_activity(
+        db,
+        organization_id=user.organization_id,
+        user_id=auth.user_id,
+        action="removed",
+        entity_type="role",
+        entity_id=user.id,
+        new_values={"role_slug": normalized_role},
     )
 
     db.commit()

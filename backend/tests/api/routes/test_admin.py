@@ -8,7 +8,12 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.routes import admin
-from app.schemas.admin import AdminAssignRoleRequest, AdminCreateUserRequest
+from app.schemas.admin import (
+    AdminAssignRoleRequest,
+    AdminCaseAssignmentRequest,
+    AdminCreateOrganizationRequest,
+    AdminCreateUserRequest,
+)
 from tests.support import FakeResult, row
 
 
@@ -43,12 +48,36 @@ def test_create_organization_rejects_duplicate_slug(make_auth_context):
     auth = make_auth_context(roles=['super_admin'], permissions={'*'})
     db = MagicMock()
     db.scalar.return_value = uuid4()
-    payload = row(name='Acme', contact_email='hello@acme.com', slug='acme', subscription_tier='basic', subscription_status='active')
+    payload = AdminCreateOrganizationRequest(
+        name='Acme',
+        contact_email='hello@acme.com',
+        slug='acme',
+        subscription_tier='basic',
+        subscription_status='active',
+    )
 
     with pytest.raises(HTTPException) as exc:
         admin.create_organization(payload=payload, auth=auth, db=db)
 
     assert exc.value.status_code == 409
+
+
+def test_create_organization_requires_active_super_admin(make_auth_context):
+    auth = make_auth_context(roles=['super_admin', 'org_admin'], permissions={'*'})
+    auth.active_role = 'org_admin'
+    db = MagicMock()
+    payload = AdminCreateOrganizationRequest(
+        name='Acme',
+        contact_email='hello@acme.com',
+        slug='acme',
+        subscription_tier='basic',
+        subscription_status='active',
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        admin.create_organization(payload=payload, auth=auth, db=db)
+
+    assert exc.value.status_code == 403
 
 
 def test_list_admin_organizations_returns_scoped_rows(make_auth_context):
@@ -141,6 +170,7 @@ def test_create_user_assigns_role_and_returns_item(monkeypatch, make_auth_contex
     assert result.email == 'client@example.com'
     assert result.full_name == 'Client User'
     assert assigned[0][1] == 'client'
+    assert result.roles == ['client']
 
 
 def test_assign_user_role_assigns_and_commits(monkeypatch, make_auth_context, make_user):
@@ -165,4 +195,153 @@ def test_assign_user_role_assigns_and_commits(monkeypatch, make_auth_context, ma
     )
 
     assert assigned == [(existing_user.id, 'lawyer', auth.user_id)]
+    db.commit.assert_called_once()
+
+
+def test_list_admin_users_includes_roles(make_auth_context, make_user):
+    auth = make_auth_context(roles=['org_admin'], permissions={'users:manage'})
+    existing_user = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = [existing_user]
+    db.execute.return_value = FakeResult([row(user_id=existing_user.id, slug='lawyer')])
+
+    result = admin.list_admin_users(limit=25, offset=0, auth=auth, db=db)
+
+    assert result[0].roles == ['lawyer']
+
+
+def test_remove_user_role_revokes_and_commits(monkeypatch, make_auth_context, make_user):
+    auth = make_auth_context(roles=['org_admin'], permissions={'users:manage', 'roles:manage'})
+    existing_user = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.return_value = existing_user
+
+    monkeypatch.setattr(admin, 'revoke_role_from_user', lambda db, user_id, role_slug: True)
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+
+    admin.remove_user_role(user_id=existing_user.id, role_slug='lawyer', auth=auth, db=db)
+
+    db.commit.assert_called_once()
+
+
+def test_get_admin_operations_returns_snapshot(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    now = datetime.now(timezone.utc)
+    db = MagicMock()
+
+    db.execute.side_effect = [
+        FakeResult(
+            [
+                row(
+                    id=uuid4(),
+                    case_number='C-2026-001',
+                    case_type='H1B',
+                    status='intake',
+                    priority='high',
+                    created_at=now,
+                    primary_lawyer_id=None,
+                    first_name=None,
+                    last_name=None,
+                )
+            ]
+        ),
+        FakeResult([row(id=uuid4(), first_name='Avery', last_name='Law')]),
+        FakeResult(
+            [
+                row(
+                    id=uuid4(),
+                    user_id=uuid4(),
+                    email='invite@example.com',
+                    role_slug='client',
+                    created_at=now,
+                    expires_at=now,
+                    accepted_at=None,
+                    revoked_at=None,
+                    first_name='Admin',
+                    last_name='User',
+                )
+            ]
+        ),
+    ]
+
+    result = admin.get_admin_operations(auth=auth, db=db)
+
+    assert result.organization_id == auth.organization_id
+    assert len(result.unassigned_cases) == 1
+    assert len(result.lawyer_workload) == 1
+
+
+def test_assign_case_lawyer_updates_primary(monkeypatch, make_auth_context, make_user):
+    auth = make_auth_context(roles=['org_admin'])
+    existing_case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        case_number='C-2026-002',
+        primary_lawyer_id=None,
+    )
+    lawyer = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.side_effect = [existing_case, lawyer]
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+
+    result = admin.assign_case_lawyer(
+        case_number='C-2026-002',
+        payload=AdminCaseAssignmentRequest(lawyer_user_id=lawyer.id),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.primary_lawyer_id == lawyer.id
+    db.commit.assert_called_once()
+
+
+def test_revoke_invitation_marks_revoked(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    invitation = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        accepted_at=None,
+        revoked_at=None,
+        email='invite@example.com',
+        role_slug='client',
+    )
+    db = MagicMock()
+    db.scalar.return_value = invitation
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+
+    admin.revoke_invitation(invitation_id=invitation.id, auth=auth, db=db)
+
+    assert invitation.revoked_at is not None
+    db.commit.assert_called_once()
+
+
+def test_delete_user_soft_deletes_user(monkeypatch, make_auth_context, make_user):
+    auth = make_auth_context(roles=['org_admin'], permissions={'users:manage'})
+    target_user = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.return_value = target_user
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+
+    admin.delete_user(user_id=target_user.id, auth=auth, db=db)
+
+    assert target_user.deleted_at is not None
+    assert target_user.status == 'disabled'
+    db.commit.assert_called_once()
+
+
+def test_delete_organization_soft_deletes_org(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['super_admin'])
+    db = MagicMock()
+    organization = row(
+        id=uuid4(),
+        name='Org',
+        slug='org',
+        deleted_at=None,
+    )
+    db.scalar.return_value = organization
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+
+    admin.delete_organization(organization_id=organization.id, auth=auth, db=db)
+
+    assert organization.deleted_at is not None
     db.commit.assert_called_once()

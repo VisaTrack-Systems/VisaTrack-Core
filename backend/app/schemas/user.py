@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserRead(BaseModel):
@@ -24,3 +24,4 @@ class UserListItem(BaseModel):
     status: str
     organization_id: Optional[UUID]
     created_at: datetime
+    roles: list[str] = Field(default_factory=list)

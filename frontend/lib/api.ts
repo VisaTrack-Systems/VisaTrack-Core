@@ -113,6 +113,7 @@ export type UserListItem = {
   status: string;
   organization_id: string | null;
   created_at: string;
+  roles: string[];
 };
 
 export type AdminOverview = {
@@ -163,7 +164,7 @@ export type AdminRoleItem = {
 export type AdminCreateOrganizationInput = {
   name: string;
   contact_email: string;
-  slug?: string | null;
+  slug: string;
   subscription_tier?: string;
   subscription_status?: string;
 };
@@ -176,6 +177,58 @@ export type AdminCreateUserInput = {
   password: string;
   status?: string;
   role_slug?: string;
+};
+
+export type AdminOperations = {
+  organization_id: string;
+  unassigned_cases: Array<{
+    case_id: string;
+    case_number: string;
+    case_type: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    days_open: number;
+    primary_lawyer_id: string | null;
+    primary_lawyer_name: string | null;
+  }>;
+  aging_cases: Array<{
+    case_id: string;
+    case_number: string;
+    case_type: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    days_open: number;
+    primary_lawyer_id: string | null;
+    primary_lawyer_name: string | null;
+  }>;
+  lawyer_workload: Array<{
+    lawyer_user_id: string;
+    full_name: string;
+    active_cases: number;
+  }>;
+  pending_invitations: Array<{
+    invitation_id: string;
+    user_id: string;
+    email: string;
+    role_slug: string;
+    created_at: string;
+    expires_at: string;
+    status: string;
+    invited_by_name: string | null;
+  }>;
+};
+
+export type AdminCaseAssignmentInput = {
+  lawyer_user_id: string | null;
+};
+
+export type AdminCaseAssignmentResult = {
+  case_id: string;
+  case_number: string;
+  primary_lawyer_id: string | null;
+  primary_lawyer_name: string | null;
 };
 
 export type MilestoneSummary = {
@@ -440,8 +493,17 @@ export type CurrentUser = {
   full_name: string;
   status: string;
   roles: string[];
+  active_role: string;
   onboarding_required: boolean;
   last_login_at: string | null;
+};
+
+export type SwitchActiveRoleResponse = {
+  access_token: string;
+  token_type: string;
+  expires_in_seconds: number;
+  active_role: string;
+  roles: string[];
 };
 
 export type CurrentUserSettings = {
@@ -639,6 +701,15 @@ export async function getCurrentUser(): Promise<CurrentUser> {
   return requestJson<CurrentUser>('/api/v1/auth/me');
 }
 
+export async function switchActiveRole(role: string): Promise<SwitchActiveRoleResponse> {
+  const response = await requestJson<SwitchActiveRoleResponse>('/api/v1/auth/switch-role', {
+    method: 'POST',
+    body: JSON.stringify({ role }),
+  });
+  setAccessToken(response.access_token);
+  return response;
+}
+
 export async function getCurrentUserSettings(): Promise<CurrentUserSettings> {
   return requestJson<CurrentUserSettings>('/api/v1/auth/me/settings');
 }
@@ -723,6 +794,11 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   return requestJson<AdminOverview>('/api/v1/admin/overview');
 }
 
+export async function getAdminOperations(organizationId?: string): Promise<AdminOperations> {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : '';
+  return requestJson<AdminOperations>(`/api/v1/admin/operations${query}`);
+}
+
 export async function getAdminOrganizations(limit = 50): Promise<OrganizationListItem[]> {
   return requestJson<OrganizationListItem[]>(`/api/v1/admin/organizations?limit=${limit}`);
 }
@@ -744,6 +820,12 @@ export async function createAdminOrganization(
   });
 }
 
+export async function deleteAdminOrganization(organizationId: string): Promise<void> {
+  return requestVoid(`/api/v1/admin/organizations/${encodeURIComponent(organizationId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function createAdminUser(input: AdminCreateUserInput): Promise<UserListItem> {
   return requestJson<UserListItem>('/api/v1/admin/users', {
     method: 'POST',
@@ -751,10 +833,41 @@ export async function createAdminUser(input: AdminCreateUserInput): Promise<User
   });
 }
 
+export async function deleteAdminUser(userId: string): Promise<void> {
+  return requestVoid(`/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function assignAdminRole(userId: string, roleSlug: string): Promise<void> {
   return requestVoid(`/api/v1/admin/users/${encodeURIComponent(userId)}/roles`, {
     method: 'POST',
     body: JSON.stringify({ role_slug: roleSlug }),
+  });
+}
+
+export async function removeAdminRole(userId: string, roleSlug: string): Promise<void> {
+  return requestVoid(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleSlug)}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
+export async function assignAdminCaseLawyer(
+  caseNumber: string,
+  input: AdminCaseAssignmentInput
+): Promise<AdminCaseAssignmentResult> {
+  return requestJson<AdminCaseAssignmentResult>(`/api/v1/admin/cases/${encodeURIComponent(caseNumber)}/assign`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function revokeAdminInvitation(invitationId: string): Promise<void> {
+  return requestVoid(`/api/v1/admin/invitations/${encodeURIComponent(invitationId)}/revoke`, {
+    method: 'POST',
   });
 }
 
