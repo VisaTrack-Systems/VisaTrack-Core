@@ -4,6 +4,7 @@ node_modules/
 
 # Python
 venv/
+backend/.venv/
 __pycache__/
 
 # Env
@@ -11,3 +12,7 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Logs
+/.logs
+*.log

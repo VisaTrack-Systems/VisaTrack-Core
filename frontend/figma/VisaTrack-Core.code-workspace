@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"sqltools.connections": [
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "aws-1-ca-central-1.pooler.supabase.com",
+				"port": 5432,
+				"askForPassword": true,
+				"driver": "PostgreSQL",
+				"database": "postgres",
+				"username": "postgres.tcdfjzfpfxtntaxsxtlk",
+				"name": "VisaTrack Supabase",
+				"group": "VisaTrack"
+			}
+		]
+	}
+}
