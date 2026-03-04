@@ -64,9 +64,25 @@ SYSTEM_ROLE_DEFINITIONS: dict[str, tuple[str, list[str]]] = {
     ),
 }
 
+ROLE_SLUG_ALIASES: dict[str, str] = {
+    "admin": "org_admin",
+}
+
+
+def canonical_role_slug(value: str) -> str:
+    normalized = value.strip().lower()
+    return ROLE_SLUG_ALIASES.get(normalized, normalized)
+
+ROLE_SWITCH_PRIORITY: tuple[str, ...] = (
+    "lawyer",
+    "org_admin",
+    "super_admin",
+    "client",
+)
+
 
 def ensure_system_role(db: Session, slug: str) -> Role:
-    normalized_slug = slug.strip().lower()
+    normalized_slug = canonical_role_slug(slug)
     role = db.scalar(
         select(Role).where(
             cast(Role.slug, String) == normalized_slug,
@@ -128,3 +144,31 @@ def get_user_roles(db: Session, user_id: UUID, organization_id: UUID) -> list[st
         )
     ).scalars().all()
     return sorted({str(row).lower() for row in rows})
+
+
+def select_default_active_role(roles: list[str]) -> str | None:
+    normalized = {canonical_role_slug(str(role)) for role in roles if str(role).strip()}
+    for role in ROLE_SWITCH_PRIORITY:
+        if role in normalized:
+            return role
+    if not normalized:
+        return None
+    return sorted(normalized)[0]
+
+
+def revoke_role_from_user(
+    db: Session,
+    *,
+    user_id: UUID,
+    role_slug: str,
+) -> bool:
+    role = ensure_system_role(db, role_slug)
+    existing = db.scalar(
+        select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role.id)
+    )
+    if existing is None:
+        return False
+
+    db.delete(existing)
+    db.flush()
+    return True

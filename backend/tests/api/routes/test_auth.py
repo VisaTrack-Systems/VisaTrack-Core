@@ -56,6 +56,7 @@ def test_me_returns_current_user_payload(monkeypatch, make_auth_context):
     result = auth.me(auth=auth_context, db=db)
 
     assert result.email == auth_context.user.email
+    assert result.active_role == 'lawyer'
     assert result.onboarding_required is True
 
 
@@ -78,7 +79,7 @@ def test_login_success_returns_access_token(monkeypatch, make_user):
     db.scalar.side_effect = [organization, user]
     db.execute.return_value = FakeResult(rows=['lawyer'])
     monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: True)
-    monkeypatch.setattr(auth, 'create_access_token', lambda user_id, org_id, roles: 'token-123')
+    monkeypatch.setattr(auth, 'create_access_token', lambda user_id, org_id, roles, active_role=None: 'token-123')
 
     result = auth.login(
         payload=LoginRequest(organization_slug='acme', email='user@example.com', password='secret'),
@@ -88,6 +89,26 @@ def test_login_success_returns_access_token(monkeypatch, make_user):
     assert result.access_token == 'token-123'
     assert user.login_attempts == 0
     db.commit.assert_called_once()
+
+
+def test_switch_active_role_reissues_token(monkeypatch, make_auth_context):
+    auth_context = make_auth_context(roles=['lawyer', 'org_admin'])
+    captured = {}
+
+    def fake_create_access_token(user_id, org_id, roles, active_role=None):
+        captured['user_id'] = user_id
+        captured['org_id'] = org_id
+        captured['roles'] = roles
+        captured['active_role'] = active_role
+        return 'token-role-switch'
+
+    monkeypatch.setattr(auth, 'create_access_token', fake_create_access_token)
+
+    result = auth.switch_active_role(payload=row(role='org_admin'), auth=auth_context)
+
+    assert result.access_token == 'token-role-switch'
+    assert result.active_role == 'org_admin'
+    assert captured['active_role'] == 'org_admin'
 
 
 def test_me_settings_returns_current_user_settings(make_auth_context):

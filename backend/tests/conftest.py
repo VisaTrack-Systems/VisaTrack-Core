@@ -54,6 +54,7 @@ def make_auth_context(make_user):
             user=resolved_user,
             organization_id=resolved_user.organization_id,
             roles=roles or ['lawyer'],
+            active_role=(roles or ['lawyer'])[0],
             permissions=permissions or set(),
         )
 

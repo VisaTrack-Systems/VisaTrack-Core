@@ -29,9 +29,12 @@ from app.schemas.auth import (
     CurrentUserResponse,
     CurrentUserSettingsResponse,
     LoginRequest,
+    SwitchActiveRoleRequest,
+    SwitchActiveRoleResponse,
     UpdateCurrentUserSettingsRequest,
 )
 from app.services.audit import log_activity
+from app.services.rbac import canonical_role_slug, select_default_active_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -134,7 +137,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthTokenResp
     if user.status.lower() == "invited":
         raise HTTPException(status_code=403, detail="Invitation pending acceptance")
 
-    token = create_access_token(str(user.id), str(organization.id), roles)
+    active_role = select_default_active_role(roles)
+    if active_role is None:
+        raise HTTPException(status_code=403, detail="No active role assigned. Contact admin")
+
+    token = create_access_token(str(user.id), str(organization.id), roles, active_role)
 
     user.login_attempts = 0
     user.locked_until = None
@@ -158,8 +165,32 @@ def me(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_
         full_name=f"{auth.user.first_name} {auth.user.last_name}",
         status=auth.user.status,
         roles=auth.roles,
+        active_role=auth.active_role,
         onboarding_required=onboarding_required,
         last_login_at=auth.user.last_login_at,
+    )
+
+
+@router.post("/switch-role", response_model=SwitchActiveRoleResponse)
+def switch_active_role(
+    payload: SwitchActiveRoleRequest,
+    auth: AuthContext = Depends(get_auth_context),
+) -> SwitchActiveRoleResponse:
+    requested_role = canonical_role_slug(payload.role)
+    if requested_role not in auth.roles:
+        raise HTTPException(status_code=403, detail="Requested role is not assigned to this user")
+
+    token = create_access_token(
+        str(auth.user_id),
+        str(auth.organization_id),
+        auth.roles,
+        requested_role,
+    )
+    return SwitchActiveRoleResponse(
+        access_token=token,
+        expires_in_seconds=settings.auth_access_token_minutes * 60,
+        active_role=requested_role,
+        roles=auth.roles,
     )
 
 

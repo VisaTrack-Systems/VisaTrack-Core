@@ -95,7 +95,12 @@ def verify_password(password: str, stored_hash: str) -> bool:
     return hmac.compare_digest(candidate, stored_hash)
 
 
-def create_access_token(user_id: str, organization_id: str, roles: list[str]) -> str:
+def create_access_token(
+    user_id: str,
+    organization_id: str,
+    roles: list[str],
+    active_role: str | None = None,
+) -> str:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.auth_access_token_minutes)
     payload: dict[str, Any] = {
@@ -106,6 +111,8 @@ def create_access_token(user_id: str, organization_id: str, roles: list[str]) ->
         "exp": int(expires_at.timestamp()),
         "type": "access",
     }
+    if active_role:
+        payload["active_role"] = active_role
     return jwt.encode(payload, settings.auth_secret_key, algorithm=settings.auth_algorithm)
 
 
