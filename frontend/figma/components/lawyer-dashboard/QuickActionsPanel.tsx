@@ -1,17 +1,17 @@
-import { Calendar, FileText, MessageSquare, Users } from 'lucide-react';
+import { AlertTriangle, FilePlus2, Flag, FolderOpen } from 'lucide-react';
 
 type QuickActionsPanelProps = {
   onCreateCase?: () => void | Promise<void>;
-  onAddClient?: () => void | Promise<void>;
-  onViewMessages?: () => void;
-  onScheduleAppointment?: () => void;
+  onViewActiveCases?: () => void;
+  onOpenNextDeadlineCase?: () => void;
+  onOpenHighPriorityCase?: () => void;
 };
 
 export function QuickActionsPanel({
   onCreateCase,
-  onAddClient,
-  onViewMessages,
-  onScheduleAppointment,
+  onViewActiveCases,
+  onOpenNextDeadlineCase,
+  onOpenHighPriorityCase,
 }: QuickActionsPanelProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
@@ -24,34 +24,34 @@ export function QuickActionsPanel({
           }}
           type="button"
         >
-          <FileText className="w-5 h-5 text-gray-600" />
+          <FilePlus2 className="w-5 h-5 text-gray-600" />
           <span className="text-sm font-medium text-gray-900">Create New Case</span>
         </button>
         <button
           className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-          onClick={() => {
-            void onAddClient?.();
-          }}
+          onClick={onViewActiveCases}
           type="button"
         >
-          <Users className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-900">Add New Client</span>
+          <FolderOpen className="w-5 h-5 text-gray-600" />
+          <span className="text-sm font-medium text-gray-900">View Active Cases</span>
         </button>
         <button
-          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-          onClick={onViewMessages}
+          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg transition-colors text-left disabled:opacity-60 disabled:cursor-not-allowed enabled:hover:bg-gray-50"
+          onClick={onOpenNextDeadlineCase}
+          disabled={!onOpenNextDeadlineCase}
           type="button"
         >
-          <MessageSquare className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-900">View Messages</span>
+          <AlertTriangle className="w-5 h-5 text-gray-600" />
+          <span className="text-sm font-medium text-gray-900">Open Next Deadline Case</span>
         </button>
         <button
-          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-          onClick={onScheduleAppointment}
+          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg transition-colors text-left disabled:opacity-60 disabled:cursor-not-allowed enabled:hover:bg-gray-50"
+          onClick={onOpenHighPriorityCase}
+          disabled={!onOpenHighPriorityCase}
           type="button"
         >
-          <Calendar className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-900">Schedule Appointment</span>
+          <Flag className="w-5 h-5 text-gray-600" />
+          <span className="text-sm font-medium text-gray-900">Open Highest Priority Case</span>
         </button>
       </div>
     </div>

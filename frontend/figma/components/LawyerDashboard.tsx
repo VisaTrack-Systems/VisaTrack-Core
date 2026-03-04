@@ -10,9 +10,6 @@ import { useLawyerDashboardData } from './lawyer-dashboard/useLawyerDashboardDat
 interface LawyerDashboardProps {
   onViewActiveCases?: () => void;
   onSelectCase?: (caseId: string) => void;
-  onViewMessages?: () => void;
-  onScheduleAppointment?: () => void;
-  onAddClient?: () => void | Promise<void>;
   onCreateCase?: () => void | Promise<void>;
   lawyerName?: string;
 }
@@ -20,14 +17,16 @@ interface LawyerDashboardProps {
 export function LawyerDashboard({
   onViewActiveCases,
   onSelectCase,
-  onViewMessages,
-  onScheduleAppointment,
-  onAddClient,
   onCreateCase,
   lawyerName,
 }: LawyerDashboardProps) {
   const { cases, stats, upcomingDeadlines, derivedActivity, isLoading, error, retry } = useLawyerDashboardData();
   const displayName = lawyerName?.trim().split(/\s+/)[0] || 'Attorney';
+  const nextDeadlineCaseId = [...upcomingDeadlines].sort((left, right) => left.daysLeft - right.daysLeft)[0]?.client;
+  const highestPriorityCaseId =
+    cases.find((entry) => entry.priority.toLowerCase() === 'high')?.id ??
+    cases.find((entry) => entry.priority.toLowerCase() === 'medium')?.id ??
+    cases[0]?.id;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -82,9 +81,21 @@ export function LawyerDashboard({
             <UpcomingDeadlinesPanel deadlines={upcomingDeadlines} isLoading={isLoading} />
             <QuickActionsPanel
               onCreateCase={onCreateCase}
-              onAddClient={onAddClient ?? onCreateCase}
-              onViewMessages={onViewMessages ?? onViewActiveCases}
-              onScheduleAppointment={onScheduleAppointment ?? onViewActiveCases}
+              onViewActiveCases={onViewActiveCases}
+              onOpenNextDeadlineCase={
+                nextDeadlineCaseId
+                  ? () => {
+                      onSelectCase?.(nextDeadlineCaseId);
+                    }
+                  : undefined
+              }
+              onOpenHighPriorityCase={
+                highestPriorityCaseId
+                  ? () => {
+                      onSelectCase?.(highestPriorityCaseId);
+                    }
+                  : undefined
+              }
             />
           </div>
         </div>
