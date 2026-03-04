@@ -137,7 +137,7 @@ export function AdminDashboard() {
     try {
       const created = await createAdminOrganization({
         ...orgForm,
-        slug: orgForm.slug?.trim() ? orgForm.slug : null,
+        slug: orgForm.slug.trim(),
       });
       setOrgForm(initialOrgForm);
       setFlash({ kind: 'success', message: `Organization created: ${created.name}` });
@@ -252,14 +252,18 @@ export function AdminDashboard() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Slug (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
               <input
+                required
                 type="text"
                 value={orgForm.slug ?? ''}
                 onChange={(event) => setOrgForm((previous) => ({ ...previous, slug: event.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
                 placeholder="acme-immigration"
               />
+              {orgForm.slug.trim() && organizations.some((o) => o.slug === orgForm.slug.trim()) && (
+                <p className="mt-1 text-xs text-red-600">A organization with this slug already exists.</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
