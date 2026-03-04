@@ -1,6 +1,8 @@
 import {
+  Briefcase,
   FileText,
   Settings,
+  Shield,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -18,6 +20,7 @@ import {
   getLawyerClients,
   login,
   logout,
+  switchActiveRole,
   updateCurrentUserSettings,
 } from '@/lib/api';
 
@@ -37,15 +40,15 @@ function getDefaultViewForUser(user: CurrentUser | null): AppView {
     return 'login';
   }
 
-  if (user.roles.includes('org_admin') || user.roles.includes('super_admin')) {
+  if (user.active_role === 'org_admin' || user.active_role === 'admin' || user.active_role === 'super_admin') {
     return 'admin';
   }
 
-  if (user.roles.includes('lawyer')) {
+  if (user.active_role === 'lawyer') {
     return 'lawyer';
   }
 
-  if (user.roles.includes('client')) {
+  if (user.active_role === 'client') {
     return 'client';
   }
 
@@ -61,9 +64,10 @@ function canAccessView(user: CurrentUser | null, view: AppView): boolean {
     return false;
   }
 
-  const isAdmin = user.roles.includes('org_admin') || user.roles.includes('super_admin');
-  const isLawyer = user.roles.includes('lawyer');
-  const isClient = user.roles.includes('client');
+  const isAdmin =
+    user.active_role === 'org_admin' || user.active_role === 'admin' || user.active_role === 'super_admin';
+  const isLawyer = user.active_role === 'lawyer';
+  const isClient = user.active_role === 'client';
 
   if (view === 'admin') {
     return isAdmin;
@@ -95,6 +99,7 @@ export default function App() {
   const [loadingProfileSettings, setLoadingProfileSettings] = useState(false);
   const [savingProfileSettings, setSavingProfileSettings] = useState(false);
   const [profileSettingsError, setProfileSettingsError] = useState<string | null>(null);
+  const [switchingRole, setSwitchingRole] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -260,6 +265,58 @@ export default function App() {
       });
   };
 
+  const handleSwitchRole = async (nextRole: string) => {
+    if (!currentUser || nextRole === currentUser.active_role || switchingRole) {
+      return;
+    }
+
+    setSwitchingRole(true);
+    try {
+      await switchActiveRole(nextRole);
+      const updatedUser = await getCurrentUser();
+      setCurrentUser(updatedUser);
+      setCurrentView(getDefaultViewForUser(updatedUser));
+      setSelectedCaseId(null);
+      setNewCaseError(null);
+    } catch {
+      handleLogout();
+    } finally {
+      setSwitchingRole(false);
+    }
+  };
+
+  const roleDisplayName = (role: string): string => {
+    if (role === 'super_admin') {
+      return 'Super Admin';
+    }
+    if (role === 'org_admin') {
+      return 'Admin';
+    }
+    if (role === 'admin') {
+      return 'Admin';
+    }
+    if (role === 'lawyer') {
+      return 'Lawyer';
+    }
+    if (role === 'client') {
+      return 'Client';
+    }
+    return role;
+  };
+
+  const sortedUserRoles = currentUser
+    ? [...currentUser.roles].sort((a, b) => {
+        const order: Record<string, number> = {
+          super_admin: 0,
+          org_admin: 1,
+          admin: 1,
+          lawyer: 2,
+          client: 3,
+        };
+        return (order[a] ?? 99) - (order[b] ?? 99);
+      })
+    : [];
+
   const handleCloseProfileDialog = () => {
     if (savingProfileSettings) {
       return;
@@ -300,6 +357,41 @@ export default function App() {
           <div className="flex items-center gap-3">
             {currentUser ? (
               <div className="flex items-center gap-2">
+                {currentUser.roles.length > 1 ? (
+                  <div className="flex items-center gap-2 border border-gray-700 bg-gray-900/70 rounded-xl px-2 py-1.5">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gray-800 border border-gray-700">
+                      {currentUser.active_role === 'org_admin' || currentUser.active_role === 'admin' || currentUser.active_role === 'super_admin' ? (
+                        <Shield className="w-3.5 h-3.5 text-gray-200" />
+                      ) : (
+                        <Briefcase className="w-3.5 h-3.5 text-gray-200" />
+                      )}
+                    </div>
+                    <div className="leading-tight">
+                      <div className="inline-flex rounded-lg border border-gray-700 bg-gray-800 p-0.5">
+                        {sortedUserRoles.map((role) => {
+                          const isActive = role === currentUser.active_role;
+                          return (
+                            <button
+                              key={role}
+                              type="button"
+                              disabled={switchingRole || isActive}
+                              onClick={() => {
+                                void handleSwitchRole(role);
+                              }}
+                              className={`px-2 py-1 text-[11px] rounded-md transition-colors ${
+                                isActive
+                                  ? 'bg-white text-gray-900 font-semibold'
+                                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                              }`}
+                            >
+                              {roleDisplayName(role)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <button
                   onClick={handleOpenProfileDialog}
                   className="text-xs border border-gray-700 hover:border-gray-500 px-3 py-2 rounded-lg flex items-center gap-1"
@@ -346,9 +438,6 @@ export default function App() {
           onViewActiveCases={handleViewActiveCases}
           onSelectCase={handleSelectCase}
           onCreateCase={handleOpenNewCaseDialog}
-          onAddClient={handleOpenNewCaseDialog}
-          onViewMessages={handleViewActiveCases}
-          onScheduleAppointment={handleViewActiveCases}
           lawyerName={currentUser?.full_name}
         />
       ) : null}
@@ -375,7 +464,7 @@ export default function App() {
       ) : null}
 
       {currentView === 'client' ? <ClientDashboard /> : null}
-      {currentView === 'admin' ? <AdminDashboard /> : null}
+      {currentView === 'admin' ? <AdminDashboard currentUser={currentUser} /> : null}
       {isNewCaseDialogOpen &&
       (currentView === 'lawyer' || currentView === 'active-cases' || currentView === 'case-config') ? (
         <NewCaseDialog
