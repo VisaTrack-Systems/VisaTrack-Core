@@ -24,8 +24,21 @@ class CurrentUserResponse(BaseModel):
     full_name: str
     status: str
     roles: list[str]
+    active_role: str
     onboarding_required: bool
     last_login_at: Optional[datetime]
+
+
+class SwitchActiveRoleRequest(BaseModel):
+    role: str = Field(min_length=2, max_length=100)
+
+
+class SwitchActiveRoleResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in_seconds: int
+    active_role: str
+    roles: list[str]
 
 
 class CurrentUserSettingsResponse(BaseModel):

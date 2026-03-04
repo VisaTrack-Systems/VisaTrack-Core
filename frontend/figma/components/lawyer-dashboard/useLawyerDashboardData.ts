@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { getLawyerCases } from '@/lib/api';
+import { getLawyerCases, getLawyerClients } from '@/lib/api';
 
 import type { ActivityItem, DashboardCase, DashboardStats, DeadlineItem } from './types';
 import { daysUntil, relativeTime, titleize } from './utils';
@@ -19,22 +19,37 @@ type LawyerDashboardData = {
   stats: DashboardStats;
   upcomingDeadlines: DeadlineItem[];
   derivedActivity: ActivityItem[];
+  isLoading: boolean;
+  error: string | null;
+  retry: () => void;
 };
 
 export function useLawyerDashboardData(): LawyerDashboardData {
   const [cases, setCases] = useState<DashboardCase[]>([]);
   const [stats, setStats] = useState<DashboardStats>(fallbackStats);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<DeadlineItem[]>(fallbackDeadlines);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let ignore = false;
 
     async function loadDashboard() {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        const caseRows = await getLawyerCases(100);
+        const [caseRows, clients] = await Promise.all([
+          getLawyerCases(100),
+          getLawyerClients(200).catch(() => null),
+        ]);
         if (ignore) {
           return;
         }
+
+        const totalUsersFromCases = new Set(caseRows.map((entry) => entry.client_name)).size;
+        const totalUsers = clients ? clients.length : totalUsersFromCases;
 
         setCases(
           caseRows.slice(0, 8).map((entry) => ({
@@ -61,7 +76,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
 
         setStats({
           activeCases,
-          totalUsers: 0,
+          totalUsers,
           upcomingMilestones: caseRows.filter((entry) => !!entry.target_filing_date).length,
           completedCases,
         });
@@ -82,9 +97,18 @@ export function useLawyerDashboardData(): LawyerDashboardData {
           }));
         setUpcomingDeadlines(deadlines);
       } catch {
+        if (ignore) {
+          return;
+        }
+
+        setError('Failed to load dashboard data.');
         setCases([]);
         setStats(fallbackStats);
         setUpcomingDeadlines(fallbackDeadlines);
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     }
 
@@ -93,7 +117,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [reloadToken]);
 
   const derivedActivity = useMemo<ActivityItem[]>(
     () =>
@@ -107,5 +131,9 @@ export function useLawyerDashboardData(): LawyerDashboardData {
     [cases]
   );
 
-  return { cases, stats, upcomingDeadlines, derivedActivity };
+  const retry = () => {
+    setReloadToken((current) => current + 1);
+  };
+
+  return { cases, stats, upcomingDeadlines, derivedActivity, isLoading, error, retry };
 }

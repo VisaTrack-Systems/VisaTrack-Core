@@ -9,13 +9,14 @@
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
-				"server": "localhost",
+				"server": "aws-1-ca-central-1.pooler.supabase.com",
 				"port": 5432,
+				"askForPassword": true,
 				"driver": "PostgreSQL",
-				"name": "visatrack",
-				"database": "visatrack",
-				"username": "umerqamar",
-				"password": ""
+				"database": "postgres",
+				"username": "postgres.tcdfjzfpfxtntaxsxtlk",
+				"name": "VisaTrack Supabase",
+				"group": "VisaTrack"
 			}
 		]
 	}
