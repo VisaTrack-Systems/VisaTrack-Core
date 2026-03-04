@@ -116,19 +116,39 @@ esac
 echo "Starting backend..."
 cd "${PROJECT_ROOT}/backend" || exit
 
+# Check if we're on a Windows filesystem in WSL (can't create venvs there)
+if [[ "$(pwd)" == /mnt/* ]] && grep -qi microsoft /proc/version 2>/dev/null; then
+  echo ""
+  echo "WARNING: You're running this script from a Windows filesystem in WSL."
+  echo "Python virtual environments cannot be created on /mnt/c due to permission restrictions."
+  echo ""
+  echo "Please choose one of these solutions:"
+  echo ""
+  echo "1. Move your project to the WSL filesystem (e.g. /home/username/visatrack) and run this script again from there"
+  echo ""
+  echo "2. Or run the dev.ps1 script from Windows PowerShell instead of WSL"
+  echo ""
+  exit 1
+fi
+
+# 1. Create venv if it doesn't exist
 if [ ! -d ".venv" ]; then
-  echo "Creating Python virtual environment and installing dependencies..."
+  echo "Creating Python virtual environment..."
   PYTHON_BIN="$(find_python)"
   "$PYTHON_BIN" -m venv .venv
-  activate_venv
-  BACKEND_PYTHON="$(resolve_backend_python)"
-  "$BACKEND_PYTHON" -m pip install --upgrade pip
-  "$BACKEND_PYTHON" -m pip install -r requirements.txt
-  if [ -f requirements-dev.txt ]; then
-    "$BACKEND_PYTHON" -m pip install -r requirements-dev.txt
-  fi
-else
-  activate_venv
+fi
+
+# 2. Always activate the venv
+activate_venv
+BACKEND_PYTHON="$(resolve_backend_python)"
+
+# 3. Always sync dependencies (even if venv existed)
+echo "Syncing backend dependencies..."
+"$BACKEND_PYTHON" -m pip install --upgrade pip --quiet
+"$BACKEND_PYTHON" -m pip install --quiet -r requirements.txt
+
+if [ -f requirements-dev.txt ]; then
+  "$BACKEND_PYTHON" -m pip install --quiet -r requirements-dev.txt
 fi
 
 echo "Backend venv ready"
@@ -201,11 +221,17 @@ fi
 echo "Preparing frontend..."
 cd "${PROJECT_ROOT}/frontend" || exit
 
-if [ ! -d "node_modules" ]; then
-  echo "Installing frontend dependencies..."
-  npm install
+# 1. Ensure node_modules exists and is up to date
+echo "Syncing frontend dependencies..."
+if [ -f "package-lock.json" ]; then
+  # npm ci is faster and cleaner for dev environments with a lockfile
+  npm install --silent
+else
+  npm install --silent
 fi
 
+# 2. Clean up previous build artifacts
+echo "Cleaning build cache..."
 rm -rf .next
 
 echo "Frontend ready, launching..."
