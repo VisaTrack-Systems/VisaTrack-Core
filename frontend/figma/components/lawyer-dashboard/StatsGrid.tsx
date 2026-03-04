@@ -19,7 +19,7 @@ export function StatsGrid({ stats }: StatsGridProps) {
       label: 'Total Users',
       value: String(stats.totalUsers),
       icon: Users,
-      trend: 'All roles included',
+      trend: 'Clients in your roster',
       color: 'text-blue-600',
     },
     {
