@@ -509,6 +509,12 @@ export const mockDashboardDocuments: DashboardDocument[] = mockCaseWorkspace.doc
           : document.required
             ? 'pending'
             : 'optional',
+    lawyerStatus: document.status
+      .replaceAll('_', ' ')
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0].toUpperCase() + part.slice(1))
+      .join(' '),
     uploadedDate: document.uploaded_at ?? 'Pending',
     required: document.required,
     instructions: document.instructions,
@@ -523,8 +529,22 @@ export const mockDashboardMilestones: DashboardMilestone[] = [
 ];
 
 export const mockDashboardMessages: DashboardMessage[] = [
-  { from: 'Avery Counsel', subject: 'Updated review status', preview: 'Please upload a revised employer letter including salary.', time: '2 hours ago', unread: true },
-  { from: 'Billing', subject: 'Invoice reminder', preview: 'Your filing preparation balance is due next week.', time: '1 day ago', unread: false },
+  {
+    from: 'Avery Counsel',
+    subject: 'Updated review status',
+    preview: 'Please upload a revised employer letter including salary.',
+    body: 'Please upload a revised employer letter including salary and responsibilities. Once uploaded, we will review and proceed with the submission package.',
+    time: '2 hours ago',
+    unread: true,
+  },
+  {
+    from: 'Billing',
+    subject: 'Invoice reminder',
+    preview: 'Your filing preparation balance is due next week.',
+    body: 'Your filing preparation balance is due next week. You can complete payment in the billing section of your portal.',
+    time: '1 day ago',
+    unread: false,
+  },
 ];
 
 export const mockDashboardAppointments: DashboardAppointment[] = [

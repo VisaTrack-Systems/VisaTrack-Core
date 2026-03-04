@@ -15,7 +15,7 @@ export function CaseConfigDialog({
   onClose,
 }: CaseConfigDialogProps) {
   return (
-    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-lg bg-white border border-gray-200 rounded-xl shadow-xl">
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
           <div>

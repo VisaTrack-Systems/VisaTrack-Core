@@ -9,7 +9,7 @@ type DocumentUploadDialogProps = {
   submitting: boolean;
   errorMessage: string | null;
   onClose: () => void;
-  onSubmit: (file: File) => Promise<void>;
+  onSubmit: (file: File, note: string | null) => Promise<void>;
 };
 
 export function DocumentUploadDialog({
@@ -21,6 +21,7 @@ export function DocumentUploadDialog({
   onSubmit,
 }: DocumentUploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [note, setNote] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -32,7 +33,8 @@ export function DocumentUploadDialog({
       return;
     }
 
-    await onSubmit(selectedFile);
+    const normalizedNote = note.trim() ? note.trim() : null;
+    await onSubmit(selectedFile, normalizedNote);
   };
 
   if (!isOpen || !document) {
@@ -40,7 +42,7 @@ export function DocumentUploadDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[85] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
       <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 bg-black text-white flex items-start justify-between">
           <div>
@@ -94,6 +96,22 @@ export function DocumentUploadDialog({
                 {selectedFile.name} ({Math.max(1, Math.round(selectedFile.size / 1024))} KB)
               </p>
             ) : null}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Note for your lawyer (optional)
+            </label>
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Add context about this file, if needed."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-red-500 focus:outline-none"
+              disabled={submitting}
+            />
+            <p className="mt-1 text-xs text-gray-500">{note.length}/2000</p>
           </div>
 
           <div className="flex justify-end gap-3">

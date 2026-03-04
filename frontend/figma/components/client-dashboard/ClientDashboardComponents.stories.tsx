@@ -43,8 +43,10 @@ export const DocumentChecklist: Story = {
       requiredDocuments={3}
       canUploadDocuments
       onUploadDocument={async () => {}}
+      onDeleteUploadedDocument={async () => {}}
       onDownloadDocument={async () => {}}
       uploadingDocumentId={null}
+      deletingDocumentId={null}
       downloadingDocumentId={null}
     />
   ),
@@ -76,7 +78,7 @@ export const DocumentUploadModal: Story = {
     await expect(await canvas.findByText(/passport\.pdf/i)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole('button', { name: 'Upload Document' }));
 
-    await expect(documentUploadSubmit).toHaveBeenCalledWith(expect.any(File));
+    await expect(documentUploadSubmit).toHaveBeenCalledWith(expect.any(File), null);
   },
 };
 
