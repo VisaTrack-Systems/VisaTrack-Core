@@ -40,20 +40,28 @@ try {
     $failed = $true
 }
 
-# 4) Frontend
-Write-Host "`n[4] Frontend (port 3000)..." -ForegroundColor Yellow
-$feCode = (curl.exe -s -o NUL -w "%{http_code}" http://localhost:3000 2>&1)
-if ($feCode -eq "200") {
-    Write-Host "  OK - Frontend reachable at http://localhost:3000" -ForegroundColor Green
+# 4) Frontend (try 3000 then 3001 - docker-compose may map to either)
+Write-Host "`n[4] Frontend (port 3000 or 3001)..." -ForegroundColor Yellow
+$fePort = $null
+$feCode3000 = (curl.exe -s -o NUL -w "%{http_code}" --connect-timeout 2 http://localhost:3000 2>&1)
+$feCode3001 = (curl.exe -s -o NUL -w "%{http_code}" --connect-timeout 2 http://localhost:3001 2>&1)
+if ($feCode3000 -eq "200") {
+    $fePort = 3000
+} elseif ($feCode3001 -eq "200") {
+    $fePort = 3001
+}
+if ($fePort) {
+    Write-Host "  OK - Frontend reachable at http://localhost:$fePort" -ForegroundColor Green
 } else {
-    Write-Host "  FAIL - Frontend not reachable at http://localhost:3000 (HTTP $feCode). Is 'visatrack-frontend' running?" -ForegroundColor Red
+    Write-Host "  FAIL - Frontend not reachable at http://localhost:3000 or :3001 (3000=$feCode3000, 3001=$feCode3001). Is 'visatrack-frontend' running?" -ForegroundColor Red
     $failed = $true
 }
 
 # 5) Frontend -> API (CORS / connectivity)
 Write-Host "`n[5] Frontend -> API (CORS)..." -ForegroundColor Yellow
+$origin = if ($fePort) { "http://localhost:$fePort" } else { "http://localhost:3000" }
 try {
-    $headers = @{ "Origin" = "http://localhost:3000" }
+    $headers = @{ "Origin" = $origin }
     $r = Invoke-WebRequest -Uri "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 5 -Headers $headers
     $aco = $r.Headers["Access-Control-Allow-Origin"]
     if ($r.StatusCode -ne 200) { throw "Status $($r.StatusCode)" }
