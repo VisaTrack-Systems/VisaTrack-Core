@@ -15,7 +15,7 @@ from app.schemas.user import UserRead
 
 def test_schema_objects_validate_expected_fields():
     now = datetime.now(timezone.utc)
-    assert AdminCreateOrganizationRequest(name='Acme', contact_email='a@b.com').subscription_tier == 'basic'
+    assert AdminCreateOrganizationRequest(name='Acme', contact_email='a@b.com', slug='acme').subscription_tier == 'basic'
     assert LoginRequest(organization_slug='acme', email='user@example.com', password='secret').organization_slug == 'acme'
     assert CaseDocumentUploadInitiateRequest(file_name='doc.pdf', file_type='application/pdf', file_size_bytes=10).file_type == 'application/pdf'
     assert DashboardStats(organizations=1, users=2, active_cases=3, completed_cases=4).users == 2
