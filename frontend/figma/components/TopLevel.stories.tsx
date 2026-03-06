@@ -109,7 +109,7 @@ export const ClientDashboardPage: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await expect(await canvas.findByRole('heading', { name: /welcome back, jordan client/i })).toBeInTheDocument();
+    await expect(await canvas.findByRole('heading', { name: /welcome back, jordan/i })).toBeInTheDocument();
     await expect(await canvas.findByText('Document Checklist')).toBeInTheDocument();
 
     const caseSwitcher = await canvas.findByRole('combobox');

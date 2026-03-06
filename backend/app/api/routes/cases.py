@@ -1450,7 +1450,8 @@ def get_case_workspace_by_number(
                 COALESCE(cd.status, CASE WHEN dt.is_required THEN 'pending' ELSE 'not_requested' END) AS doc_status,
                 cd.uploaded_at,
                 cd.expiry_date,
-                cd.file_name
+                cd.file_name,
+                cd.description AS client_note
             FROM document_suites ds
             LEFT JOIN document_templates dt ON dt.suite_id = ds.id AND dt.is_active = TRUE
             LEFT JOIN LATERAL (
@@ -1459,7 +1460,8 @@ def get_case_workspace_by_number(
                     cdx.status,
                     cdx.uploaded_at,
                     cdx.expiry_date,
-                    cdx.file_name
+                    cdx.file_name,
+                    cdx.description
                 FROM case_documents cdx
                 WHERE
                     cdx.case_id = :case_id
@@ -1512,6 +1514,7 @@ def get_case_workspace_by_number(
                     due_date=document_row["expiry_date"],
                     uploaded_at=document_row["uploaded_at"],
                     instructions=document_row["instructions"],
+                    client_note=document_row.get("client_note"),
                     file_name=document_row["file_name"],
                     latest_case_document_id=(
                         str(document_row["latest_case_document_id"])
@@ -1536,14 +1539,15 @@ def get_case_workspace_by_number(
                         status,
                         uploaded_at,
                         expiry_date,
-                        file_name
+                        file_name,
+                        description AS client_note
                     FROM case_documents
                     WHERE case_id = :case_id
                       AND deleted_at IS NULL
                       AND id = ANY(CAST(:document_ids AS uuid[]))
                     """
                 ),
-                {"case_id": str(case.id), "document_ids": bound_case_document_ids},
+                {"case_id": case_id, "document_ids": bound_case_document_ids},
             ).mappings().all()
         }
 
@@ -1556,7 +1560,8 @@ def get_case_workspace_by_number(
                 status,
                 uploaded_at,
                 expiry_date,
-                file_name
+                file_name,
+                description AS client_note
             FROM case_documents
             WHERE
                 case_id = :case_id
@@ -1590,6 +1595,7 @@ def get_case_workspace_by_number(
                 due_date=custom_document_row["expiry_date"],
                 uploaded_at=custom_document_row["uploaded_at"],
                 instructions="",
+                client_note=custom_document_row.get("client_note"),
                 file_name=custom_document_row["file_name"],
                 latest_case_document_id=custom_document_id,
                 can_download=True,
@@ -1635,6 +1641,7 @@ def get_case_workspace_by_number(
         bound_status = bound_case_document["status"] if bound_case_document else None
         bound_uploaded_at = bound_case_document["uploaded_at"] if bound_case_document else None
         bound_file_name = bound_case_document["file_name"] if bound_case_document else None
+        bound_client_note = bound_case_document.get("client_note") if bound_case_document else None
         suites_map[suite_id]["documents"].append(
             CaseWorkspaceDocument(
                 id=custom_document_id,
@@ -1644,6 +1651,7 @@ def get_case_workspace_by_number(
                 due_date=custom_document["due_date"],
                 uploaded_at=bound_uploaded_at,
                 instructions=custom_document["instructions"],
+                client_note=bound_client_note,
                 file_name=bound_file_name,
                 latest_case_document_id=str(bound_case_document["id"]) if bound_case_document else None,
                 can_download=bound_case_document is not None,
@@ -2509,6 +2517,9 @@ def complete_case_document_upload(
     actual_file_size = int(head_response.get("ContentLength") or payload.file_size_bytes)
     actual_file_type = str(head_response.get("ContentType") or payload.file_type or "application/octet-stream")
     actual_file_name = payload.file_name.strip()
+    normalized_client_note = (payload.client_note or "").strip() or None
+    if normalized_client_note and len(normalized_client_note) > 2000:
+        raise HTTPException(status_code=400, detail="Client note must be 2000 characters or fewer")
     if not actual_file_name:
         raise HTTPException(status_code=400, detail="File name is required")
 
@@ -2519,6 +2530,7 @@ def complete_case_document_upload(
                 case_id,
                 template_id,
                 name,
+                description,
                 file_name,
                 file_path,
                 file_size_bytes,
@@ -2534,6 +2546,7 @@ def complete_case_document_upload(
                 :case_id,
                 CAST(:template_id AS uuid),
                 :name,
+                :description,
                 :file_name,
                 :file_path,
                 :file_size_bytes,
@@ -2553,6 +2566,7 @@ def complete_case_document_upload(
             "case_id": str(case.id),
             "template_id": slot["template_id"],
             "name": slot["name"],
+            "description": normalized_client_note,
             "file_name": actual_file_name,
             "file_path": payload.storage_key,
             "file_size_bytes": actual_file_size,
@@ -2618,10 +2632,89 @@ def complete_case_document_upload(
         due_date=payload.expiry_date,
         uploaded_at=insert_result["uploaded_at"],
         instructions=slot["instructions"],
+        client_note=normalized_client_note,
         file_name=actual_file_name,
         latest_case_document_id=str(insert_result["id"]),
         can_download=True,
     )
+
+
+@router.delete(
+    "/by-number/{case_number}/documents/{document_id}/uploaded-file",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_client_uploaded_document(
+    case_number: str,
+    document_id: str,
+    auth: AuthContext = Depends(require_roles("client")),
+    db: Session = Depends(get_db),
+) -> None:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    client_capabilities = _client_portal_capabilities(case)
+    if not client_capabilities["can_upload_documents"]:
+        raise HTTPException(status_code=403, detail="Document deletions are disabled for this portal")
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    case_document = slot["bound_case_document"]
+    if case_document is None:
+        raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+
+    delete_result = db.execute(
+        text(
+            """
+            UPDATE case_documents
+            SET deleted_at = NOW(), updated_at = NOW()
+            WHERE
+                id = :case_document_id
+                AND case_id = :case_id
+                AND uploaded_by = :user_id
+                AND deleted_at IS NULL
+            RETURNING id
+            """
+        ),
+        {
+            "case_document_id": str(case_document["id"]),
+            "case_id": str(case.id),
+            "user_id": str(auth.user_id),
+        },
+    ).first()
+
+    if delete_result is None:
+        raise HTTPException(status_code=403, detail="You can only delete documents you uploaded")
+
+    if slot["kind"] == "custom_request":
+        custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+        upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+        if upload_bindings.get(slot["logical_document_id"]) == str(case_document["id"]):
+            upload_bindings.pop(slot["logical_document_id"], None)
+            case.custom_fields = {**custom_fields, "document_upload_bindings": upload_bindings}
+            db.add(case)
+
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="deleted",
+        entity_type="document",
+        entity_id=case_document["id"],
+        case_id=case.id,
+        client_id=case.client_id,
+        old_values={
+            "document_id": slot["logical_document_id"],
+            "case_document_id": str(case_document["id"]),
+            "file_name": str(case_document["file_name"] or slot["name"]),
+        },
+    )
+    log_document_access(
+        db,
+        document_id=case_document["id"],
+        user_id=auth.user_id,
+        action="delete",
+        ip_address=None,
+        user_agent=None,
+    )
+
+    db.commit()
 
 
 @router.get(

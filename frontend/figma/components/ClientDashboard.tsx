@@ -18,6 +18,7 @@ export function ClientDashboard() {
     caseInfo,
     documents,
     milestones,
+    allMessages,
     recentMessages,
     upcomingAppointments,
     billingInfo,
@@ -25,8 +26,10 @@ export function ClientDashboard() {
     completedRequiredDocuments,
     capabilities,
     uploadDocument,
+    deleteUploadedDocument,
     downloadDocument,
     uploadingDocumentId,
+    deletingDocumentId,
     downloadingDocumentId,
   } = useClientDashboardData();
 
@@ -49,6 +52,7 @@ export function ClientDashboard() {
     capabilities.canViewMilestones ||
     capabilities.canViewMessages ||
     capabilities.canViewBilling;
+  const firstName = workspace.case.client_name.trim().split(/\s+/)[0] || workspace.case.client_name;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -56,7 +60,7 @@ export function ClientDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Welcome back, {workspace.case.client_name}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Welcome back, {firstName}</h1>
               <p className="text-sm text-gray-500 mt-1">Here&apos;s the latest on your immigration case.</p>
             </div>
             {clientCases.length > 1 ? (
@@ -113,8 +117,10 @@ export function ClientDashboard() {
                 requiredDocuments={requiredDocuments}
                 canUploadDocuments={capabilities.canUploadDocuments}
                 onUploadDocument={uploadDocument}
+                onDeleteUploadedDocument={deleteUploadedDocument}
                 onDownloadDocument={downloadDocument}
                 uploadingDocumentId={uploadingDocumentId}
+                deletingDocumentId={deletingDocumentId}
                 downloadingDocumentId={downloadingDocumentId}
               />
             ) : null}
@@ -124,6 +130,7 @@ export function ClientDashboard() {
           <div className="space-y-6">
             {capabilities.canViewMessages ? (
               <MessagesPanel
+                allMessages={allMessages}
                 recentMessages={recentMessages}
                 canSendMessages={capabilities.canSendMessages}
               />
