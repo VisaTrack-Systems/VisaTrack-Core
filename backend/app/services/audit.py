@@ -198,3 +198,83 @@ def _array_to_pg(arr: Optional[list[str]]) -> Optional[str]:
         return None
     escaped = [str(s).replace("\\", "\\\\").replace('"', '\\"') for s in arr]
     return "{" + ",".join(f'"{e}"' for e in escaped) + "}"
+
+
+# Invoice event types (append-only trail for SOC 1)
+INVOICE_EVENT_CREATED = "invoice_created"
+INVOICE_EVENT_SENT = "sent"
+INVOICE_EVENT_VIEWED = "viewed"
+INVOICE_EVENT_LINE_ITEM_ADDED = "line_item_added"
+INVOICE_EVENT_ADJUSTED = "adjusted"
+INVOICE_EVENT_VOIDED = "voided"
+INVOICE_EVENT_PAID = "paid"
+INVOICE_EVENT_REFUNDED = "refunded"
+
+
+def log_invoice_event(
+    db: Session,
+    *,
+    invoice_id: UUID,
+    organization_id: UUID,
+    event_type: str,
+    actor_user_id: Optional[UUID] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> None:
+    """Append an event to invoice_events (append-only). No-op if table does not exist."""
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO invoice_events (invoice_id, organization_id, event_type, actor_user_id, metadata)
+                VALUES (:invoice_id, :organization_id, :event_type, :actor_user_id, CAST(:metadata AS jsonb))
+                """
+            ),
+            {
+                "invoice_id": str(invoice_id),
+                "organization_id": str(organization_id),
+                "event_type": event_type,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+                "metadata": _json_or_none(metadata),
+            },
+        )
+    except Exception as e:
+        if "does not exist" in str(e).lower() or "undefined_table" in str(e).lower():
+            return
+        raise
+
+
+# Trust entry event types (append-only trail for SOC 1)
+TRUST_ENTRY_EVENT_RECONCILE = "reconcile"
+TRUST_ENTRY_EVENT_VOID = "void"
+
+
+def log_trust_entry_event(
+    db: Session,
+    *,
+    trust_entry_id: UUID,
+    organization_id: UUID,
+    event_type: str,
+    actor_user_id: Optional[UUID] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> None:
+    """Append an event to trust_entry_events (append-only). No-op if table does not exist."""
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO trust_entry_events (trust_entry_id, organization_id, event_type, actor_user_id, metadata)
+                VALUES (:trust_entry_id, :organization_id, :event_type, :actor_user_id, CAST(:metadata AS jsonb))
+                """
+            ),
+            {
+                "trust_entry_id": str(trust_entry_id),
+                "organization_id": str(organization_id),
+                "event_type": event_type,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+                "metadata": _json_or_none(metadata),
+            },
+        )
+    except Exception as e:
+        if "does not exist" in str(e).lower() or "undefined_table" in str(e).lower():
+            return
+        raise

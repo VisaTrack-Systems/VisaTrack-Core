@@ -53,7 +53,8 @@ Ensure migrations run in order (e.g. `alembic upgrade head`):
 5. d4e5f6a7b8c9 (Phase 2 RLS policies)  
 6. e5f6a7b8c9d0 (Phase 3 activity_log + doc audit)  
 7. f6a7b8c9d0e1 (Phase 4 financial)  
-8. a7b8c9d0e1f2 (Phase 5 retention/legal hold)
+8. a7b8c9d0e1f2 (Phase 5 retention/legal hold)  
+9. b8c9d0e1f2a3 (trust_account_entries organization_id + RLS)
 
 ---
 

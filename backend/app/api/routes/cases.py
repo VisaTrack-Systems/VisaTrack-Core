@@ -24,6 +24,8 @@ from app.schemas.case import (
     CaseCustomDocumentCreateRequest,
     CaseDocumentRenameRequest,
     CaseDocumentRenameResponse,
+    CaseDocumentRetentionUpdateRequest,
+    CaseDocumentRetentionUpdateResponse,
     CaseDocumentDownloadResponse,
     CaseDocumentUploadCompleteRequest,
     CaseDocumentUploadInitiateRequest,
@@ -2469,6 +2471,77 @@ def update_case_document_status(
         document_id=str(document_uuid),
         status=normalized_status,
     )
+
+
+@router.patch(
+    "/by-number/{case_number}/documents/{document_id}/retention",
+    response_model=CaseDocumentRetentionUpdateResponse,
+)
+def update_case_document_retention(
+    case_number: str,
+    document_id: str,
+    payload: CaseDocumentRetentionUpdateRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentRetentionUpdateResponse:
+    """Set legal_hold and/or retain_until on a case document (retention/legal hold)."""
+    case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
+    try:
+        document_uuid = UUID(document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid document id") from exc
+
+    try:
+        updates = []
+        params = {"document_id": str(document_uuid), "case_id": str(case.id)}
+        if payload.legal_hold is not None:
+            updates.append("legal_hold = :legal_hold")
+            params["legal_hold"] = payload.legal_hold
+        if payload.retain_until is not None:
+            updates.append("retain_until = :retain_until")
+            params["retain_until"] = payload.retain_until
+        if not updates:
+            raise HTTPException(status_code=400, detail="Provide legal_hold and/or retain_until")
+
+        set_clause = ", ".join(updates)
+        row = db.execute(
+            text(
+                f"""
+                UPDATE case_documents
+                SET {set_clause}, updated_at = NOW()
+                WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
+                RETURNING id, legal_hold, retain_until
+                """
+            ),
+            params,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Document not found for this case")
+
+        log_activity(
+            db,
+            organization_id=case.organization_id,
+            user_id=auth.user_id,
+            action="updated",
+            entity_type="document_retention",
+            entity_id=None,
+            case_id=case.id,
+            client_id=case.client_id,
+            new_values={"document_id": document_id, "legal_hold": getattr(row, "legal_hold", None), "retain_until": getattr(row, "retain_until", None)},
+        )
+        db.commit()
+        return CaseDocumentRetentionUpdateResponse(
+            document_id=str(document_uuid),
+            legal_hold=getattr(row, "legal_hold", False),
+            retain_until=getattr(row, "retain_until"),
+        )
+    except ProgrammingError as e:
+        if "does not exist" in str(e).lower() or "undefined_column" in str(e).lower():
+            raise HTTPException(
+                status_code=501,
+                detail="Retention columns (legal_hold, retain_until) not available; run Phase 5 migration",
+            ) from e
+        raise
 
 
 @router.post(
