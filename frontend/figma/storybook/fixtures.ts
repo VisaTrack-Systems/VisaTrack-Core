@@ -1,4 +1,5 @@
 import type {
+  AdminOperations,
   AdminOverview,
   AdminRoleItem,
   CaseListItem,
@@ -618,6 +619,14 @@ export const mockAdminRoles: AdminRoleItem[] = [
     permissions: ['portal:view'],
   },
 ];
+
+export const mockAdminOperations: AdminOperations = {
+  organization_id: organizationId,
+  unassigned_cases: [],
+  aging_cases: [],
+  lawyer_workload: [],
+  pending_invitations: [],
+};
 
 export const mockAdminOverview: AdminOverview = {
   stats: {
