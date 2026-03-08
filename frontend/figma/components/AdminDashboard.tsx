@@ -1047,8 +1047,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             { label: 'First Name', value: pendingUserCreate.first_name },
             { label: 'Last Name', value: pendingUserCreate.last_name },
             { label: 'Email', value: pendingUserCreate.email },
-            { label: 'Role', value: pendingUserCreate.role_slug ?? "" },
-            { label: 'Status', value: pendingUserCreate.status  ?? "" },
+            { label: 'Role', value: pendingUserCreate.role_slug ?? '' },
+            { label: 'Status', value: pendingUserCreate.status ?? '' },
             { label: 'Temporary Password', value: '••••••••' },
           ]}
           onConfirm={() => void executeCreateUser()}
