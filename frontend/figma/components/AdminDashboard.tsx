@@ -757,11 +757,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 {roles.length === 0 ? (
                   <option value="lawyer">Lawyer</option>
                 ) : (
-                  roles.map((role) => (
-                    <option key={role.id} value={role.slug}>
-                      {role.name}
-                    </option>
-                  ))
+                  roles
+                    .filter((role) => isSuperAdmin || role.slug !== 'super_admin')
+                    .map((role) => (
+                      <option key={role.id} value={role.slug}>
+                        {role.name}
+                      </option>
+                    ))
                 )}
               </select>
             </div>
@@ -860,7 +862,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <tbody className="divide-y divide-gray-200">
                 {users.map((user) => {
                   const organization = organizations.find((entry) => entry.id === user.organization_id);
-                  const assignableRoles = roles.filter((role) => !user.roles.includes(role.slug));
+                  const assignableRoles = roles.filter(
+                    (role) => !user.roles.includes(role.slug) && (isSuperAdmin || role.slug !== 'super_admin')
+                  );
                   const selectedRole = roleDraftByUserId[user.id] ?? assignableRoles[0]?.slug ?? '';
                   const roleBusy = busyRoleUserId === user.id;
                   return (
@@ -986,8 +990,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             { label: 'Organization Name', value: pendingOrgCreate.name },
             { label: 'Contact Email', value: pendingOrgCreate.contact_email },
             { label: 'Slug', value: pendingOrgCreate.slug },
-            { label: 'Subscription Tier', value: pendingOrgCreate.subscription_tier || " "},
-            { label: 'Subscription Status', value: pendingOrgCreate.subscription_status || ""},
+            { label: 'Subscription Tier', value: pendingOrgCreate.subscription_tier ?? '' },
+            { label: 'Subscription Status', value: pendingOrgCreate.subscription_status ?? '' },
           ]}
           onConfirm={() => void executeCreateOrganization()}
           onClose={() => setPendingOrgCreate(null)}
@@ -1005,8 +1009,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             { label: 'First Name', value: pendingUserCreate.first_name },
             { label: 'Last Name', value: pendingUserCreate.last_name },
             { label: 'Email', value: pendingUserCreate.email },
-            { label: 'Role', value: pendingUserCreate.role_slug || " " },
-            { label: 'Status', value: pendingUserCreate.status || " " },
+            { label: 'Role', value: pendingUserCreate.role_slug ?? "" },
+            { label: 'Status', value: pendingUserCreate.status  ?? "" },
             { label: 'Temporary Password', value: '••••••••' },
           ]}
           onConfirm={() => void executeCreateUser()}
