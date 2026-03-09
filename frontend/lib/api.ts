@@ -179,6 +179,23 @@ export type AdminCreateUserInput = {
   role_slug?: string;
 };
 
+export type AdminCreateUserResult = UserListItem & {
+  invitation_url: string | null;
+};
+
+export type VerifyInvitationResult = {
+  email: string;
+  full_name: string;
+  organization_id: string;
+  expires_at: string;
+};
+
+export type AcceptInvitationResult = {
+  message: string;
+  email: string;
+  organization_id: string;
+};
+
 export type AdminOperations = {
   organization_id: string;
   unassigned_cases: Array<{
@@ -836,10 +853,23 @@ export async function deleteAdminOrganization(organizationId: string): Promise<v
   });
 }
 
-export async function createAdminUser(input: AdminCreateUserInput): Promise<UserListItem> {
-  return requestJson<UserListItem>('/api/v1/admin/users', {
+export async function createAdminUser(input: AdminCreateUserInput): Promise<AdminCreateUserResult> {
+  return requestJson<AdminCreateUserResult>('/api/v1/admin/users', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export async function verifyInvitation(token: string): Promise<VerifyInvitationResult> {
+  return requestJson<VerifyInvitationResult>(
+    `/api/v1/auth/verify-invitation?token=${encodeURIComponent(token)}`
+  );
+}
+
+export async function acceptInvitation(token: string, password: string): Promise<AcceptInvitationResult> {
+  return requestJson<AcceptInvitationResult>('/api/v1/auth/accept-invitation', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
   });
 }
 

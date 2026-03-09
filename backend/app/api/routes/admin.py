@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -8,7 +8,8 @@ from sqlalchemy import String, and_, cast, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_permissions, require_roles
-from app.core.security import hash_password
+from app.core.config import settings
+from app.core.security import generate_invitation_token, hash_invitation_token, hash_password
 from app.db.deps import get_db
 from app.models.case import Case
 from app.models.organization import Organization
@@ -22,6 +23,7 @@ from app.schemas.admin import (
     AdminCaseAssignmentResponse,
     AdminCreateOrganizationRequest,
     AdminCreateUserRequest,
+    AdminCreateUserResponse,
     AdminOperationsResponse,
     AdminOpsCaseItem,
     AdminOpsInvitationItem,
@@ -641,13 +643,19 @@ def list_admin_users(
     ]
 
 
-@router.post("/users", response_model=UserListItem, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=AdminCreateUserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     payload: AdminCreateUserRequest,
     auth: AuthContext = Depends(require_permissions("users:manage")),
     db: Session = Depends(get_db),
-) -> UserListItem:
+) -> AdminCreateUserResponse:
     _require_org_scope(auth, payload.organization_id)
+
+    normalized_status = payload.status.strip().lower()
+    is_invited = normalized_status == "invited"
+
+    if not is_invited and not payload.password:
+        raise HTTPException(status_code=400, detail="Password is required for non-invited users")
 
     organization_exists = db.scalar(
         select(Organization.id).where(
@@ -669,10 +677,13 @@ def create_user(
     if existing_user is not None:
         raise HTTPException(status_code=409, detail="User email already exists in organization")
 
-    try:
-        password_hash = hash_password(payload.password)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if is_invited:
+        password_hash = hash_password(generate_invitation_token())
+    else:
+        try:
+            password_hash = hash_password(payload.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     new_user = User(
         organization_id=payload.organization_id,
@@ -680,7 +691,7 @@ def create_user(
         password_hash=password_hash,
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip(),
-        status=payload.status.strip().lower(),
+        status=normalized_status,
     )
     db.add(new_user)
     db.flush()
@@ -692,6 +703,22 @@ def create_user(
         assigned_by=auth.user_id,
     )
 
+    invitation_url: str | None = None
+    if is_invited:
+        now = datetime.now(timezone.utc)
+        plain_token = generate_invitation_token()
+        invitation = UserInvitation(
+            organization_id=payload.organization_id,
+            user_id=new_user.id,
+            email=normalized_email,
+            role_slug=payload.role_slug.strip().lower(),
+            token_hash=hash_invitation_token(plain_token),
+            expires_at=now + timedelta(hours=settings.invitation_expiry_hours),
+            invited_by=auth.user_id,
+        )
+        db.add(invitation)
+        invitation_url = f"{settings.frontend_origin}/invite?token={plain_token}"
+
     log_activity(
         db,
         organization_id=payload.organization_id,
@@ -699,13 +726,13 @@ def create_user(
         action="created",
         entity_type="user",
         entity_id=new_user.id,
-        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower()},
+        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower(), "invited": is_invited},
     )
 
     db.commit()
     db.refresh(new_user)
 
-    return UserListItem(
+    return AdminCreateUserResponse(
         id=new_user.id,
         email=new_user.email,
         full_name=f"{new_user.first_name} {new_user.last_name}",
@@ -713,6 +740,7 @@ def create_user(
         organization_id=new_user.organization_id,
         created_at=new_user.created_at,
         roles=[payload.role_slug.strip().lower()],
+        invitation_url=invitation_url,
     )
 
 

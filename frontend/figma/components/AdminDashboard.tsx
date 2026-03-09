@@ -203,6 +203,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const closeConfirm = () => setConfirmDialog(null);
   const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
   const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
+  const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
   const [userNameFilter, setUserNameFilter] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
 
@@ -302,7 +303,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         ...initialUserForm,
         organization_id: previous.organization_id,
       }));
-      setFlash({ kind: 'success', message: `User created: ${created.full_name}` });
+      if (created.invitation_url) {
+        setInvitationUrl(created.invitation_url);
+      } else {
+        setFlash({ kind: 'success', message: `User created: ${created.full_name}` });
+      }
       await loadAdminData(true);
     } catch (createError) {
       setFlash({
@@ -871,7 +876,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <button
                 type="button"
                 onClick={() => { setUserNameFilter(''); setUserRoleFilter(''); }}
-                className="bg-red-500 border border-gray-300 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors text-amber-50 hover:text-amber-700"
+                className="bg-red-500 border border-gray-300 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
               >
                 Reset filters
               </button>
@@ -1054,6 +1059,51 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           onConfirm={() => void executeCreateUser()}
           onClose={() => setPendingUserCreate(null)}
         />
+      ) : null}
+
+      {invitationUrl ? (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl">
+            <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Invitation link ready</h2>
+              <button
+                type="button"
+                onClick={() => setInvitationUrl(null)}
+                className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-600 mb-3">
+                Share this link with the user so they can set their password and activate their account. It expires in 72 hours.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={invitationUrl}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 bg-gray-50 truncate"
+                />
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard.writeText(invitationUrl)}
+                  className="border border-gray-300 px-3 py-2 rounded-lg text-xs hover:bg-gray-100 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInvitationUrl(null)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

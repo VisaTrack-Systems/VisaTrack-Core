@@ -18,9 +18,20 @@ class AdminCreateUserRequest(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
-    password: str = Field(min_length=8, max_length=128)
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
     status: str = Field(default="active", min_length=2, max_length=50)
     role_slug: str = Field(default="lawyer", min_length=2, max_length=100)
+
+
+class AdminCreateUserResponse(BaseModel):
+    id: UUID
+    email: str
+    full_name: str
+    status: str
+    organization_id: Optional[UUID]
+    created_at: datetime
+    roles: list[str] = Field(default_factory=list)
+    invitation_url: Optional[str] = None
 
 
 class AdminOverviewStats(BaseModel):
