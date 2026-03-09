@@ -203,6 +203,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const closeConfirm = () => setConfirmDialog(null);
   const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
   const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
+  const [userNameFilter, setUserNameFilter] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
 
   const isSuperAdmin = currentUser?.active_role === 'super_admin';
 
@@ -842,8 +844,38 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-900">All Users</h3>
+          <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <h3 className="font-semibold text-gray-900 mr-auto">All Users</h3>
+            <input
+              type="text"
+              placeholder="Filter by name…"
+              value={userNameFilter}
+              onChange={(event) => setUserNameFilter(event.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-500 w-48"
+            />
+            <select
+              value={userRoleFilter}
+              onChange={(event) => setUserRoleFilter(event.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white"
+            >
+              <option value="">All roles</option>
+              {roles
+                .filter((role) => role.slug !== 'super_admin')
+                .map((role) => (
+                  <option key={role.id} value={role.slug}>
+                    {role.name}
+                  </option>
+                ))}
+            </select>
+            {(userNameFilter !== '' || userRoleFilter !== '') && (
+              <button
+                type="button"
+                onClick={() => { setUserNameFilter(''); setUserRoleFilter(''); }}
+                className="bg-red-500 border border-gray-300 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors text-amber-50 hover:text-amber-700"
+              >
+                Reset filters
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -860,7 +892,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {users.map((user) => {
+                {users
+                  .filter((user) => {
+                    const nameMatch = user.full_name.toLowerCase().includes(userNameFilter.toLowerCase());
+                    const roleMatch = userRoleFilter === '' || user.roles.includes(userRoleFilter);
+                    return nameMatch && roleMatch;
+                  })
+                  .map((user) => {
                   const organization = organizations.find((entry) => entry.id === user.organization_id);
                   const assignableRoles = roles.filter(
                     (role) => !user.roles.includes(role.slug) && (isSuperAdmin || role.slug !== 'super_admin')
