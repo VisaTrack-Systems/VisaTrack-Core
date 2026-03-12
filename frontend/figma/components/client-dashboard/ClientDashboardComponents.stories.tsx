@@ -50,6 +50,14 @@ export const DocumentChecklist: Story = {
       downloadingDocumentId={null}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByText('Requested')).toBeInTheDocument();
+    await expect(await canvas.findByText('Received / Under Review')).toBeInTheDocument();
+    await expect(await canvas.findByText('Rejected')).toBeInTheDocument();
+    await expect(await canvas.findByText('Rejection note')).toBeInTheDocument();
+  },
 };
 
 export const DocumentUploadModal: Story = {
@@ -94,7 +102,14 @@ export const Milestones: Story = {
 };
 
 export const Messages: Story = {
-  render: () => <MessagesPanel recentMessages={mockDashboardMessages} canSendMessages />,
+  render: () => <MessagesPanel recentMessages={mockDashboardMessages} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByRole('heading', { name: 'Lawyer Messages' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: /send message/i })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: /messaging disabled/i })).not.toBeInTheDocument();
+  },
 };
 
 export const Appointments: Story = {
