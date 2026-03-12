@@ -288,6 +288,7 @@ export type CaseWorkspace = {
       uploaded_at: string | null;
       instructions: string | null;
       client_note?: string | null;
+      rejection_note?: string | null;
       file_name: string | null;
       latest_case_document_id: string | null;
       can_download: boolean;
@@ -302,6 +303,7 @@ export type CaseWorkspace = {
     uploaded_at: string | null;
     instructions: string | null;
     client_note?: string | null;
+    rejection_note?: string | null;
     file_name: string | null;
     latest_case_document_id: string | null;
     can_download: boolean;
@@ -374,12 +376,10 @@ export type CaseCustomDocumentSuiteCreateInput = {
 };
 
 export type CaseDocumentStatus =
-  | 'pending'
-  | 'received'
-  | 'under_review'
+  | 'requested'
+  | 'received_under_review'
   | 'approved'
   | 'rejected'
-  | 'needs_revision'
   | 'expired'
   | 'not_requested';
 
@@ -1003,13 +1003,14 @@ export async function createCaseCustomDocumentSuite(
 export async function updateCaseDocumentStatus(
   caseNumber: string,
   documentId: string,
-  status: CaseDocumentStatus
-): Promise<{ document_id: string; status: CaseDocumentStatus }> {
-  return requestJson<{ document_id: string; status: CaseDocumentStatus }>(
+  status: CaseDocumentStatus,
+  rejectionNote?: string | null
+): Promise<{ document_id: string; status: CaseDocumentStatus; rejection_note?: string | null }> {
+  return requestJson<{ document_id: string; status: CaseDocumentStatus; rejection_note?: string | null }>(
     `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/status`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, rejection_note: rejectionNote ?? null }),
     }
   );
 }

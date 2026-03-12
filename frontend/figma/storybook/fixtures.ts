@@ -225,10 +225,11 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-reference',
           name: 'Employer Reference Letter',
           required: true,
-          status: 'needs_revision',
+          status: 'rejected',
           due_date: '2026-03-05',
           uploaded_at: '2026-02-19T16:30:00Z',
           instructions: 'Must include duties, salary, and duration.',
+          rejection_note: 'Please upload a signed employer letter that includes salary, duties, and exact dates.',
           file_name: 'reference-letter.pdf',
           latest_case_document_id: 'case-doc-reference',
           can_download: true,
@@ -237,7 +238,7 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-paystubs',
           name: 'Recent Pay Stubs',
           required: true,
-          status: 'received',
+          status: 'received_under_review',
           due_date: '2026-03-05',
           uploaded_at: '2026-02-20T10:15:00Z',
           instructions: 'Upload the last three months.',
@@ -257,7 +258,7 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-travel-history',
           name: 'Travel History Summary',
           required: false,
-          status: 'pending',
+          status: 'requested',
           due_date: '2026-03-10',
           uploaded_at: null,
           instructions: 'Provide a list of trips taken in the last 10 years.',
@@ -417,7 +418,7 @@ mockCaseWorkspaceSecondary.document_suites = mockCaseWorkspaceSecondary.document
     document.id === 'doc-reference'
       ? {
           ...document,
-          status: 'pending',
+          status: 'requested',
           uploaded_at: null,
           file_name: null,
           latest_case_document_id: null,
@@ -426,7 +427,7 @@ mockCaseWorkspaceSecondary.document_suites = mockCaseWorkspaceSecondary.document
       : document.id === 'doc-paystubs'
         ? {
             ...document,
-            status: 'received',
+            status: 'received_under_review',
             uploaded_at: '2026-02-18T10:15:00Z',
             file_name: 'work-permit-paystubs.zip',
             latest_case_document_id: 'case-doc-work-permit-paystubs',
@@ -502,24 +503,34 @@ export const mockDashboardDocuments: DashboardDocument[] = mockCaseWorkspace.doc
     id: document.id,
     name: document.name,
     status:
-      document.status === 'approved'
+      document.status === 'rejected'
+        ? 'rejected'
+        : document.status === 'approved'
         ? 'completed'
-        : document.status === 'received' || document.status === 'under_review'
+        : document.status === 'received_under_review' || document.status === 'received' || document.status === 'under_review'
           ? 'review'
           : document.required
             ? 'pending'
             : 'optional',
-    lawyerStatus: document.status
-      .replaceAll('_', ' ')
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0].toUpperCase() + part.slice(1))
-      .join(' '),
+    lawyerStatus:
+      document.status === 'received_under_review'
+        ? 'Received / Under Review'
+        : document.status === 'requested'
+          ? 'Requested'
+          : document.status === 'rejected'
+            ? 'Rejected'
+            : document.status
+                .replaceAll('_', ' ')
+                .split(' ')
+                .filter(Boolean)
+                .map((part) => part[0].toUpperCase() + part.slice(1))
+                .join(' '),
     uploadedDate: document.uploaded_at ?? 'Pending',
     required: document.required,
     instructions: document.instructions,
     fileName: document.file_name,
     canDownload: document.can_download,
+    rejectionNote: document.rejection_note ?? null,
   }));
 
 export const mockDashboardMilestones: DashboardMilestone[] = [

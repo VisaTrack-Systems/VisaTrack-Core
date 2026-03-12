@@ -42,21 +42,47 @@ export function titleize(value: string): string {
     .join(' ');
 }
 
+export function documentStatusLabel(status: string): string {
+  switch (status) {
+    case 'requested':
+    case 'pending':
+      return 'Requested';
+    case 'received_under_review':
+    case 'received':
+    case 'under_review':
+    case 'under-review':
+      return 'Received / Under Review';
+    case 'approved':
+      return 'Approved';
+    case 'rejected':
+    case 'needs_revision':
+    case 'needs-revision':
+      return 'Rejected';
+    case 'not_requested':
+    case 'not-requested':
+      return 'Not Requested';
+    case 'expired':
+      return 'Expired';
+    default:
+      return titleize(status);
+  }
+}
+
 export function statusColor(status: string): string {
   switch (status) {
     case 'approved':
       return 'bg-green-100 text-green-700 border-green-200';
+    case 'received_under_review':
     case 'received':
-      return 'bg-blue-100 text-blue-700 border-blue-200';
     case 'under_review':
     case 'under-review':
       return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+    case 'requested':
     case 'pending':
       return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    case 'rejected':
     case 'needs_revision':
     case 'needs-revision':
-      return 'bg-orange-100 text-orange-700 border-orange-200';
-    case 'rejected':
       return 'bg-red-100 text-red-700 border-red-200';
     case 'expired':
       return 'bg-slate-100 text-slate-700 border-slate-200';

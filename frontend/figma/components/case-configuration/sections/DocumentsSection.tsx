@@ -5,11 +5,12 @@ import { ChevronDown, ChevronRight, Download, Edit2, FolderPlus, MessageSquare, 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 
 import { AddDocumentDialog } from '../dialogs/AddDocumentDialog';
+import { CaseConfigDialog } from '../dialogs/CaseConfigDialog';
 import { CreateSuiteDialog } from '../dialogs/CreateSuiteDialog';
 import { DeleteDocumentDialog } from '../dialogs/DeleteDocumentDialog';
 import { RenameDocumentDialog } from '../dialogs/RenameDocumentDialog';
 import type { DocumentStats, NewDocumentInput, NewDocumentSuiteInput } from '../types';
-import { formatDate, statusColor, titleize } from '../utils';
+import { documentStatusLabel, formatDate, statusColor } from '../utils';
 
 type DocumentsSectionProps = {
   workspace: CaseWorkspace;
@@ -28,7 +29,11 @@ type DocumentsSectionProps = {
   renamingDocumentId: string | null;
   onDownloadDocument: (documentId: string) => Promise<void>;
   downloadingDocumentId: string | null;
-  onUpdateDocumentStatus: (documentId: string, status: CaseDocumentStatus) => Promise<void>;
+  onUpdateDocumentStatus: (
+    documentId: string,
+    status: CaseDocumentStatus,
+    rejectionNote?: string | null
+  ) => Promise<void>;
   updatingDocumentId: string | null;
   onSendDocumentReminder: (documentId: string) => Promise<void>;
   sendingDocumentReminderId: string | null;
@@ -66,6 +71,9 @@ export function DocumentsSection({
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [noteTarget, setNoteTarget] = useState<{ name: string; note: string } | null>(null);
+  const [rejectionTarget, setRejectionTarget] = useState<{ id: string; name: string; note: string } | null>(null);
+  const [rejectionNoteValue, setRejectionNoteValue] = useState('');
+  const [rejectionNoteError, setRejectionNoteError] = useState<string | null>(null);
 
   const handleCreateSuite = async (input: NewDocumentSuiteInput): Promise<boolean> => {
     setIsCreatingSuite(true);
@@ -98,15 +106,36 @@ export function DocumentsSection({
   };
 
   const documentStatusOptions: Array<{ value: CaseDocumentStatus; label: string }> = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'received', label: 'Received' },
-    { value: 'under_review', label: 'Under Review' },
+    { value: 'requested', label: 'Requested' },
+    { value: 'received_under_review', label: 'Received / Under Review' },
     { value: 'approved', label: 'Approved' },
-    { value: 'needs_revision', label: 'Needs Revision' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'expired', label: 'Expired' },
     { value: 'not_requested', label: 'Not Requested' },
   ];
+
+  const openRejectionDialog = (documentId: string, documentName: string, note?: string | null) => {
+    setRejectionTarget({ id: documentId, name: documentName, note: note ?? '' });
+    setRejectionNoteValue(note ?? '');
+    setRejectionNoteError(null);
+  };
+
+  const handleRejectionSubmit = async (): Promise<void> => {
+    if (!rejectionTarget) {
+      return;
+    }
+
+    const normalizedNote = rejectionNoteValue.trim();
+    if (!normalizedNote) {
+      setRejectionNoteError('A rejection note is required.');
+      return;
+    }
+
+    setRejectionNoteError(null);
+    await onUpdateDocumentStatus(rejectionTarget.id, 'rejected', normalizedNote);
+    setRejectionTarget(null);
+    setRejectionNoteValue('');
+  };
 
   return (
     <>
@@ -123,15 +152,15 @@ export function DocumentsSection({
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="text-2xl font-bold text-blue-700">{documentStats.received}</div>
-            <div className="text-sm text-blue-600">Received</div>
+            <div className="text-sm text-blue-600">Received / Under Review</div>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="text-2xl font-bold text-yellow-700">{documentStats.pending}</div>
-            <div className="text-sm text-yellow-600">Pending</div>
+            <div className="text-sm text-yellow-600">Requested</div>
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-orange-700">{documentStats.needsRevision}</div>
-            <div className="text-sm text-orange-600">Needs Revision</div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="text-2xl font-bold text-red-700">{documentStats.rejected}</div>
+            <div className="text-sm text-red-600">Rejected</div>
           </div>
         </div>
 
@@ -201,7 +230,7 @@ export function DocumentsSection({
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-sm text-gray-600">
-                    {suite.documents.filter((document) => ['approved', 'received'].includes(document.status)).length} /{' '}
+                    {suite.documents.filter((document) => ['approved', 'received_under_review'].includes(document.status)).length} /{' '}
                     {suite.documents.length} complete
                   </div>
                 </div>
@@ -240,19 +269,26 @@ export function DocumentsSection({
                               <span
                                 className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${statusColor(document.status)}`}
                               >
-                                {titleize(document.status)}
+                                {documentStatusLabel(document.status)}
                               </span>
                               <select
                                 value={document.status}
                                 onClick={(event) => event.stopPropagation()}
-                                onChange={(event) =>
-                                  void onUpdateDocumentStatus(
-                                    document.id,
-                                    event.target.value as CaseDocumentStatus
-                                  )
-                                }
+                                onChange={(event) => {
+                                  const nextStatus = event.target.value as CaseDocumentStatus;
+                                  if (nextStatus === 'rejected') {
+                                    openRejectionDialog(
+                                      document.id,
+                                      document.name,
+                                      document.rejection_note
+                                    );
+                                    return;
+                                  }
+
+                                  void onUpdateDocumentStatus(document.id, nextStatus, null);
+                                }}
                                 disabled={updatingDocumentId === document.id}
-                                className="w-40 px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-800 disabled:opacity-60"
+                                className="w-48 px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-800 disabled:opacity-60"
                               >
                                 {documentStatusOptions.map((statusOption) => (
                                   <option key={statusOption.value} value={statusOption.value}>
@@ -260,6 +296,11 @@ export function DocumentsSection({
                                   </option>
                                 ))}
                               </select>
+                              {document.rejection_note ? (
+                                <p className="max-w-xs text-[11px] leading-5 text-red-700 whitespace-pre-wrap">
+                                  Rejection note: {document.rejection_note}
+                                </p>
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{formatDate(document.due_date)}</td>
@@ -371,6 +412,64 @@ export function DocumentsSection({
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleDeleteDocument}
         />
+      ) : null}
+      {rejectionTarget ? (
+        <CaseConfigDialog
+          title="Reject Document"
+          description="Explain why this file was rejected and what the client should upload instead."
+          onClose={() => {
+            setRejectionTarget(null);
+            setRejectionNoteValue('');
+            setRejectionNoteError(null);
+          }}
+        >
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-gray-700">
+              Send a rejection note for <span className="font-semibold text-gray-900">{rejectionTarget.name}</span>.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Note to client</label>
+              <textarea
+                value={rejectionNoteValue}
+                onChange={(event) => setRejectionNoteValue(event.target.value)}
+                rows={4}
+                maxLength={2000}
+                placeholder="Explain what is wrong with the file and what the client should upload next."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-red-500 focus:outline-none"
+              />
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-xs text-gray-500">{rejectionNoteValue.length}/2000</span>
+                {rejectionNoteError ? (
+                  <span className="text-xs text-red-600">{rejectionNoteError}</span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setRejectionTarget(null);
+                setRejectionNoteValue('');
+                setRejectionNoteError(null);
+              }}
+              disabled={updatingDocumentId === rejectionTarget.id}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleRejectionSubmit();
+              }}
+              disabled={updatingDocumentId === rejectionTarget.id}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+            >
+              {updatingDocumentId === rejectionTarget.id ? 'Sending...' : 'Reject and Send Note'}
+            </button>
+          </div>
+        </CaseConfigDialog>
       ) : null}
       {noteTarget ? (
         <div className="fixed inset-0 z-[85] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

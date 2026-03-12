@@ -41,7 +41,7 @@ def test_case_helper_normalizers_and_sanitizers():
             'required': True,
             'due_date': None,
             'instructions': None,
-            'status': 'under_review',
+            'status': 'received_under_review',
         }
     ]
     assert cases._sanitize_file_name(' My File?.pdf ') == 'My_File_.pdf'
@@ -514,7 +514,7 @@ def test_update_case_document_status_updates_custom_document(monkeypatch, make_a
         id=uuid4(),
         organization_id=auth.organization_id,
         case_type='Express Entry',
-        custom_fields={'custom_documents': [{'id': document_id, 'name': 'Passport', 'required': True, 'status': 'pending'}]},
+        custom_fields={'custom_documents': [{'id': document_id, 'name': 'Passport', 'required': True, 'status': 'requested'}]},
     )
     db = MagicMock()
     db.execute.side_effect = [FakeResult(rows=[]), FakeResult(rows=[])]
@@ -530,6 +530,61 @@ def test_update_case_document_status_updates_custom_document(monkeypatch, make_a
 
     assert result.status == 'approved'
     assert case.custom_fields['custom_documents'][0]['status'] == 'approved'
+
+
+def test_update_case_document_status_rejected_stores_rejection_note(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    document_id = str(uuid4())
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        case_type='Express Entry',
+        custom_fields={'custom_documents': [{'id': document_id, 'name': 'Passport', 'required': True, 'status': 'requested'}]},
+    )
+    db = MagicMock()
+    db.execute.side_effect = [FakeResult(rows=[]), FakeResult(rows=[])]
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+
+    result = cases.update_case_document_status(
+        case_number='C-2026-001',
+        document_id=document_id,
+        payload=CaseDocumentStatusUpdateRequest(
+            status='rejected',
+            rejection_note='Please upload the full passport page in color.'
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.status == 'rejected'
+    assert result.rejection_note == 'Please upload the full passport page in color.'
+    assert case.custom_fields['document_rejection_notes'][document_id] == 'Please upload the full passport page in color.'
+
+
+def test_update_case_document_status_rejected_requires_note(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    document_id = str(uuid4())
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        case_type='Express Entry',
+        custom_fields={'custom_documents': [{'id': document_id, 'name': 'Passport', 'required': True, 'status': 'requested'}]},
+    )
+    db = MagicMock()
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+
+    try:
+        cases.update_case_document_status(
+            case_number='C-2026-001',
+            document_id=document_id,
+            payload=CaseDocumentStatusUpdateRequest(status='rejected'),
+            auth=auth,
+            db=db,
+        )
+        assert False, 'Expected HTTPException'
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert exc.detail == 'Rejection note is required when rejecting a document'
 
 
 def test_initiate_case_document_upload_returns_presigned_upload(monkeypatch, make_auth_context):
@@ -595,7 +650,7 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
         db=db,
     )
 
-    assert result.status == 'received'
+    assert result.status == 'received_under_review'
     assert result.can_download is True
 
 

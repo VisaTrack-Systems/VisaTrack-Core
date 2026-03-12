@@ -1,4 +1,4 @@
-import { MessageSquare, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { DashboardMessage } from './types';
@@ -6,10 +6,9 @@ import type { DashboardMessage } from './types';
 type MessagesPanelProps = {
   allMessages?: DashboardMessage[];
   recentMessages: DashboardMessage[];
-  canSendMessages: boolean;
 };
 
-export function MessagesPanel({ allMessages, recentMessages, canSendMessages }: MessagesPanelProps) {
+export function MessagesPanel({ allMessages, recentMessages }: MessagesPanelProps) {
   const [selectedMessage, setSelectedMessage] = useState<DashboardMessage | null>(null);
   const [isBoardOpen, setIsBoardOpen] = useState(false);
 
@@ -34,7 +33,7 @@ export function MessagesPanel({ allMessages, recentMessages, canSendMessages }: 
       <div className="bg-white rounded-lg shadow-sm">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Lawyer Messages</h2>
             <button
               className="text-sm text-red-600 hover:text-red-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
               onClick={openBoard}
@@ -64,19 +63,6 @@ export function MessagesPanel({ allMessages, recentMessages, canSendMessages }: 
               <p className="text-xs text-gray-500 line-clamp-2">{message.preview}</p>
             </button>
           ))}
-        </div>
-        <div className="p-4 border-t border-gray-200">
-          <button
-            className={`w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-              canSendMessages
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
-            disabled={!canSendMessages}
-          >
-            <MessageSquare className="w-4 h-4" />
-            {canSendMessages ? 'Send Message' : 'Messaging Disabled'}
-          </button>
         </div>
       </div>
       {selectedMessage ? (

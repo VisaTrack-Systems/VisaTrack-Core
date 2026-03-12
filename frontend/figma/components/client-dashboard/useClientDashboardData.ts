@@ -21,7 +21,7 @@ import {
   type DashboardMilestone,
   type ClientPortalCapabilities,
 } from './types';
-import { documentDisplayStatus, formatDate, relativeTime, titleize } from './utils';
+import { documentDisplayStatus, documentStatusLabel, formatDate, relativeTime, titleize } from './utils';
 
 type ClientDashboardData = {
   clientCases: ClientCaseListItem[];
@@ -264,12 +264,13 @@ export function useClientDashboardData(): ClientDashboardData {
       id: document.id,
       name: document.name,
       status: documentDisplayStatus(document.status, document.required),
-      lawyerStatus: titleize(document.status),
+      lawyerStatus: documentStatusLabel(document.status),
       uploadedDate: formatDate(document.uploaded_at),
       required: document.required,
       instructions: document.instructions,
       fileName: document.file_name,
       canDownload: document.can_download,
+      rejectionNote: document.rejection_note ?? null,
     }));
   }, [workspace, capabilities.canViewDocuments]);
 

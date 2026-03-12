@@ -192,7 +192,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       approved: 0,
       received: 0,
       pending: 0,
-      needsRevision: 0,
+      rejected: 0,
     };
 
     if (!workspace) {
@@ -202,10 +202,10 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     for (const document of workspace.documents) {
       if (document.status === 'approved') {
         stats.approved += 1;
-      } else if (document.status === 'received') {
+      } else if (['received_under_review', 'received', 'under_review'].includes(document.status)) {
         stats.received += 1;
-      } else if (['needs_revision', 'needs-revision'].includes(document.status)) {
-        stats.needsRevision += 1;
+      } else if (['rejected', 'needs_revision', 'needs-revision'].includes(document.status)) {
+        stats.rejected += 1;
       } else {
         stats.pending += 1;
       }
@@ -268,7 +268,9 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return 0;
     }
 
-    return workspace.documents.filter((document) => document.required && !['approved', 'received'].includes(document.status)).length;
+    return workspace.documents.filter(
+      (document) => document.required && !['approved', 'received_under_review'].includes(document.status)
+    ).length;
   }, [workspace]);
 
   const toggleSuite = (suiteId: string) => {
@@ -391,7 +393,9 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     const pendingRequiredDocuments = workspace.documents.filter(
-      (document) => document.required && !['approved', 'received', 'completed'].includes(document.status)
+      (document) =>
+        document.required &&
+        !['approved', 'received_under_review', 'completed'].includes(document.status)
     );
     if (pendingRequiredDocuments.length === 0) {
       showNotice('info', 'No pending required documents for reminders.');
@@ -485,7 +489,11 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
-  const handleUpdateDocumentStatus = async (documentId: string, status: CaseDocumentStatus) => {
+  const handleUpdateDocumentStatus = async (
+    documentId: string,
+    status: CaseDocumentStatus,
+    rejectionNote?: string | null
+  ) => {
     if (!workspace) {
       return;
     }
@@ -495,7 +503,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       const updated = await updateCaseDocumentStatus(
         workspace.case.case_number,
         documentId,
-        status
+        status,
+        rejectionNote
       );
 
       updateWorkspace((current) => ({
@@ -507,6 +516,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
               ? {
                   ...document,
                   status: updated.status,
+                  rejection_note: updated.rejection_note ?? null,
                 }
               : document
           ),
@@ -516,6 +526,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
             ? {
                 ...document,
                 status: updated.status,
+                rejection_note: updated.rejection_note ?? null,
               }
             : document
         ),

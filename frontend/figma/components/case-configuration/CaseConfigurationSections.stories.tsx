@@ -72,7 +72,7 @@ export const Documents: Story = {
   render: () => (
     <DocumentsSection
       workspace={mockCaseWorkspace}
-      documentStats={{ approved: 1, received: 1, pending: 1, needsRevision: 1 }}
+      documentStats={{ approved: 1, received: 1, pending: 1, rejected: 1 }}
       expandedSuites={mockCaseWorkspace.document_suites.map((suite) => suite.id)}
       onToggleSuite={() => {}}
       onAddCustomDocument={async () => true}

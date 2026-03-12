@@ -36,12 +36,37 @@ export function titleize(value: string): string {
     .join(' ');
 }
 
+export function documentStatusLabel(status: string): string {
+  switch (status) {
+    case 'requested':
+    case 'pending':
+      return 'Requested';
+    case 'received_under_review':
+    case 'received':
+    case 'under_review':
+      return 'Received / Under Review';
+    case 'approved':
+      return 'Approved';
+    case 'rejected':
+    case 'needs_revision':
+      return 'Rejected';
+    case 'not_requested':
+      return 'Not Requested';
+    default:
+      return titleize(status);
+  }
+}
+
 export function documentDisplayStatus(status: string, required: boolean): DashboardDocumentStatus {
-  if (['approved', 'received', 'completed'].includes(status)) {
+  if (status === 'rejected' || status === 'needs_revision') {
+    return 'rejected';
+  }
+
+  if (['approved', 'completed'].includes(status)) {
     return 'completed';
   }
 
-  if (['under_review', 'review', 'needs_revision'].includes(status)) {
+  if (['received_under_review', 'received', 'under_review', 'review'].includes(status)) {
     return 'review';
   }
 

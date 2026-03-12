@@ -132,7 +132,6 @@ export function ClientDashboard() {
               <MessagesPanel
                 allMessages={allMessages}
                 recentMessages={recentMessages}
-                canSendMessages={capabilities.canSendMessages}
               />
             ) : null}
             {capabilities.canViewMilestones ? (

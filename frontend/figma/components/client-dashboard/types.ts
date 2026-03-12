@@ -1,4 +1,4 @@
-export type DashboardDocumentStatus = 'completed' | 'pending' | 'review' | 'optional';
+export type DashboardDocumentStatus = 'completed' | 'pending' | 'review' | 'rejected' | 'optional';
 
 export type DashboardDocument = {
   id: string;
@@ -10,6 +10,7 @@ export type DashboardDocument = {
   instructions: string | null;
   fileName: string | null;
   canDownload: boolean;
+  rejectionNote: string | null;
 };
 
 export type DashboardMilestone = {
