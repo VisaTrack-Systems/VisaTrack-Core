@@ -654,6 +654,57 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
     assert result.can_download is True
 
 
+def test_complete_case_document_upload_clears_rejection_state(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    document_id = str(uuid4())
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        custom_fields={
+            'document_status_overrides': {document_id: 'rejected'},
+            'document_rejection_notes': {document_id: 'Please upload all edges of the document.'},
+        },
+    )
+    slot = {
+        'kind': 'template',
+        'logical_document_id': document_id,
+        'template_id': document_id,
+        'name': 'Passport',
+        'required': True,
+        'instructions': 'Upload passport',
+        'previous_case_document_id': None,
+        'next_version': 2,
+    }
+    storage_key = f'org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-passport.pdf'
+    db = MagicMock()
+    db.execute.return_value = FakeResult(rows=[{'id': uuid4(), 'uploaded_at': datetime.now(timezone.utc)}])
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+    monkeypatch.setattr(cases, 'head_object', lambda **kwargs: {'ContentLength': 1024, 'ContentType': 'application/pdf'})
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'log_document_access', lambda *args, **kwargs: None)
+
+    result = cases.complete_case_document_upload(
+        case_number='C-2026-001',
+        document_id=document_id,
+        payload=CaseDocumentUploadCompleteRequest(
+            storage_key=storage_key,
+            file_name='passport.pdf',
+            file_type='application/pdf',
+            file_size_bytes=1024,
+        ),
+        request=row(client=row(host='127.0.0.1'), headers={'user-agent': 'pytest'}),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.status == 'received_under_review'
+    assert result.rejection_note is None
+    assert case.custom_fields['document_status_overrides'] == {}
+    assert case.custom_fields['document_rejection_notes'] == {}
+
+
 def test_get_case_document_download_url_returns_presigned_link(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})

@@ -2649,23 +2649,31 @@ def complete_case_document_upload(
     if insert_result is None:
         raise HTTPException(status_code=500, detail="Failed to record uploaded document")
 
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
+    status_overrides.pop(slot["logical_document_id"], None)
+    rejection_notes.pop(slot["logical_document_id"], None)
+
     if slot["kind"] == "custom_request":
-        custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
         upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
-        status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
-        rejection_notes = _normalized_document_rejection_notes(
-            custom_fields.get("document_rejection_notes")
-        )
-        status_overrides.pop(slot["logical_document_id"], None)
-        rejection_notes.pop(slot["logical_document_id"], None)
         case.custom_fields = {
             **custom_fields,
             "document_upload_bindings": upload_bindings,
             "document_status_overrides": status_overrides,
             "document_rejection_notes": rejection_notes,
         }
-        db.add(case)
+    else:
+        case.custom_fields = {
+            **custom_fields,
+            "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
+        }
+
+    db.add(case)
 
     log_activity(
         db,
