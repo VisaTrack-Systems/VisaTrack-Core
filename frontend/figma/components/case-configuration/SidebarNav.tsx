@@ -1,12 +1,12 @@
 import {
   ArrowLeft,
+  BellRing,
   CheckCircle,
   DollarSign,
   FileCheck,
   FileText,
   Info,
   type LucideIcon,
-  MessageSquare,
   Settings,
 } from 'lucide-react';
 
@@ -29,7 +29,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
     { id: 'documents', label: 'Document Requests', icon: FileCheck },
     { id: 'milestones', label: 'Milestones', icon: CheckCircle },
     { id: 'payments', label: 'Payments & Invoices', icon: DollarSign },
-    { id: 'messages', label: 'Messages / Notes', icon: MessageSquare },
+    { id: 'reminders', label: 'Reminders', icon: BellRing },
     { id: 'permissions', label: 'Sharing / Permissions', icon: Settings },
   ];
 

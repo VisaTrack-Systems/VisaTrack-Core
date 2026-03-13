@@ -9,7 +9,7 @@ export type SectionType =
   | 'documents'
   | 'milestones'
   | 'payments'
-  | 'messages'
+  | 'reminders'
   | 'permissions';
 
 export type DocumentStats = {

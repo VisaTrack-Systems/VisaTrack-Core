@@ -35,7 +35,7 @@ BEGIN;
 \ir client_accounts.sql
 \ir trust_account_entries.sql
 
-\ir messages.sql
+\ir reminders.sql
 \ir notifications.sql
 \ir activity_log.sql
 

@@ -29,7 +29,7 @@ from app.schemas.case import (
     CaseDocumentUploadInitiateResponse,
     CaseDetailsUpdateRequest,
     CaseDetailsUpdateResponse,
-    CaseMessageCreateRequest,
+    CaseReminderCreateRequest,
     CaseMilestoneCreateRequest,
     CaseMilestoneUpdateRequest,
     CaseCustomDocumentSuiteCreateRequest,
@@ -46,8 +46,8 @@ from app.schemas.case import (
     CaseWorkspaceDocument,
     CaseWorkspaceDocumentSuite,
     CaseWorkspaceInfo,
-    CaseWorkspaceMessage,
     CaseDocumentViewResponse,
+    CaseWorkspaceReminder,
     CaseWorkspaceMilestone,
     CaseWorkspacePaymentItem,
     MilestoneSummary,
@@ -71,12 +71,12 @@ DEFAULT_PORTAL_PERMISSIONS = {
     "show_document_requirements": True,
     "portal_access": "full_access",
     "document_upload": "enabled",
-    "messaging": "two_way",
+    "reminders": "enabled",
 }
 
 ALLOWED_PORTAL_ACCESS = {"full_access", "limited_access", "read_only", "disabled"}
 ALLOWED_DOCUMENT_UPLOAD = {"enabled", "disabled"}
-ALLOWED_MESSAGING = {"two_way", "one_way", "disabled"}
+ALLOWED_REMINDERS = {"enabled", "disabled"}
 ALLOWED_DOCUMENT_STATUSES = {
     "requested",
     "received",
@@ -208,6 +208,21 @@ def _normalized_document_status(value: str, *, default: str = "requested") -> st
     return default
 
 
+def _case_sender_name(case: Case) -> str:
+    lawyer = getattr(case, "primary_lawyer", None)
+    if lawyer is None:
+        return "Firm"
+
+    first_name = (getattr(lawyer, "first_name", "") or "").strip()
+    last_name = (getattr(lawyer, "last_name", "") or "").strip()
+    full_name = f"{first_name} {last_name}".strip()
+    if full_name:
+        return full_name
+
+    email = (getattr(lawyer, "email", "") or "").strip()
+    return email or "Firm"
+
+
 def _generate_case_number(db: Session, organization_id: UUID) -> str:
     year = date.today().year
     prefix_like = f"C-{year}-%"
@@ -251,9 +266,9 @@ def _normalized_portal_permissions(raw: Any) -> dict[str, Any]:
     if document_upload in ALLOWED_DOCUMENT_UPLOAD:
         normalized["document_upload"] = document_upload
 
-    messaging = str(raw.get("messaging", normalized["messaging"])).strip().lower()
-    if messaging in ALLOWED_MESSAGING:
-        normalized["messaging"] = messaging
+    reminders = str(raw.get("reminders", normalized["reminders"])).strip().lower()
+    if reminders in ALLOWED_REMINDERS:
+        normalized["reminders"] = reminders
 
     return normalized
 
@@ -404,6 +419,7 @@ def _client_portal_capabilities(case: Case) -> dict[str, bool | str]:
         "portal_access": portal_access,
         "can_view_documents": can_view_documents,
         "can_upload_documents": can_upload_documents,
+        "can_view_reminders": portal_access != "disabled" and permissions["reminders"] == "enabled",
     }
 
 
@@ -1275,37 +1291,37 @@ def delete_case_milestone(
 
 
 @router.post(
-    "/by-number/{case_number}/messages",
-    response_model=CaseWorkspaceMessage,
+    "/by-number/{case_number}/reminders",
+    response_model=CaseWorkspaceReminder,
     status_code=status.HTTP_201_CREATED,
 )
-def create_case_message(
+def create_case_reminder(
     case_number: str,
-    payload: CaseMessageCreateRequest,
+    payload: CaseReminderCreateRequest,
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
-) -> CaseWorkspaceMessage:
+) -> CaseWorkspaceReminder:
     case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
 
-    subject = payload.subject.strip()
+    title = payload.title.strip()
     body = payload.body.strip()
-    if not subject:
-        raise HTTPException(status_code=400, detail="Subject is required")
-    if len(subject) > 255:
-        raise HTTPException(status_code=400, detail="Subject must be 255 characters or fewer")
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if len(title) > 255:
+        raise HTTPException(status_code=400, detail="Title must be 255 characters or fewer")
     if not body:
-        raise HTTPException(status_code=400, detail="Message body is required")
+        raise HTTPException(status_code=400, detail="Reminder body is required")
 
     inserted_row = db.execute(
         text(
             """
-            INSERT INTO messages (
+            INSERT INTO reminders (
                 case_id,
+                organization_id,
+                client_user_id,
                 sender_id,
-                recipient_id,
-                subject,
+                title,
                 body,
-                is_draft,
                 sent_at,
                 visible_to_client,
                 created_at,
@@ -1313,24 +1329,25 @@ def create_case_message(
             )
             VALUES (
                 :case_id,
+                :organization_id,
+                :client_user_id,
                 :sender_id,
-                :recipient_id,
-                :subject,
+                :title,
                 :body,
-                FALSE,
                 NOW(),
                 :visible_to_client,
                 NOW(),
                 NOW()
             )
-            RETURNING id, subject, body, sent_at, read_at
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
             """
         ),
         {
             "case_id": str(case.id),
+            "organization_id": str(case.organization_id),
+            "client_user_id": str(case.client_id),
             "sender_id": str(auth.user_id),
-            "recipient_id": str(case.client_id),
-            "subject": subject,
+            "title": title,
             "body": body,
             "visible_to_client": payload.visible_to_client,
         },
@@ -1345,26 +1362,141 @@ def create_case_message(
         organization_id=case.organization_id,
         user_id=auth.user_id,
         action="created",
-        entity_type="message",
+        entity_type="reminder",
         entity_id=inserted_row["id"],
         case_id=case.id,
         client_id=case.client_id,
         new_values={
-            "subject": subject,
+            "title": title,
             "visible_to_client": payload.visible_to_client,
-            "send_email": payload.send_email,
+            "send_email_notification": payload.send_email_notification,
         },
     )
 
     db.commit()
-    return CaseWorkspaceMessage(
+    return CaseWorkspaceReminder(
         id=inserted_row["id"],
         sender_name=sender_name,
-        subject=inserted_row["subject"] or "(No subject)",
+        title=inserted_row["title"] or "(No title)",
         body=inserted_row["body"] or "",
         sent_at=inserted_row["sent_at"],
         read_at=inserted_row["read_at"],
-        from_client=False,
+        acknowledged_at=inserted_row["acknowledged_at"],
+    )
+
+
+@router.post(
+    "/by-number/{case_number}/reminders/{reminder_id}/read",
+    response_model=CaseWorkspaceReminder,
+)
+def mark_case_reminder_read(
+    case_number: str,
+    reminder_id: str,
+    auth: AuthContext = Depends(require_roles("client")),
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceReminder:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    client_capabilities = _client_portal_capabilities(case)
+    if not client_capabilities["can_view_reminders"]:
+        raise HTTPException(status_code=403, detail="Reminder access is disabled for this portal")
+
+    reminder_row = db.execute(
+        text(
+            """
+            UPDATE reminders
+            SET read_at = COALESCE(read_at, NOW()), updated_at = NOW()
+            WHERE
+                id = CAST(:reminder_id AS uuid)
+                AND case_id = :case_id
+                AND client_user_id = :client_user_id
+                AND visible_to_client = TRUE
+                AND deleted_at IS NULL
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
+            """
+        ),
+        {
+            "reminder_id": reminder_id,
+            "case_id": str(case.id),
+            "client_user_id": str(auth.user_id),
+        },
+    ).mappings().first()
+    if reminder_row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+    sender_name = _case_sender_name(case)
+    db.commit()
+    return CaseWorkspaceReminder(
+        id=reminder_row["id"],
+        sender_name=sender_name,
+        title=reminder_row["title"] or "(No title)",
+        body=reminder_row["body"] or "",
+        sent_at=reminder_row["sent_at"],
+        read_at=reminder_row["read_at"],
+        acknowledged_at=reminder_row["acknowledged_at"],
+    )
+
+
+@router.post(
+    "/by-number/{case_number}/reminders/{reminder_id}/acknowledge",
+    response_model=CaseWorkspaceReminder,
+)
+def acknowledge_case_reminder(
+    case_number: str,
+    reminder_id: str,
+    auth: AuthContext = Depends(require_roles("client")),
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceReminder:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    client_capabilities = _client_portal_capabilities(case)
+    if not client_capabilities["can_view_reminders"]:
+        raise HTTPException(status_code=403, detail="Reminder access is disabled for this portal")
+
+    reminder_row = db.execute(
+        text(
+            """
+            UPDATE reminders
+            SET
+                read_at = COALESCE(read_at, NOW()),
+                acknowledged_at = COALESCE(acknowledged_at, NOW()),
+                updated_at = NOW()
+            WHERE
+                id = CAST(:reminder_id AS uuid)
+                AND case_id = :case_id
+                AND client_user_id = :client_user_id
+                AND visible_to_client = TRUE
+                AND deleted_at IS NULL
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
+            """
+        ),
+        {
+            "reminder_id": reminder_id,
+            "case_id": str(case.id),
+            "client_user_id": str(auth.user_id),
+        },
+    ).mappings().first()
+    if reminder_row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+    sender_name = _case_sender_name(case)
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="acknowledged",
+        entity_type="reminder",
+        entity_id=reminder_row["id"],
+        case_id=case.id,
+        client_id=case.client_id,
+    )
+    db.commit()
+    return CaseWorkspaceReminder(
+        id=reminder_row["id"],
+        sender_name=sender_name,
+        title=reminder_row["title"] or "(No title)",
+        body=reminder_row["body"] or "",
+        sent_at=reminder_row["sent_at"],
+        read_at=reminder_row["read_at"],
+        acknowledged_at=reminder_row["acknowledged_at"],
     )
 
 
@@ -1474,9 +1606,9 @@ def get_case_workspace_by_number(
         portal_access != "disabled"
         and bool(portal_permissions_payload["show_document_requirements"])
     )
-    client_can_view_messages = (
+    client_can_view_reminders = (
         portal_access != "disabled"
-        and portal_permissions_payload["messaging"] != "disabled"
+        and portal_permissions_payload["reminders"] == "enabled"
     )
     client_can_view_billing = portal_access in {"full_access", "read_only"}
 
@@ -1792,48 +1924,47 @@ def get_case_workspace_by_number(
         for payment_row in payment_rows
     ]
 
-    message_rows = db.execute(
+    reminder_rows = db.execute(
         text(
             """
             SELECT
-                m.id,
+                r.id,
                 COALESCE(CONCAT(su.first_name, ' ', su.last_name), 'System') AS sender_name,
-                m.subject,
-                m.body,
-                m.sent_at,
-                m.read_at,
-                (m.sender_id = :client_id) AS from_client
-            FROM messages m
-            LEFT JOIN users su ON su.id = m.sender_id
+                r.title,
+                r.body,
+                r.sent_at,
+                r.read_at,
+                r.acknowledged_at
+            FROM reminders r
+            LEFT JOIN users su ON su.id = r.sender_id
             WHERE
-                m.case_id = :case_id
-                AND COALESCE(m.is_draft, FALSE) = FALSE
+                r.case_id = :case_id
+                AND r.deleted_at IS NULL
                 AND (
                     :is_client_portal_view = FALSE
-                    OR COALESCE(m.visible_to_client, TRUE) = TRUE
+                    OR COALESCE(r.visible_to_client, TRUE) = TRUE
                 )
-            ORDER BY COALESCE(m.sent_at, m.created_at) DESC
+            ORDER BY COALESCE(r.sent_at, r.created_at) DESC
             LIMIT 25
             """
         ),
         {
             "case_id": case_id,
-            "client_id": client_id,
             "is_client_portal_view": is_client_portal_view,
         },
     ).mappings().all()
 
-    messages = [
-        CaseWorkspaceMessage(
-            id=message_row["id"],
-            sender_name=message_row["sender_name"],
-            subject=message_row["subject"] or "(No subject)",
-            body=message_row["body"] or "",
-            sent_at=message_row["sent_at"],
-            read_at=message_row["read_at"],
-            from_client=bool(message_row["from_client"]),
+    reminders = [
+        CaseWorkspaceReminder(
+            id=reminder_row["id"],
+            sender_name=reminder_row["sender_name"],
+            title=reminder_row["title"] or "(No title)",
+            body=reminder_row["body"] or "",
+            sent_at=reminder_row["sent_at"],
+            read_at=reminder_row["read_at"],
+            acknowledged_at=reminder_row["acknowledged_at"],
         )
-        for message_row in message_rows
+        for reminder_row in reminder_rows
     ]
 
     appointments = [
@@ -1987,8 +2118,8 @@ def get_case_workspace_by_number(
                 document for suite in document_suites for document in suite.documents
             ]
 
-        if not client_can_view_messages:
-            messages = []
+        if not client_can_view_reminders:
+            reminders = []
 
         if not client_can_view_billing:
             payment_items = []
@@ -2006,7 +2137,7 @@ def get_case_workspace_by_number(
         documents=documents,
         milestones=milestones,
         payment_items=payment_items,
-        messages=messages,
+        reminders=reminders,
         appointments=appointments,
         billing_summary=billing_summary,
         assignments=assignments,

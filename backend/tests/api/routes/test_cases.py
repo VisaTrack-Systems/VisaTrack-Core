@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 
+import pytest
 from fastapi import HTTPException
 
 from app.api.routes import cases
@@ -16,7 +17,7 @@ from app.schemas.case import (
     CaseDocumentStatusUpdateRequest,
     CaseDocumentUploadCompleteRequest,
     CaseDocumentUploadInitiateRequest,
-    CaseMessageCreateRequest,
+    CaseReminderCreateRequest,
     CaseMilestoneCreateRequest,
     CaseMilestoneUpdateRequest,
     CasePortalPermissionsUpdateRequest,
@@ -309,30 +310,121 @@ def test_delete_case_milestone_commits(monkeypatch, make_auth_context):
     db.commit.assert_called_once()
 
 
-def test_create_case_message_returns_message(monkeypatch, make_auth_context):
+def test_create_case_reminder_returns_reminder(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     case = row(id=uuid4(), organization_id=auth.organization_id, client_id=uuid4())
     inserted_row = {
         'id': uuid4(),
-        'subject': 'Need passport',
+        'title': 'Need passport',
         'body': 'Please upload it.',
         'sent_at': datetime.now(timezone.utc),
         'read_at': None,
+        'acknowledged_at': None,
     }
     db = MagicMock()
     db.execute.return_value = FakeResult(rows=[inserted_row])
     monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
     monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
 
-    result = cases.create_case_message(
+    result = cases.create_case_reminder(
         case_number='C-2026-001',
-        payload=CaseMessageCreateRequest(subject='Need passport', body='Please upload it.', visible_to_client=True),
+        payload=CaseReminderCreateRequest(title='Need passport', body='Please upload it.', visible_to_client=True),
         auth=auth,
         db=db,
     )
 
-    assert result.subject == 'Need passport'
-    assert result.from_client is False
+    assert result.title == 'Need passport'
+    assert result.acknowledged_at is None
+
+
+def test_mark_case_reminder_read_returns_updated_reminder(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        primary_lawyer=row(first_name='Avery', last_name='Counsel', email='lawyer@example.com'),
+        custom_fields={},
+    )
+    reminder_row = {
+        'id': uuid4(),
+        'title': 'Need passport',
+        'body': 'Please upload it.',
+        'sent_at': datetime.now(timezone.utc),
+        'read_at': datetime.now(timezone.utc),
+        'acknowledged_at': None,
+    }
+    db = MagicMock()
+    db.execute.return_value = FakeResult(rows=[reminder_row])
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+
+    result = cases.mark_case_reminder_read(
+        case_number='C-2026-001',
+        reminder_id=str(reminder_row['id']),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.id == reminder_row['id']
+    assert result.read_at == reminder_row['read_at']
+    db.commit.assert_called_once()
+
+
+def test_acknowledge_case_reminder_returns_updated_reminder(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        primary_lawyer=row(first_name='Avery', last_name='Counsel', email='lawyer@example.com'),
+        custom_fields={},
+    )
+    reminder_row = {
+        'id': uuid4(),
+        'title': 'Need passport',
+        'body': 'Please upload it.',
+        'sent_at': datetime.now(timezone.utc),
+        'read_at': datetime.now(timezone.utc),
+        'acknowledged_at': datetime.now(timezone.utc),
+    }
+    db = MagicMock()
+    db.execute.return_value = FakeResult(rows=[reminder_row])
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+
+    result = cases.acknowledge_case_reminder(
+        case_number='C-2026-001',
+        reminder_id=str(reminder_row['id']),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.id == reminder_row['id']
+    assert result.acknowledged_at == reminder_row['acknowledged_at']
+    db.commit.assert_called_once()
+
+
+def test_mark_case_reminder_read_rejects_when_portal_reminders_disabled(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        custom_fields={'portal_permissions': {'portal_access': 'full_access', 'reminders': 'disabled'}},
+    )
+    db = MagicMock()
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+
+    with pytest.raises(HTTPException) as error:
+        cases.mark_case_reminder_read(
+            case_number='C-2026-001',
+            reminder_id=str(uuid4()),
+            auth=auth,
+            db=db,
+        )
+
+    assert error.value.status_code == 403
+    db.execute.assert_not_called()
 
 
 def test_get_case_workspace_by_number_returns_workspace(make_auth_context):
@@ -409,7 +501,7 @@ def test_update_case_portal_permissions_persists_custom_fields(monkeypatch, make
             show_document_requirements=True,
             portal_access='limited_access',
             document_upload='disabled',
-            messaging='one_way',
+            reminders='disabled',
         ),
         auth=auth,
         db=db,

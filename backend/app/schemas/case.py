@@ -120,14 +120,14 @@ class CaseWorkspacePaymentItem(BaseModel):
     invoice_number: Optional[str]
 
 
-class CaseWorkspaceMessage(BaseModel):
+class CaseWorkspaceReminder(BaseModel):
     id: UUID
     sender_name: str
-    subject: str
+    title: str
     body: str
     sent_at: Optional[datetime]
     read_at: Optional[datetime]
-    from_client: bool
+    acknowledged_at: Optional[datetime]
 
 
 class CaseWorkspaceAppointment(BaseModel):
@@ -158,7 +158,7 @@ class CasePortalPermissions(BaseModel):
     show_document_requirements: bool
     portal_access: str
     document_upload: str
-    messaging: str
+    reminders: str
 
 
 class CasePortalPermissionsUpdateRequest(BaseModel):
@@ -167,7 +167,7 @@ class CasePortalPermissionsUpdateRequest(BaseModel):
     show_document_requirements: bool
     portal_access: str
     document_upload: str
-    messaging: str
+    reminders: str
 
 
 class CaseCustomDocumentSuiteCreateRequest(BaseModel):
@@ -279,10 +279,10 @@ class CaseMilestoneUpdateRequest(BaseModel):
     client_visible: Optional[bool] = None
 
 
-class CaseMessageCreateRequest(BaseModel):
-    subject: str
+class CaseReminderCreateRequest(BaseModel):
+    title: str
     body: str
-    send_email: bool = False
+    send_email_notification: bool = False
     visible_to_client: bool = True
 
 
@@ -292,7 +292,7 @@ class CaseWorkspace(BaseModel):
     documents: list[CaseWorkspaceDocument]
     milestones: list[CaseWorkspaceMilestone]
     payment_items: list[CaseWorkspacePaymentItem]
-    messages: list[CaseWorkspaceMessage]
+    reminders: list[CaseWorkspaceReminder]
     appointments: list[CaseWorkspaceAppointment]
     billing_summary: CaseWorkspaceBillingSummary
     assignments: list[CaseWorkspaceAssignment]

@@ -143,7 +143,7 @@ export function PermissionsSection({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
             >
               <option value="full_access">Full Access - Client can view all enabled sections</option>
-              <option value="limited_access">Limited Access - Client can only view documents and messages</option>
+              <option value="limited_access">Limited Access - Client can only view documents and reminders</option>
               <option value="read_only">Read Only - Client cannot upload or respond</option>
               <option value="disabled">Disabled - Client portal access suspended</option>
             </select>
@@ -167,20 +167,19 @@ export function PermissionsSection({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Messaging Permissions</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Reminder Visibility</label>
             <select
-              value={portalPermissions.messaging}
+              value={portalPermissions.reminders}
               onChange={(event) =>
                 onChange({
                   ...portalPermissions,
-                  messaging: event.target.value as CasePortalPermissions['messaging'],
+                  reminders: event.target.value as CasePortalPermissions['reminders'],
                 })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
             >
-              <option value="two_way">Two-way - Client can send and receive messages</option>
-              <option value="one_way">One-way - Client can only receive messages</option>
-              <option value="disabled">Disabled - Messaging suspended</option>
+              <option value="enabled">Enabled - Client can view lawyer reminders</option>
+              <option value="disabled">Disabled - Hide reminders from client portal</option>
             </select>
           </div>
         </div>

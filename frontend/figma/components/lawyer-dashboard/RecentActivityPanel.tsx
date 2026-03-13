@@ -1,4 +1,4 @@
-import { AlertCircle, FileText, MessageSquare, TrendingUp } from 'lucide-react';
+import { AlertCircle, BellRing, FileText, TrendingUp } from 'lucide-react';
 
 import type { ActivityItem } from './types';
 
@@ -26,7 +26,7 @@ export function RecentActivityPanel({ activityItems, isLoading = false }: Recent
                   className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                     activity.type === 'document'
                       ? 'bg-blue-100'
-                      : activity.type === 'message'
+                      : activity.type === 'reminder'
                         ? 'bg-purple-100'
                         : activity.type === 'payment'
                           ? 'bg-green-100'
@@ -34,7 +34,7 @@ export function RecentActivityPanel({ activityItems, isLoading = false }: Recent
                   }`}
                 >
                   {activity.type === 'document' && <FileText className="w-5 h-5 text-blue-600" />}
-                  {activity.type === 'message' && <MessageSquare className="w-5 h-5 text-purple-600" />}
+                  {activity.type === 'reminder' && <BellRing className="w-5 h-5 text-purple-600" />}
                   {activity.type === 'payment' && <TrendingUp className="w-5 h-5 text-green-600" />}
                   {activity.type === 'milestone' && <AlertCircle className="w-5 h-5 text-red-600" />}
                 </div>
