@@ -50,7 +50,6 @@ export type CaseInfo = {
   assignedLawyer: string;
   startDate: string;
   estimatedCompletion: string;
-  progress: number;
 };
 
 export type ClientPortalCapabilities = {

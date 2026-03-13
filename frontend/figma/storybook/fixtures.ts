@@ -23,7 +23,6 @@ import type {
   ActivityItem,
   DashboardCase,
   DashboardStats,
-  DeadlineItem,
 } from '../components/lawyer-dashboard/types';
 
 export const authTokenStorageKey = 'visatrack.access_token';
@@ -483,12 +482,6 @@ export const mockDashboardStats: DashboardStats = {
   completedCases: 1,
 };
 
-export const mockDeadlineItems: DeadlineItem[] = [
-  { task: 'Express Entry filing', client: 'C-2026-001', date: 'Mar 15', daysLeft: 17 },
-  { task: 'Work Permit filing', client: 'C-2026-002', date: 'Mar 1', daysLeft: 3 },
-  { task: 'Study Permit review', client: 'C-2026-003', date: 'Mar 22', daysLeft: 24 },
-];
-
 export const mockActivityItems: ActivityItem[] = [
   { action: 'Document uploaded', client: 'Jordan Client', detail: 'Passport Biographical Page', time: '10 minutes ago', type: 'document' },
   { action: 'Client message', client: 'Jordan Client', detail: 'Asked about revised employer letter', time: '1 hour ago', type: 'message' },
@@ -567,7 +560,6 @@ export const mockCaseInfo: CaseInfo = {
   assignedLawyer: 'Avery Counsel',
   startDate: 'Feb 10, 2026',
   estimatedCompletion: 'Jun 1, 2026 - Aug 15, 2026',
-  progress: 68,
 };
 
 export const mockOrganizations: OrganizationListItem[] = [

@@ -251,7 +251,6 @@ export function useClientDashboardData(): ClientDashboardData {
       assignedLawyer: workspace.case.primary_lawyer_name ?? 'Unassigned',
       startDate: formatDate(workspace.case.start_date),
       estimatedCompletion,
-      progress: workspace.case.progress_percent,
     };
   }, [workspace, capabilities.canViewCaseStatus]);
 

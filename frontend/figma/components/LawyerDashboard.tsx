@@ -4,7 +4,6 @@ import { ActiveCasesPanel } from './lawyer-dashboard/ActiveCasesPanel';
 import { QuickActionsPanel } from './lawyer-dashboard/QuickActionsPanel';
 import { RecentActivityPanel } from './lawyer-dashboard/RecentActivityPanel';
 import { StatsGrid } from './lawyer-dashboard/StatsGrid';
-import { UpcomingDeadlinesPanel } from './lawyer-dashboard/UpcomingDeadlinesPanel';
 import { useLawyerDashboardData } from './lawyer-dashboard/useLawyerDashboardData';
 
 interface LawyerDashboardProps {
@@ -20,13 +19,8 @@ export function LawyerDashboard({
   onCreateCase,
   lawyerName,
 }: LawyerDashboardProps) {
-  const { cases, stats, upcomingDeadlines, derivedActivity, isLoading, error, retry } = useLawyerDashboardData();
+  const { cases, stats, derivedActivity, isLoading, error, retry } = useLawyerDashboardData();
   const displayName = lawyerName?.trim().split(/\s+/)[0] || 'Attorney';
-  const nextDeadlineCaseId = [...upcomingDeadlines].sort((left, right) => left.daysLeft - right.daysLeft)[0]?.client;
-  const highestPriorityCaseId =
-    cases.find((entry) => entry.priority.toLowerCase() === 'high')?.id ??
-    cases.find((entry) => entry.priority.toLowerCase() === 'medium')?.id ??
-    cases[0]?.id;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,24 +72,9 @@ export function LawyerDashboard({
           </div>
 
           <div className="space-y-6">
-            <UpcomingDeadlinesPanel deadlines={upcomingDeadlines} isLoading={isLoading} />
             <QuickActionsPanel
               onCreateCase={onCreateCase}
               onViewActiveCases={onViewActiveCases}
-              onOpenNextDeadlineCase={
-                nextDeadlineCaseId
-                  ? () => {
-                      onSelectCase?.(nextDeadlineCaseId);
-                    }
-                  : undefined
-              }
-              onOpenHighPriorityCase={
-                highestPriorityCaseId
-                  ? () => {
-                      onSelectCase?.(highestPriorityCaseId);
-                    }
-                  : undefined
-              }
             />
           </div>
         </div>

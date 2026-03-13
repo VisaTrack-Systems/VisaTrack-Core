@@ -4,12 +4,10 @@ import { ActiveCasesPanel } from './ActiveCasesPanel';
 import { QuickActionsPanel } from './QuickActionsPanel';
 import { RecentActivityPanel } from './RecentActivityPanel';
 import { StatsGrid } from './StatsGrid';
-import { UpcomingDeadlinesPanel } from './UpcomingDeadlinesPanel';
 import {
   mockActivityItems,
   mockDashboardCases,
   mockDashboardStats,
-  mockDeadlineItems,
 } from '../../storybook/fixtures';
 
 const StoryHost = () => null;
@@ -34,10 +32,6 @@ export const ActiveCasesList: Story = {
 
 export const RecentActivity: Story = {
   render: () => <RecentActivityPanel activityItems={mockActivityItems} />,
-};
-
-export const UpcomingDeadlines: Story = {
-  render: () => <UpcomingDeadlinesPanel deadlines={mockDeadlineItems} />,
 };
 
 export const QuickActions: Story = {
