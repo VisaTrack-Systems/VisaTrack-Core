@@ -5,6 +5,7 @@ import {
   type CaseWorkspace,
   type ClientCaseListItem,
   completeCaseDocumentUpload,
+  deleteClientUploadedDocument,
   getCaseWorkspaceByNumber,
   getCaseDocumentDownloadUrl,
   getClientCases,
@@ -33,15 +34,18 @@ type ClientDashboardData = {
   caseInfo: CaseInfo | null;
   documents: DashboardDocument[];
   milestones: DashboardMilestone[];
+  allMessages: DashboardMessage[];
   recentMessages: DashboardMessage[];
   upcomingAppointments: DashboardAppointment[];
   billingInfo: BillingInfo;
   requiredDocuments: number;
   completedRequiredDocuments: number;
   capabilities: ClientPortalCapabilities;
-  uploadDocument: (documentId: string, file: File) => Promise<void>;
+  uploadDocument: (documentId: string, file: File, note: string | null) => Promise<void>;
+  deleteUploadedDocument: (documentId: string) => Promise<void>;
   downloadDocument: (documentId: string) => Promise<void>;
   uploadingDocumentId: string | null;
+  deletingDocumentId: string | null;
   downloadingDocumentId: string | null;
 };
 
@@ -74,6 +78,29 @@ function normalizePortalPermissions(
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetryUploadComplete(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('uploaded file not found') ||
+    message.includes('failed to validate uploaded file') ||
+    message.includes('request failed: 500') ||
+    message.includes('request failed: 502') ||
+    message.includes('request failed: 503') ||
+    message.includes('networkerror') ||
+    message.includes('failed to fetch')
+  );
+}
+
 export function useClientDashboardData(): ClientDashboardData {
   const hasLoadedInitialWorkspaceRef = useRef(false);
   const [clientCases, setClientCases] = useState<ClientCaseListItem[]>([]);
@@ -83,6 +110,7 @@ export function useClientDashboardData(): ClientDashboardData {
   const [loading, setLoading] = useState(true);
   const [switchingCase, setSwitchingCase] = useState(false);
   const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -236,6 +264,7 @@ export function useClientDashboardData(): ClientDashboardData {
       id: document.id,
       name: document.name,
       status: documentDisplayStatus(document.status, document.required),
+      lawyerStatus: titleize(document.status),
       uploadedDate: formatDate(document.uploaded_at),
       required: document.required,
       instructions: document.instructions,
@@ -244,7 +273,11 @@ export function useClientDashboardData(): ClientDashboardData {
     }));
   }, [workspace, capabilities.canViewDocuments]);
 
-  const uploadDocument = async (documentId: string, file: File): Promise<void> => {
+  const uploadDocument = async (
+    documentId: string,
+    file: File,
+    note: string | null
+  ): Promise<void> => {
     if (!selectedCaseNumber) {
       throw new Error('No active case selected');
     }
@@ -258,6 +291,10 @@ export function useClientDashboardData(): ClientDashboardData {
       });
 
       const uploadHeaders = new Headers(uploadSession.upload_headers);
+      if (!uploadHeaders.has('Content-Type')) {
+        uploadHeaders.set('Content-Type', file.type || 'application/octet-stream');
+      }
+
       const uploadResponse = await fetch(uploadSession.upload_url, {
         method: 'PUT',
         headers: uploadHeaders,
@@ -265,15 +302,41 @@ export function useClientDashboardData(): ClientDashboardData {
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Storage upload failed: ${uploadResponse.status}`);
+        const responseBody = await uploadResponse.text().catch(() => '');
+        const detail = responseBody ? ` - ${responseBody.slice(0, 300)}` : '';
+        throw new Error(`Storage upload failed: ${uploadResponse.status}${detail}`);
       }
 
-      await completeCaseDocumentUpload(selectedCaseNumber, documentId, {
+      const completionPayload = {
         storage_key: uploadSession.storage_key,
         file_name: file.name,
         file_type: file.type || 'application/octet-stream',
         file_size_bytes: file.size,
-      });
+        client_note: note,
+      };
+
+      const retryDelaysMs = [0, 400, 900];
+      let completionError: unknown = null;
+      for (const delayMs of retryDelaysMs) {
+        if (delayMs > 0) {
+          await sleep(delayMs);
+        }
+
+        try {
+          await completeCaseDocumentUpload(selectedCaseNumber, documentId, completionPayload);
+          completionError = null;
+          break;
+        } catch (error) {
+          completionError = error;
+          if (!shouldRetryUploadComplete(error)) {
+            break;
+          }
+        }
+      }
+
+      if (completionError) {
+        throw completionError;
+      }
 
       await refreshSelectedCaseWorkspace();
     } finally {
@@ -292,6 +355,20 @@ export function useClientDashboardData(): ClientDashboardData {
       window.open(response.download_url, '_blank', 'noopener,noreferrer');
     } finally {
       setDownloadingDocumentId(null);
+    }
+  };
+
+  const deleteUploadedDocument = async (documentId: string): Promise<void> => {
+    if (!selectedCaseNumber) {
+      throw new Error('No active case selected');
+    }
+
+    setDeletingDocumentId(documentId);
+    try {
+      await deleteClientUploadedDocument(selectedCaseNumber, documentId);
+      await refreshSelectedCaseWorkspace();
+    } finally {
+      setDeletingDocumentId(null);
     }
   };
 
@@ -319,19 +396,25 @@ export function useClientDashboardData(): ClientDashboardData {
       });
   }, [workspace, capabilities.canViewMilestones]);
 
-  const recentMessages = useMemo<DashboardMessage[]>(() => {
+  const allMessages = useMemo<DashboardMessage[]>(() => {
     if (!workspace || !capabilities.canViewMessages) {
       return [];
     }
 
-    return workspace.messages.slice(0, 4).map((message) => ({
+    return workspace.messages.map((message) => ({
       from: message.sender_name,
       subject: message.subject,
       preview: message.body.slice(0, 96),
+      body: message.body,
       time: relativeTime(message.sent_at),
       unread: !message.read_at,
     }));
   }, [workspace, capabilities.canViewMessages]);
+
+  const recentMessages = useMemo<DashboardMessage[]>(
+    () => allMessages.slice(0, 4),
+    [allMessages]
+  );
 
   const upcomingAppointments = useMemo<DashboardAppointment[]>(() => {
     if (!workspace || !capabilities.canViewMilestones) {
@@ -382,6 +465,7 @@ export function useClientDashboardData(): ClientDashboardData {
     caseInfo,
     documents,
     milestones,
+    allMessages,
     recentMessages,
     upcomingAppointments,
     billingInfo,
@@ -389,8 +473,10 @@ export function useClientDashboardData(): ClientDashboardData {
     completedRequiredDocuments,
     capabilities,
     uploadDocument,
+    deleteUploadedDocument,
     downloadDocument,
     uploadingDocumentId,
+    deletingDocumentId,
     downloadingDocumentId,
   };
 }

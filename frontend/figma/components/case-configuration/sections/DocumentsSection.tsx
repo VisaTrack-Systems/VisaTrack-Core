@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, FolderPlus, Plus, Send, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, FolderPlus, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 
@@ -65,6 +65,7 @@ export function DocumentsSection({
   const [isCreatingSuite, setIsCreatingSuite] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [noteTarget, setNoteTarget] = useState<{ name: string; note: string } | null>(null);
 
   const handleCreateSuite = async (input: NewDocumentSuiteInput): Promise<boolean> => {
     setIsCreatingSuite(true);
@@ -283,6 +284,23 @@ export function DocumentsSection({
                                 <Download className="w-4 h-4 text-gray-600" />
                               </button>
                               <button
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (!document.client_note?.trim()) {
+                                    return;
+                                  }
+                                  setNoteTarget({
+                                    name: document.name,
+                                    note: document.client_note ?? '',
+                                  });
+                                }}
+                                title={document.client_note?.trim() ? 'View client note' : 'No client note'}
+                                disabled={!document.client_note?.trim()}
+                              >
+                                <MessageSquare className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
                                 className="p-1 hover:bg-gray-100 rounded"
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -353,6 +371,38 @@ export function DocumentsSection({
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleDeleteDocument}
         />
+      ) : null}
+      {noteTarget ? (
+        <div className="fixed inset-0 z-[85] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Client Note</h3>
+                <p className="text-xs text-gray-500 mt-1">{noteTarget.name}</p>
+              </div>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-gray-100"
+                onClick={() => setNoteTarget(null)}
+                aria-label="Close note dialog"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{noteTarget.note}</p>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setNoteTarget(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );

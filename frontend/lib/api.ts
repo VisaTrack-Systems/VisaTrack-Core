@@ -287,6 +287,7 @@ export type CaseWorkspace = {
       due_date: string | null;
       uploaded_at: string | null;
       instructions: string | null;
+      client_note?: string | null;
       file_name: string | null;
       latest_case_document_id: string | null;
       can_download: boolean;
@@ -300,6 +301,7 @@ export type CaseWorkspace = {
     due_date: string | null;
     uploaded_at: string | null;
     instructions: string | null;
+    client_note?: string | null;
     file_name: string | null;
     latest_case_document_id: string | null;
     can_download: boolean;
@@ -464,6 +466,7 @@ export type CaseDocumentUploadCompleteInput = {
   file_hash?: string | null;
   issue_date?: string | null;
   expiry_date?: string | null;
+  client_note?: string | null;
 };
 
 export type CaseDocumentDownloadResponse = {
@@ -1035,6 +1038,18 @@ export async function completeCaseDocumentUpload(
     {
       method: 'POST',
       body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function deleteClientUploadedDocument(
+  caseNumber: string,
+  documentId: string
+): Promise<void> {
+  return requestVoid(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/uploaded-file`,
+    {
+      method: 'DELETE',
     }
   );
 }
