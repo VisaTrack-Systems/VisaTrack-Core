@@ -599,6 +599,36 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
     assert result.can_download is True
 
 
+def test_get_case_document_view_url_returns_inline_presigned_link(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})
+    slot = {
+        'logical_document_id': str(uuid4()),
+        'name': 'Passport',
+        'bound_case_document': {
+            'id': uuid4(),
+            'file_path': 'org/x/doc.pdf',
+            'file_name': 'passport.pdf',
+        },
+    }
+    db = MagicMock()
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+    monkeypatch.setattr(cases, 'create_presigned_download', lambda **kwargs: 'https://view-inline')
+    monkeypatch.setattr(cases, 'log_document_access', lambda *args, **kwargs: None)
+
+    result = cases.get_case_document_view_url(
+        case_number='C-2026-001',
+        document_id=slot['logical_document_id'],
+        request=row(client=row(host='127.0.0.1'), headers={'user-agent': 'pytest'}),
+        auth=auth,
+        db=db,
+    )
+
+    assert result.view_url == 'https://view-inline'
+    assert result.file_name == 'passport.pdf'
+
+
 def test_get_case_document_download_url_returns_presigned_link(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})
@@ -614,7 +644,7 @@ def test_get_case_document_download_url_returns_presigned_link(monkeypatch, make
     db = MagicMock()
     monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
     monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
-    monkeypatch.setattr(cases, 'create_presigned_download', lambda **kwargs: 'https://download')
+    monkeypatch.setattr(cases, 'create_presigned_force_download', lambda **kwargs: 'https://download')
     monkeypatch.setattr(cases, 'log_document_access', lambda *args, **kwargs: None)
 
     result = cases.get_case_document_download_url(

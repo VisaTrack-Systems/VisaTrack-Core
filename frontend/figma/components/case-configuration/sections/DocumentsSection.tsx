@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, FolderPlus, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 
@@ -26,6 +26,8 @@ type DocumentsSectionProps = {
   onDownloadAll: () => void;
   onRenameDocument: (documentId: string, name: string) => Promise<boolean>;
   renamingDocumentId: string | null;
+  onViewDocument: (documentId: string) => Promise<void>;
+  viewingDocumentId: string | null;
   onDownloadDocument: (documentId: string) => Promise<void>;
   downloadingDocumentId: string | null;
   onUpdateDocumentStatus: (documentId: string, status: CaseDocumentStatus) => Promise<void>;
@@ -51,6 +53,8 @@ export function DocumentsSection({
   onDownloadAll,
   onRenameDocument,
   renamingDocumentId,
+  onViewDocument,
+  viewingDocumentId,
   onDownloadDocument,
   downloadingDocumentId,
   onUpdateDocumentStatus,
@@ -274,12 +278,23 @@ export function DocumentsSection({
                             <div className="flex items-center gap-2">
                               <button
                                 className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                                disabled={!document.can_download || viewingDocumentId === document.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void onViewDocument(document.id);
+                                }}
+                                title={document.can_download ? 'View submitted file in browser' : 'No file uploaded yet'}
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
                                 disabled={!document.can_download || downloadingDocumentId === document.id}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   void onDownloadDocument(document.id);
                                 }}
-                                title={document.can_download ? 'Open submitted file' : 'No file uploaded yet'}
+                                title={document.can_download ? 'Download submitted file' : 'No file uploaded yet'}
                               >
                                 <Download className="w-4 h-4 text-gray-600" />
                               </button>

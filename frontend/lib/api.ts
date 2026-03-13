@@ -477,6 +477,14 @@ export type CaseDocumentDownloadResponse = {
   expires_in_seconds: number;
 };
 
+export type CaseDocumentViewResponse = {
+  document_id: string;
+  case_document_id: string;
+  file_name: string;
+  view_url: string;
+  expires_in_seconds: number;
+};
+
 export type AuthLoginInput = {
   organization_slug: string;
   email: string;
@@ -1051,6 +1059,15 @@ export async function deleteClientUploadedDocument(
     {
       method: 'DELETE',
     }
+  );
+}
+
+export async function getCaseDocumentViewUrl(
+  caseNumber: string,
+  documentId: string
+): Promise<CaseDocumentViewResponse> {
+  return requestJson<CaseDocumentViewResponse>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/view-url`
   );
 }
 
