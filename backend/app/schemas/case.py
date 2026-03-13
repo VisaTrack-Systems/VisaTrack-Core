@@ -82,6 +82,7 @@ class CaseWorkspaceDocument(BaseModel):
     due_date: Optional[date]
     uploaded_at: Optional[datetime]
     instructions: Optional[str]
+    client_note: Optional[str] = None
     file_name: Optional[str] = None
     latest_case_document_id: Optional[str] = None
     can_download: bool = False
@@ -206,6 +207,7 @@ class CaseDocumentUploadCompleteRequest(BaseModel):
     file_hash: Optional[str] = None
     issue_date: Optional[date] = None
     expiry_date: Optional[date] = None
+    client_note: Optional[str] = None
 
 
 class CaseDocumentDownloadResponse(BaseModel):

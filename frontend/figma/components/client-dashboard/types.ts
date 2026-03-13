@@ -4,6 +4,7 @@ export type DashboardDocument = {
   id: string;
   name: string;
   status: DashboardDocumentStatus;
+  lawyerStatus: string;
   uploadedDate: string;
   required: boolean;
   instructions: string | null;
@@ -22,6 +23,7 @@ export type DashboardMessage = {
   from: string;
   subject: string;
   preview: string;
+  body: string;
   time: string;
   unread: boolean;
 };
