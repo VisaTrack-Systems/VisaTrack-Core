@@ -318,6 +318,8 @@ def test_revoke_invitation_marks_revoked(monkeypatch, make_auth_context):
 def test_delete_user_soft_deletes_user(monkeypatch, make_auth_context, make_user):
     auth = make_auth_context(roles=['org_admin'], permissions={'users:manage'})
     target_user = make_user(organization_id=auth.organization_id)
+    original_email = target_user.email
+    original_password_hash = target_user.password_hash
     db = MagicMock()
     db.scalar.return_value = target_user
     monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
@@ -326,6 +328,11 @@ def test_delete_user_soft_deletes_user(monkeypatch, make_auth_context, make_user
 
     assert target_user.deleted_at is not None
     assert target_user.status == 'disabled'
+    # Credentials must be scrubbed so they are not retained in the database
+    assert target_user.password_hash != original_password_hash
+    assert target_user.mfa_secret is None
+    assert target_user.email == f"deleted_{target_user.id}@deleted.local"
+    assert original_email not in target_user.email
     db.commit.assert_called_once()
 
 
