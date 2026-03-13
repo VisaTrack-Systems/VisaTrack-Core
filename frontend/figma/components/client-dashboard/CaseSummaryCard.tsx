@@ -31,19 +31,6 @@ export function CaseSummaryCard({ caseInfo }: CaseSummaryCardProps) {
           <p className="font-medium text-gray-900">{caseInfo.estimatedCompletion}</p>
         </div>
       </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-gray-700">Case Progress</p>
-          <p className="text-sm font-medium text-gray-900">{caseInfo.progress}%</p>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div
-            className="bg-red-600 h-3 rounded-full transition-all duration-500"
-            style={{ width: `${caseInfo.progress}%` }}
-          />
-        </div>
-      </div>
     </div>
   );
 }

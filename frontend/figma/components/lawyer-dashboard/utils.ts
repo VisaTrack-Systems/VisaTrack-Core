@@ -19,27 +19,6 @@ export function relativeTime(isoDate: string): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-export function daysUntil(dateIso: string): number {
-  const target = new Date(dateIso);
-  const now = new Date();
-  const diffMs = target.getTime() - now.getTime();
-  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-}
-
-export function priorityColor(priority: string): string {
-  switch (priority) {
-    case 'high':
-    case 'urgent':
-      return 'bg-red-100 text-red-700 border-red-200';
-    case 'medium':
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-    case 'low':
-      return 'bg-green-100 text-green-700 border-green-200';
-    default:
-      return 'bg-gray-100 text-gray-700 border-gray-200';
-  }
-}
-
 export function caseStatusColor(status: string): string {
   switch (status) {
     case 'Intake':

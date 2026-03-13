@@ -29,7 +29,6 @@ import { MilestonesSection } from './case-configuration/sections/MilestonesSecti
 import { OverviewSection } from './case-configuration/sections/OverviewSection';
 import { PaymentsSection } from './case-configuration/sections/PaymentsSection';
 import { PermissionsSection } from './case-configuration/sections/PermissionsSection';
-import { TimelineSection } from './case-configuration/sections/TimelineSection';
 import type {
   CaseConfigurationProps,
   DocumentStats,
@@ -840,16 +839,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onAddMilestone={handleAddMilestone}
           onUpdateMilestone={handleUpdateMilestone}
           onDeleteMilestone={handleDeleteMilestone}
-        />
-      );
-    }
-
-    if (activeSection === 'timeline') {
-      return (
-        <TimelineSection
-          workspace={workspace}
-          missingDocuments={missingDocuments}
-          pendingPaymentsAmount={pendingPaymentsAmount}
         />
       );
     }

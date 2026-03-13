@@ -8,7 +8,6 @@ export type SectionType =
   | 'details'
   | 'documents'
   | 'milestones'
-  | 'timeline'
   | 'payments'
   | 'messages'
   | 'permissions';
