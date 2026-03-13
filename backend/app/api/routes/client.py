@@ -13,6 +13,26 @@ from app.schemas.client import ClientCaseListItem
 
 router = APIRouter(prefix="/client", tags=["client"])
 
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "ready_to_submit": "in_progress",
+    "submitted": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+
+
+def _normalized_case_status(value: str) -> str:
+    token = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
 
 @router.get("/cases", response_model=list[ClientCaseListItem])
 def list_client_cases(
@@ -42,7 +62,7 @@ def list_client_cases(
             id=case.id,
             case_number=case.case_number,
             case_type=case.case_type,
-            status=case.status,
+            status=_normalized_case_status(case.status),
             priority=case.priority,
             primary_lawyer_name=(
                 f"{lawyer_first} {lawyer_last}" if lawyer_first and lawyer_last else None
@@ -87,7 +107,7 @@ def get_client_case(
         id=case.id,
         case_number=case.case_number,
         case_type=case.case_type,
-        status=case.status,
+        status=_normalized_case_status(case.status),
         priority=case.priority,
         primary_lawyer_name=(
             f"{lawyer_first} {lawyer_last}" if lawyer_first and lawyer_last else None

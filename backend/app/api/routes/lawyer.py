@@ -35,6 +35,26 @@ from app.services.rbac import assign_role_to_user
 
 router = APIRouter(prefix="/lawyer", tags=["lawyer"])
 
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "ready_to_submit": "in_progress",
+    "submitted": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+
+
+def _normalized_case_status(value: str) -> str:
+    token = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
 
 def _normalize_email(value: str) -> str:
     normalized = value.strip().lower()
@@ -306,7 +326,7 @@ def list_lawyer_cases(
             organization_id=case.organization_id,
             case_number=case.case_number,
             case_type=case.case_type,
-            status=case.status,
+            status=_normalized_case_status(case.status),
             priority=case.priority,
             client_name=f"{client_first} {client_last}",
             primary_lawyer_name=(
@@ -386,7 +406,7 @@ def create_lawyer_case(
         organization_id=new_case.organization_id,
         case_number=new_case.case_number,
         case_type=new_case.case_type,
-        status=new_case.status,
+        status=_normalized_case_status(new_case.status),
         priority=new_case.priority,
         client_name=f"{client_user.first_name} {client_user.last_name}",
         primary_lawyer_name=f"{auth.user.first_name} {auth.user.last_name}",

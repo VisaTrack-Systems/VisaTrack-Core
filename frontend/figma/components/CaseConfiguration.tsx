@@ -189,10 +189,10 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
 
   const documentStats = useMemo<DocumentStats>(() => {
     const stats = {
-      approved: 0,
+      accepted: 0,
       received: 0,
-      pending: 0,
-      needsRevision: 0,
+      requested: 0,
+      notRequested: 0,
     };
 
     if (!workspace) {
@@ -200,14 +200,14 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     for (const document of workspace.documents) {
-      if (document.status === 'approved') {
-        stats.approved += 1;
+      if (document.status === 'accepted') {
+        stats.accepted += 1;
       } else if (document.status === 'received') {
         stats.received += 1;
-      } else if (['needs_revision', 'needs-revision'].includes(document.status)) {
-        stats.needsRevision += 1;
+      } else if (document.status === 'not_requested') {
+        stats.notRequested += 1;
       } else {
-        stats.pending += 1;
+        stats.requested += 1;
       }
     }
 
@@ -268,7 +268,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return 0;
     }
 
-    return workspace.documents.filter((document) => document.required && !['approved', 'received'].includes(document.status)).length;
+    return workspace.documents.filter((document) => document.required && document.status !== 'accepted').length;
   }, [workspace]);
 
   const toggleSuite = (suiteId: string) => {
@@ -391,7 +391,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     const pendingRequiredDocuments = workspace.documents.filter(
-      (document) => document.required && !['approved', 'received', 'completed'].includes(document.status)
+      (document) => document.required && document.status !== 'accepted'
     );
     if (pendingRequiredDocuments.length === 0) {
       showNotice('info', 'No pending required documents for reminders.');

@@ -69,10 +69,8 @@ export function useLawyerDashboardData(): LawyerDashboardData {
           }))
         );
 
-        const activeCases = caseRows.filter(
-          (entry) => !['approved', 'refused', 'withdrawn', 'closed'].includes(entry.status)
-        ).length;
-        const completedCases = caseRows.filter((entry) => ['approved', 'closed'].includes(entry.status)).length;
+        const activeCases = caseRows.filter((entry) => entry.status !== 'closed').length;
+        const completedCases = caseRows.filter((entry) => entry.status === 'closed').length;
 
         setStats({
           activeCases,

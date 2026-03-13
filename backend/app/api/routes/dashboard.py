@@ -17,6 +17,26 @@ from app.schemas.dashboard import (
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "ready_to_submit": "in_progress",
+    "submitted": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+
+
+def _normalized_case_status(value: str) -> str:
+    token = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
 
 @router.get("/overview", response_model=DashboardOverview)
 def get_dashboard_overview(
@@ -36,13 +56,13 @@ def get_dashboard_overview(
     active_cases_count = db.scalar(
         select(func.count())
         .select_from(Case)
-        .where(Case.deleted_at.is_(None), Case.status.notin_(["approved", "closed", "withdrawn"]))
+        .where(Case.deleted_at.is_(None), Case.status.notin_(["closed", "approved", "refused", "withdrawn"]))
         .where(*case_filter)
     )
     completed_cases_count = db.scalar(
         select(func.count())
         .select_from(Case)
-        .where(Case.status.in_(["approved", "closed"]), Case.deleted_at.is_(None), *case_filter)
+        .where(Case.status.in_(["closed", "approved", "refused", "withdrawn"]), Case.deleted_at.is_(None), *case_filter)
     )
 
     client_user = User
@@ -94,7 +114,7 @@ def get_dashboard_overview(
                 id=row.id,
                 case_number=row.case_number,
                 case_type=row.case_type,
-                status=row.status,
+                status=_normalized_case_status(row.status),
                 priority=row.priority,
                 client_name=f"{row.first_name} {row.last_name}",
             )

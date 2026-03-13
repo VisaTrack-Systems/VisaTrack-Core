@@ -21,33 +21,28 @@ export function relativeTime(isoDate: string): string {
 
 export function completionFromStatus(status: string): number {
   switch (status) {
-    case 'approved':
     case 'closed':
       return 100;
-    case 'ready_to_submit':
-      return 88;
-    case 'submitted':
+    case 'in_progress':
       return 75;
-    case 'document_review':
-      return 55;
-    case 'document_collection':
-      return 40;
+    case 'awaiting_client':
+      return 45;
     case 'intake':
-      return 20;
+      return 15;
     default:
-      return 35;
+      return 50;
   }
 }
 
 export function statusColor(status: string): string {
   switch (status) {
-    case 'Document Review':
-      return 'bg-blue-100 text-blue-700';
+    case 'Intake':
+      return 'bg-slate-100 text-slate-700';
     case 'Awaiting Client':
       return 'bg-yellow-100 text-yellow-700';
     case 'In Progress':
       return 'bg-purple-100 text-purple-700';
-    case 'Ready To Submit':
+    case 'Closed':
       return 'bg-green-100 text-green-700';
     default:
       return 'bg-gray-100 text-gray-700';

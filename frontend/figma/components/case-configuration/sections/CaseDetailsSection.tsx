@@ -162,34 +162,16 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            {isEditing ? (
-              <select
-                value={draft.status}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
-                onChange={(event) => setDraft((previous) => ({ ...previous, status: event.target.value }))}
-              >
-                <option value="intake">Intake</option>
-                <option value="document_collection">Document Collection</option>
-                <option value="document_review">Document Review</option>
-                <option value="application_prep">In Progress</option>
-                <option value="ready_to_submit">Ready To Submit</option>
-                <option value="submitted">Submitted</option>
-                <option value="under_review">Under Review</option>
-                <option value="additional_documents_requested">Additional Documents Requested</option>
-                <option value="decision_pending">Decision Pending</option>
-                <option value="approved">Approved</option>
-                <option value="refused">Refused</option>
-                <option value="withdrawn">Withdrawn</option>
-                <option value="closed">Closed</option>
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={titleize(draft.status)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                readOnly
-              />
-            )}
+            <select
+              value={draft.status}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+              onChange={(event) => setDraft((previous) => ({ ...previous, status: event.target.value }))}
+            >
+              <option value="intake">Intake</option>
+              <option value="awaiting_client">Awaiting Client</option>
+              <option value="in_progress">In Progress</option>
+              <option value="closed">Closed</option>
+            </select>
           </div>
 
           <div>

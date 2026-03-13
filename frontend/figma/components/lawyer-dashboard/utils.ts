@@ -42,13 +42,13 @@ export function priorityColor(priority: string): string {
 
 export function caseStatusColor(status: string): string {
   switch (status) {
-    case 'Document Review':
-      return 'bg-blue-100 text-blue-700';
+    case 'Intake':
+      return 'bg-slate-100 text-slate-700';
     case 'Awaiting Client':
       return 'bg-yellow-100 text-yellow-700';
     case 'In Progress':
       return 'bg-purple-100 text-purple-700';
-    case 'Ready To Submit':
+    case 'Closed':
       return 'bg-green-100 text-green-700';
     default:
       return 'bg-gray-100 text-gray-700';

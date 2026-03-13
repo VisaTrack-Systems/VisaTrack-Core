@@ -17,7 +17,7 @@ CREATE TABLE case_documents (
     previous_version_id UUID REFERENCES case_documents(id),
     
     -- Status workflow
-    status              VARCHAR(50) DEFAULT 'pending',  -- pending, received, under_review, approved, rejected, expired
+    status              VARCHAR(50) DEFAULT 'requested',  -- requested, received, accepted, not_requested
     rejection_reason    TEXT,
     
     -- Visibility

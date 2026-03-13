@@ -37,16 +37,20 @@ export function titleize(value: string): string {
 }
 
 export function documentDisplayStatus(status: string, required: boolean): DashboardDocumentStatus {
-  if (['approved', 'received', 'completed'].includes(status)) {
+  if (['accepted', 'approved', 'completed'].includes(status)) {
     return 'completed';
   }
 
-  if (['under_review', 'review', 'needs_revision'].includes(status)) {
+  if (['received', 'under_review', 'review'].includes(status)) {
     return 'review';
   }
 
   if (!required && ['not_requested', 'optional'].includes(status)) {
     return 'optional';
+  }
+
+  if (['requested', 'pending', 'needs_revision', 'rejected', 'expired'].includes(status)) {
+    return 'pending';
   }
 
   return 'pending';
