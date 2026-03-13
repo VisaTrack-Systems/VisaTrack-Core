@@ -52,3 +52,17 @@ def test_download_and_object_fetch_helpers(monkeypatch):
     assert storage.create_presigned_download(object_key='docs/test.pdf') == 'https://example.com/download'
     assert storage.head_object(object_key='docs/test.pdf')['ContentLength'] == 42
     assert storage.get_object_bytes(object_key='docs/test.pdf') == b'document-bytes'
+
+
+def test_create_presigned_force_download_sets_attachment_disposition(monkeypatch):
+    client = MagicMock()
+    client.generate_presigned_url.return_value = 'https://example.com/force-download'
+    monkeypatch.setattr(storage, '_s3_client', lambda: client)
+    monkeypatch.setattr(storage.settings, 's3_bucket_name', 'bucket-name')
+    monkeypatch.setattr(storage.settings, 's3_presign_expires_seconds', 300)
+
+    result = storage.create_presigned_force_download(object_key='docs/test.pdf', download_name='report.pdf')
+
+    assert result == 'https://example.com/force-download'
+    _, call_kwargs = client.generate_presigned_url.call_args
+    assert call_kwargs['Params']['ResponseContentDisposition'] == 'attachment; filename="report.pdf"'
