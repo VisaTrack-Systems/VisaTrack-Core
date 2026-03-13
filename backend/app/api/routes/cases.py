@@ -78,30 +78,48 @@ ALLOWED_PORTAL_ACCESS = {"full_access", "limited_access", "read_only", "disabled
 ALLOWED_DOCUMENT_UPLOAD = {"enabled", "disabled"}
 ALLOWED_MESSAGING = {"two_way", "one_way", "disabled"}
 ALLOWED_DOCUMENT_STATUSES = {
-    "pending",
+    "requested",
     "received",
-    "under_review",
-    "approved",
-    "rejected",
-    "needs_revision",
-    "expired",
     "not_requested",
+    "accepted",
 }
 ALLOWED_CASE_PRIORITIES = {"low", "medium", "high", "urgent"}
 ALLOWED_CASE_STATUSES = {
     "intake",
-    "document_collection",
-    "document_review",
-    "application_prep",
-    "ready_to_submit",
-    "submitted",
-    "under_review",
-    "additional_documents_requested",
-    "decision_pending",
-    "approved",
-    "refused",
-    "withdrawn",
+    "awaiting_client",
+    "in_progress",
     "closed",
+}
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "in_preparation": "in_progress",
+    "ready_to_submit": "in_progress",
+    "ready_to_file": "in_progress",
+    "submitted": "in_progress",
+    "filed": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "biometrics_scheduled": "in_progress",
+    "interview_scheduled": "in_progress",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "rfe_response_drafting": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+LEGACY_DOCUMENT_STATUS_MAP = {
+    "pending": "requested",
+    "under_review": "received",
+    "approved": "accepted",
+    "rejected": "requested",
+    "needs_revision": "requested",
+    "expired": "requested",
+    "optional": "not_requested",
+    "completed": "accepted",
+    "review": "received",
 }
 ALLOWED_MILESTONE_STATUSES = {
     "not_started",
@@ -152,24 +170,42 @@ def _workspace_milestone_from_row(row: Any) -> CaseWorkspaceMilestone:
 
 
 def _progress_from_status(status: str) -> int:
+    normalized = _normalized_case_status(status)
     progress_map = {
         "intake": 15,
-        "document_collection": 35,
-        "document_review": 55,
-        "application_prep": 70,
-        "ready_to_submit": 85,
-        "submitted": 92,
-        "under_review": 95,
-        "approved": 100,
+        "awaiting_client": 45,
+        "in_progress": 75,
         "closed": 100,
-        "withdrawn": 100,
-        "refused": 100,
     }
-    return progress_map.get(status, 40)
+    return progress_map.get(normalized, 50)
 
 
 def _normalize_token(value: str) -> str:
     return value.strip().lower().replace(" ", "_")
+
+
+def _canonical_case_status(value: str) -> str:
+    token = _normalize_token(value).replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
+
+def _canonical_document_status(value: str) -> str:
+    token = _normalize_token(value).replace("-", "_")
+    return LEGACY_DOCUMENT_STATUS_MAP.get(token, token)
+
+
+def _normalized_case_status(value: str, *, default: str = "in_progress") -> str:
+    canonical = _canonical_case_status(value)
+    if canonical in ALLOWED_CASE_STATUSES:
+        return canonical
+    return default
+
+
+def _normalized_document_status(value: str, *, default: str = "requested") -> str:
+    canonical = _canonical_document_status(value)
+    if canonical in ALLOWED_DOCUMENT_STATUSES:
+        return canonical
+    return default
 
 
 def _generate_case_number(db: Session, organization_id: UUID) -> str:
@@ -251,7 +287,7 @@ def _normalized_document_status_overrides(raw: Any) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in raw.items():
         doc_id = str(key).strip()
-        status_value = _normalize_token(str(value)) if value is not None else ""
+        status_value = _canonical_document_status(str(value)) if value is not None else ""
         if not doc_id or status_value not in ALLOWED_DOCUMENT_STATUSES:
             continue
         normalized[doc_id] = status_value
@@ -322,7 +358,7 @@ def _normalized_custom_documents(raw: Any) -> list[dict[str, Any]]:
             continue
 
         suite_id = str(doc.get("suite_id") or "").strip() or None
-        status_value = _normalize_token(str(doc.get("status") or ""))
+        status_value = _canonical_document_status(str(doc.get("status") or ""))
         status = status_value if status_value in ALLOWED_DOCUMENT_STATUSES else None
 
         normalized.append(
@@ -622,7 +658,7 @@ def create_case(
     if normalized_priority not in ALLOWED_CASE_PRIORITIES:
         raise HTTPException(status_code=400, detail="Invalid priority value")
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_case_status(payload.status)
     if normalized_status not in ALLOWED_CASE_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status value")
 
@@ -678,7 +714,7 @@ def create_case(
         organization_id=new_case.organization_id,
         case_number=new_case.case_number,
         case_type=new_case.case_type,
-        status=new_case.status,
+        status=_normalized_case_status(new_case.status, default="intake"),
         priority=new_case.priority,
         client_name=f"{client_user.first_name} {client_user.last_name}",
         primary_lawyer_name=(
@@ -721,8 +757,15 @@ def list_cases(
     if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
         stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
 
-    if status:
-        stmt = stmt.where(cast(Case.status, String) == status)
+    if isinstance(status, str) and status.strip():
+        normalized_query_status = _canonical_case_status(status)
+        if normalized_query_status in ALLOWED_CASE_STATUSES:
+            legacy_query_statuses = [
+                key for key, value in LEGACY_CASE_STATUS_MAP.items() if value == normalized_query_status
+            ]
+            stmt = stmt.where(cast(Case.status, String).in_([normalized_query_status, *legacy_query_statuses]))
+        else:
+            stmt = stmt.where(cast(Case.status, String) == normalized_query_status)
 
     rows = db.execute(stmt).all()
 
@@ -732,7 +775,7 @@ def list_cases(
             organization_id=case.organization_id,
             case_number=case.case_number,
             case_type=case.case_type,
-            status=case.status,
+            status=_normalized_case_status(case.status),
             priority=case.priority,
             client_name=f"{client_first} {client_last}",
             primary_lawyer_name=(
@@ -809,7 +852,7 @@ def get_case_by_number(
         id=case.id,
         case_number=case.case_number,
         case_type=case.case_type,
-        status=case.status,
+        status=_normalized_case_status(case.status),
         priority=case.priority,
         client_name=f"{client_first} {client_last}",
         primary_lawyer_name=(f"{lawyer_first} {lawyer_last}" if lawyer_first and lawyer_last else None),
@@ -850,7 +893,7 @@ def update_case_details_by_number(
     if normalized_priority not in ALLOWED_CASE_PRIORITIES:
         raise HTTPException(status_code=400, detail="Invalid priority value")
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_case_status(payload.status)
     if normalized_status not in ALLOWED_CASE_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status value")
 
@@ -860,7 +903,7 @@ def update_case_details_by_number(
     old_values = {
         "case_type": case.case_type,
         "priority": case.priority,
-        "status": case.status,
+        "status": _normalized_case_status(case.status),
         "target_filing_date": _date_or_none(case.target_filing_date),
         "description": case.description,
         "internal_notes": case.internal_notes,
@@ -877,7 +920,7 @@ def update_case_details_by_number(
     new_values = {
         "case_type": case.case_type,
         "priority": case.priority,
-        "status": case.status,
+        "status": _normalized_case_status(case.status),
         "target_filing_date": _date_or_none(case.target_filing_date),
         "description": case.description,
         "internal_notes": case.internal_notes,
@@ -904,7 +947,7 @@ def update_case_details_by_number(
         case_number=case.case_number,
         case_type=case.case_type,
         priority=case.priority,
-        status=case.status,
+        status=_normalized_case_status(case.status),
         target_filing_date=case.target_filing_date,
         description=case.description,
         internal_notes=case.internal_notes,
@@ -1449,7 +1492,7 @@ def get_case_workspace_by_number(
                 dt.instructions,
                 dt.is_required,
                 cd.id AS latest_case_document_id,
-                COALESCE(cd.status, CASE WHEN dt.is_required THEN 'pending' ELSE 'not_requested' END) AS doc_status,
+                COALESCE(cd.status, CASE WHEN dt.is_required THEN 'requested' ELSE 'not_requested' END) AS doc_status,
                 cd.uploaded_at,
                 cd.expiry_date,
                 cd.file_name,
@@ -1512,7 +1555,9 @@ def get_case_workspace_by_number(
                     id=template_id_str,
                     name=document_name_overrides.get(template_id_str, document_row["template_name"]),
                     required=bool(document_row["is_required"]),
-                    status=document_status_overrides.get(template_id_str, document_row["doc_status"]),
+                    status=_normalized_document_status(
+                        document_status_overrides.get(template_id_str, document_row["doc_status"]),
+                    ),
                     due_date=document_row["expiry_date"],
                     uploaded_at=document_row["uploaded_at"],
                     instructions=document_row["instructions"],
@@ -1590,9 +1635,11 @@ def get_case_workspace_by_number(
                 id=custom_document_id,
                 name=document_name_overrides.get(custom_document_id, custom_document_row["name"]),
                 required=False,
-                status=document_status_overrides.get(
-                    custom_document_id,
-                    custom_document_row["status"] or "received",
+                status=_normalized_document_status(
+                    document_status_overrides.get(
+                        custom_document_id,
+                        custom_document_row["status"] or "received",
+                    ),
                 ),
                 due_date=custom_document_row["expiry_date"],
                 uploaded_at=custom_document_row["uploaded_at"],
@@ -1638,7 +1685,7 @@ def get_case_workspace_by_number(
                 "documents": [],
             }
 
-        default_status = custom_document["status"] or ("pending" if custom_document["required"] else "not_requested")
+        default_status = custom_document["status"] or ("requested" if custom_document["required"] else "not_requested")
         bound_case_document = bound_case_document_rows.get(upload_bindings.get(custom_document_id, ""))
         bound_status = bound_case_document["status"] if bound_case_document else None
         bound_uploaded_at = bound_case_document["uploaded_at"] if bound_case_document else None
@@ -1649,7 +1696,9 @@ def get_case_workspace_by_number(
                 id=custom_document_id,
                 name=document_name_overrides.get(custom_document_id, custom_document["name"]),
                 required=bool(custom_document["required"]),
-                status=document_status_overrides.get(custom_document_id, bound_status or default_status),
+                status=_normalized_document_status(
+                    document_status_overrides.get(custom_document_id, bound_status or default_status)
+                ),
                 due_date=custom_document["due_date"],
                 uploaded_at=bound_uploaded_at,
                 instructions=custom_document["instructions"],
@@ -1877,7 +1926,7 @@ def get_case_workspace_by_number(
         id=case_row["id"],
         case_number=case_row["case_number"],
         case_type=case_row["case_type"],
-        status=case_row["status"],
+        status=_normalized_case_status(case_row["status"]),
         priority=case_row["priority"],
         client_id=case_row["client_id"],
         client_name=case_row["client_name"],
@@ -2085,7 +2134,7 @@ def create_case_custom_document(
     custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
     custom_documents = _normalized_custom_documents(custom_fields.get("custom_documents"))
     new_document_id = str(uuid4())
-    default_status = "pending" if payload.required else "not_requested"
+    default_status = "requested" if payload.required else "not_requested"
     new_document = {
         "id": new_document_id,
         "name": name,
@@ -2341,7 +2390,7 @@ def update_case_document_status(
 ) -> CaseDocumentStatusUpdateResponse:
     case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_document_status(payload.status)
     if normalized_status not in ALLOWED_DOCUMENT_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid document status")
 

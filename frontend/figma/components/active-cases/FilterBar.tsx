@@ -35,10 +35,10 @@ export function FilterBar({
               className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
             >
               <option value="all">All Status</option>
-              <option value="Document Review">Document Review</option>
               <option value="Awaiting Client">Awaiting Client</option>
+              <option value="Intake">Intake</option>
               <option value="In Progress">In Progress</option>
-              <option value="Ready To Submit">Ready To Submit</option>
+              <option value="Closed">Closed</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>

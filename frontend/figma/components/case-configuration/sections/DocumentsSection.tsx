@@ -102,13 +102,9 @@ export function DocumentsSection({
   };
 
   const documentStatusOptions: Array<{ value: CaseDocumentStatus; label: string }> = [
-    { value: 'pending', label: 'Pending' },
+    { value: 'requested', label: 'Requested' },
     { value: 'received', label: 'Received' },
-    { value: 'under_review', label: 'Under Review' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'needs_revision', label: 'Needs Revision' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'expired', label: 'Expired' },
+    { value: 'accepted', label: 'Accepted' },
     { value: 'not_requested', label: 'Not Requested' },
   ];
 
@@ -122,20 +118,20 @@ export function DocumentsSection({
 
         <div className="grid grid-cols-4 gap-4">
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-green-700">{documentStats.approved}</div>
-            <div className="text-sm text-green-600">Approved</div>
+            <div className="text-2xl font-bold text-green-700">{documentStats.accepted}</div>
+            <div className="text-sm text-green-600">Accepted</div>
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="text-2xl font-bold text-blue-700">{documentStats.received}</div>
             <div className="text-sm text-blue-600">Received</div>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-yellow-700">{documentStats.pending}</div>
-            <div className="text-sm text-yellow-600">Pending</div>
+            <div className="text-2xl font-bold text-yellow-700">{documentStats.requested}</div>
+            <div className="text-sm text-yellow-600">Requested</div>
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-orange-700">{documentStats.needsRevision}</div>
-            <div className="text-sm text-orange-600">Needs Revision</div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="text-2xl font-bold text-gray-700">{documentStats.notRequested}</div>
+            <div className="text-sm text-gray-600">Not Requested</div>
           </div>
         </div>
 
@@ -205,7 +201,7 @@ export function DocumentsSection({
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-sm text-gray-600">
-                    {suite.documents.filter((document) => ['approved', 'received'].includes(document.status)).length} /{' '}
+                    {suite.documents.filter((document) => document.status === 'accepted').length} /{' '}
                     {suite.documents.length} complete
                   </div>
                 </div>

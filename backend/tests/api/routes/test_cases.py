@@ -41,7 +41,7 @@ def test_case_helper_normalizers_and_sanitizers():
             'required': True,
             'due_date': None,
             'instructions': None,
-            'status': 'under_review',
+            'status': 'received',
         }
     ]
     assert cases._sanitize_file_name(' My File?.pdf ') == 'My_File_.pdf'
@@ -207,7 +207,7 @@ def test_update_case_details_by_number_updates_case(monkeypatch, make_auth_conte
         db=db,
     )
 
-    assert result.status == 'submitted'
+    assert result.status == 'in_progress'
     assert case.case_type == 'Express Entry'
     db.commit.assert_called_once()
 
@@ -528,8 +528,8 @@ def test_update_case_document_status_updates_custom_document(monkeypatch, make_a
         db=db,
     )
 
-    assert result.status == 'approved'
-    assert case.custom_fields['custom_documents'][0]['status'] == 'approved'
+    assert result.status == 'accepted'
+    assert case.custom_fields['custom_documents'][0]['status'] == 'accepted'
 
 
 def test_initiate_case_document_upload_returns_presigned_upload(monkeypatch, make_auth_context):

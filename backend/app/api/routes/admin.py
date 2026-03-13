@@ -40,6 +40,26 @@ from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_r
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "ready_to_submit": "in_progress",
+    "submitted": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+
+
+def _normalized_case_status(value: str) -> str:
+    token = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
 
 def _slugify(value: str) -> str:
     lowered = value.strip().lower()
@@ -98,7 +118,7 @@ def _list_user_roles(
 
 
 def _is_active_case_status(value: str) -> bool:
-    return str(value).lower() not in {"approved", "refused", "withdrawn", "closed"}
+    return _normalized_case_status(value) != "closed"
 
 
 def _resolve_admin_org_scope(auth: AuthContext, organization_id: Optional[UUID]) -> UUID:
@@ -144,7 +164,7 @@ def get_admin_overview(
         .select_from(Case)
         .where(
             Case.deleted_at.is_(None),
-            cast(Case.status, String).in_(["approved", "closed"]),
+            cast(Case.status, String).in_(["approved", "refused", "withdrawn", "closed"]),
             *org_filter,
         )
     ) or 0
@@ -217,7 +237,7 @@ def get_admin_overview(
                 id=row.id,
                 case_number=row.case_number,
                 case_type=row.case_type,
-                status=row.status,
+                status=_normalized_case_status(row.status),
                 priority=row.priority,
                 client_name=f"{row.first_name} {row.last_name}",
                 created_at=row.created_at,
@@ -363,7 +383,7 @@ def get_admin_operations(
                 case_id=row.id,
                 case_number=row.case_number,
                 case_type=row.case_type,
-                status=row.status,
+                status=_normalized_case_status(row.status),
                 priority=row.priority,
                 created_at=row.created_at,
                 days_open=days_open,

@@ -374,13 +374,9 @@ export type CaseCustomDocumentSuiteCreateInput = {
 };
 
 export type CaseDocumentStatus =
-  | 'pending'
+  | 'requested'
   | 'received'
-  | 'under_review'
-  | 'approved'
-  | 'rejected'
-  | 'needs_revision'
-  | 'expired'
+  | 'accepted'
   | 'not_requested';
 
 export type CaseDetailsUpdateInput = {

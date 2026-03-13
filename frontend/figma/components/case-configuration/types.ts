@@ -14,10 +14,10 @@ export type SectionType =
   | 'permissions';
 
 export type DocumentStats = {
-  approved: number;
+  accepted: number;
   received: number;
-  pending: number;
-  needsRevision: number;
+  requested: number;
+  notRequested: number;
 };
 
 export type MilestoneStats = {
