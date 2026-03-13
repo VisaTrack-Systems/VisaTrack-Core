@@ -75,6 +75,7 @@ def create_presigned_upload(*, object_key: str, content_type: str) -> PresignedU
 
 
 def create_presigned_download(*, object_key: str, download_name: Optional[str] = None) -> str:
+    """Create a presigned URL that opens the object inline in the browser (for viewing)."""
     client = _s3_client()
     params: dict[str, str] = {
         "Bucket": settings.s3_bucket_name,
@@ -82,6 +83,31 @@ def create_presigned_download(*, object_key: str, download_name: Optional[str] =
     }
     if download_name:
         params["ResponseContentDisposition"] = f'inline; filename="{download_name}"'
+
+    try:
+        return client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params=params,
+            ExpiresIn=settings.s3_presign_expires_seconds,
+            HttpMethod="GET",
+        )
+    except (NoCredentialsError, PartialCredentialsError) as exc:
+        raise StorageConfigurationError(
+            "AWS credentials are not configured for document downloads"
+        ) from exc
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to create download URL") from exc
+
+
+def create_presigned_force_download(*, object_key: str, download_name: Optional[str] = None) -> str:
+    """Create a presigned URL with Content-Disposition: attachment to force a file download."""
+    client = _s3_client()
+    params: dict[str, str] = {
+        "Bucket": settings.s3_bucket_name,
+        "Key": object_key,
+    }
+    disposition_name = download_name or "document"
+    params["ResponseContentDisposition"] = f'attachment; filename="{disposition_name}"'
 
     try:
         return client.generate_presigned_url(

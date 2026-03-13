@@ -22,6 +22,7 @@ import {
   type ClientPortalCapabilities,
 } from './types';
 import { documentDisplayStatus, formatDate, relativeTime, titleize } from './utils';
+import { triggerFileDownload } from '../../../lib/download';
 
 type ClientDashboardData = {
   clientCases: ClientCaseListItem[];
@@ -351,7 +352,7 @@ export function useClientDashboardData(): ClientDashboardData {
     setDownloadingDocumentId(documentId);
     try {
       const response = await getCaseDocumentDownloadUrl(selectedCaseNumber, documentId);
-      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+      await triggerFileDownload(response.download_url, response.file_name);
     } finally {
       setDownloadingDocumentId(null);
     }

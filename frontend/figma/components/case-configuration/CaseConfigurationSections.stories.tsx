@@ -87,6 +87,8 @@ export const Documents: Story = {
       renamingDocumentId={null}
       onDownloadDocument={async () => {}}
       downloadingDocumentId={null}
+      onViewDocument={async () => {}}
+      viewingDocumentId={null}
       onUpdateDocumentStatus={async () => {}}
       updatingDocumentId={null}
       onSendDocumentReminder={async () => {}}

@@ -47,6 +47,7 @@ from app.schemas.case import (
     CaseWorkspaceDocumentSuite,
     CaseWorkspaceInfo,
     CaseWorkspaceMessage,
+    CaseDocumentViewResponse,
     CaseWorkspaceMilestone,
     CaseWorkspacePaymentItem,
     MilestoneSummary,
@@ -56,6 +57,7 @@ from app.services.storage import (
     StorageConfigurationError,
     StorageOperationError,
     create_presigned_download,
+    create_presigned_force_download,
     create_presigned_upload,
     get_object_bytes,
     head_object,
@@ -2768,6 +2770,59 @@ def delete_client_uploaded_document(
 
 
 @router.get(
+    "/by-number/{case_number}/documents/{document_id}/view-url",
+    response_model=CaseDocumentViewResponse,
+)
+def get_case_document_view_url(
+    case_number: str,
+    document_id: str,
+    request: Request,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentViewResponse:
+    """Return a short-lived inline presigned URL for in-browser viewing.
+
+    This endpoint is restricted to legal staff (lawyer / org_admin / super_admin).
+    Every access is recorded in document_access_log with action='view' to satisfy
+    legal audit requirements around lawyer interactions with client-uploaded documents.
+    """
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    case_document = slot["bound_case_document"]
+    if case_document is None:
+        raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+
+    try:
+        view_url = create_presigned_download(
+            object_key=str(case_document["file_path"]),
+            download_name=str(case_document["file_name"] or slot["name"]),
+        )
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    log_document_access(
+        db,
+        document_id=case_document["id"],
+        user_id=auth.user_id,
+        action="view",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    db.commit()
+
+    return CaseDocumentViewResponse(
+        document_id=slot["logical_document_id"],
+        case_document_id=str(case_document["id"]),
+        file_name=str(case_document["file_name"] or slot["name"]),
+        view_url=view_url,
+        expires_in_seconds=settings.s3_presign_expires_seconds,
+    )
+
+
+@router.get(
     "/by-number/{case_number}/documents/{document_id}/download-url",
     response_model=CaseDocumentDownloadResponse,
 )
@@ -2791,7 +2846,7 @@ def get_case_document_download_url(
         raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
 
     try:
-        download_url = create_presigned_download(
+        download_url = create_presigned_force_download(
             object_key=str(case_document["file_path"]),
             download_name=str(case_document["file_name"] or slot["name"]),
         )
@@ -2804,7 +2859,7 @@ def get_case_document_download_url(
         db,
         document_id=case_document["id"],
         user_id=auth.user_id,
-        action="view",
+        action="download",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )

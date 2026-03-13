@@ -1,9 +1,9 @@
-import { Edit2, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useState } from 'react';
 
 import type { CaseWorkspace } from '@/lib/api';
 
-import { formatDate, formatDateInput, titleize } from '../utils';
+import { formatDate, formatDateInput } from '../utils';
 
 type CaseDetailsUpdate = {
   case_type: string;
@@ -46,7 +46,6 @@ function toDraft(workspace: CaseWorkspace): CaseDetailsDraft {
 }
 
 export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: CaseDetailsSectionProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<CaseDetailsDraft>(() => toDraft(workspace));
 
   const handleReset = () => {
@@ -54,7 +53,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
       return;
     }
     setDraft(toDraft(workspace));
-    setIsEditing(false);
     onNotify('Case details reset to current saved values.');
   };
 
@@ -82,7 +80,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
       description: updates.description ?? '',
       internal_notes: updates.internal_notes ?? '',
     });
-    setIsEditing(false);
   };
 
   return (
@@ -95,14 +92,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-gray-900">Basic Information</h3>
-          <button
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => setIsEditing((previous) => !previous)}
-            disabled={saving}
-          >
-            <Edit2 className="w-4 h-4" />
-            {isEditing ? 'Cancel' : 'Edit'}
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -112,7 +101,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
               type="text"
               value={draft.case_type}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-              readOnly={!isEditing}
               onChange={(event) => setDraft((previous) => ({ ...previous, case_type: event.target.value }))}
             />
           </div>
@@ -139,25 +127,16 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-            {isEditing ? (
-              <select
-                value={draft.priority}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
-                onChange={(event) => setDraft((previous) => ({ ...previous, priority: event.target.value }))}
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={titleize(draft.priority)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                readOnly
-              />
-            )}
+            <select
+              value={draft.priority}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+              onChange={(event) => setDraft((previous) => ({ ...previous, priority: event.target.value }))}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
           </div>
 
           <div>
@@ -190,7 +169,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
               type="date"
               value={draft.target_filing_date}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-              readOnly={!isEditing}
               onChange={(event) => setDraft((previous) => ({ ...previous, target_filing_date: event.target.value }))}
             />
           </div>
@@ -205,7 +183,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             rows={3}
             value={draft.description}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-            readOnly={!isEditing}
             onChange={(event) => setDraft((previous) => ({ ...previous, description: event.target.value }))}
           />
         </div>
@@ -219,7 +196,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             rows={3}
             value={draft.internal_notes}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-            readOnly={!isEditing}
             onChange={(event) => setDraft((previous) => ({ ...previous, internal_notes: event.target.value }))}
           />
         </div>
@@ -237,7 +213,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             onClick={() => {
               void handleSave();
             }}
-            disabled={!isEditing || saving}
+            disabled={saving}
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Changes'}
