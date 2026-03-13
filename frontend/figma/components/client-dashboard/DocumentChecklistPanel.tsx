@@ -132,6 +132,14 @@ export function DocumentChecklistPanel({
                       {document.instructions ? (
                         <p className="mt-2 text-xs text-gray-500">{document.instructions}</p>
                       ) : null}
+                      {document.rejectionNote ? (
+                        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                            Rejection Note
+                          </p>
+                          <p className="mt-1 text-sm text-red-700">{document.rejectionNote}</p>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

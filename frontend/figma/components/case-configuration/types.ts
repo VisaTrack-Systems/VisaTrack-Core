@@ -17,6 +17,7 @@ export type DocumentStats = {
   received: number;
   requested: number;
   notRequested: number;
+  rejected: number;
 };
 
 export type MilestoneStats = {
