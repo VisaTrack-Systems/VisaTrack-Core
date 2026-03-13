@@ -235,6 +235,17 @@ class CaseDocumentRenameResponse(BaseModel):
     name: str
 
 
+class CaseDocumentRetentionUpdateRequest(BaseModel):
+    legal_hold: Optional[bool] = None
+    retain_until: Optional[date] = None
+
+
+class CaseDocumentRetentionUpdateResponse(BaseModel):
+    document_id: str
+    legal_hold: bool
+    retain_until: Optional[date] = None
+
+
 class CaseDetailsUpdateRequest(BaseModel):
     case_type: str
     priority: str

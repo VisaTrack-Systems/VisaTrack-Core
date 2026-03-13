@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import String, cast, select, text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_roles
@@ -23,6 +24,8 @@ from app.schemas.case import (
     CaseCustomDocumentCreateRequest,
     CaseDocumentRenameRequest,
     CaseDocumentRenameResponse,
+    CaseDocumentRetentionUpdateRequest,
+    CaseDocumentRetentionUpdateResponse,
     CaseDocumentDownloadResponse,
     CaseDocumentUploadCompleteRequest,
     CaseDocumentUploadInitiateRequest,
@@ -661,6 +664,7 @@ def create_case(
     db.flush()
     db.add(
         CaseClient(
+            organization_id=new_case.organization_id,
             case_id=new_case.id,
             client_user_id=payload.client_id,
             relationship_type="primary",
@@ -951,6 +955,7 @@ def create_case_milestone(
         text(
             """
             INSERT INTO milestones (
+                organization_id,
                 case_id,
                 name,
                 description,
@@ -966,6 +971,7 @@ def create_case_milestone(
                 updated_at
             )
             VALUES (
+                :organization_id,
                 :case_id,
                 :name,
                 :description,
@@ -993,6 +999,7 @@ def create_case_milestone(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "name": name,
             "description": (payload.description or "").strip() or None,
@@ -1255,6 +1262,7 @@ def create_case_message(
         text(
             """
             INSERT INTO messages (
+                organization_id,
                 case_id,
                 sender_id,
                 recipient_id,
@@ -1267,6 +1275,7 @@ def create_case_message(
                 updated_at
             )
             VALUES (
+                :organization_id,
                 :case_id,
                 :sender_id,
                 :recipient_id,
@@ -1282,6 +1291,7 @@ def create_case_message(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "sender_id": str(auth.user_id),
             "recipient_id": str(case.client_id),
@@ -2254,6 +2264,37 @@ def delete_case_document(
     custom_documents = [doc for doc in custom_documents if doc["id"] != str(document_uuid)]
     removed_custom_document = len(custom_documents) != previous_count
 
+    # Enforce retention/legal hold: block soft-delete if document is under legal_hold or before retain_until
+    try:
+        doc_row = db.execute(
+            text(
+                """
+                SELECT id, legal_hold, retain_until
+                FROM case_documents
+                WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
+                """
+            ),
+            {"document_id": str(document_uuid), "case_id": str(case.id)},
+        ).first()
+    except ProgrammingError as e:
+        if "does not exist" in str(e).lower() or "undefined_column" in str(e).lower():
+            doc_row = None
+        else:
+            raise
+    if doc_row is not None:
+        legal_hold = getattr(doc_row, "legal_hold", None)
+        retain_until = getattr(doc_row, "retain_until", None)
+        if legal_hold:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Document is under legal hold and cannot be deleted",
+            )
+        if retain_until is not None and retain_until > date.today():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Document cannot be deleted before retention date {retain_until.isoformat()}",
+            )
+
     removed_case_document = db.execute(
         text(
             """
@@ -2348,19 +2389,21 @@ def update_case_document_status(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid document id") from exc
 
-    case_document_exists = db.execute(
+    case_document_row = db.execute(
         text(
             """
-            SELECT 1
+            SELECT id
             FROM case_documents
-            WHERE id = :document_id
-              AND case_id = :case_id
+            WHERE case_id = :case_id
+              AND (id = :document_id OR template_id = :document_id)
               AND deleted_at IS NULL
+            ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
             LIMIT 1
             """
         ),
         {"document_id": str(document_uuid), "case_id": str(case.id)},
-    ).first()
+    ).mappings().first()
+    case_document_exists = case_document_row is not None
 
     template_exists = db.execute(
         text(
@@ -2416,12 +2459,97 @@ def update_case_document_status(
         case.custom_fields = {**custom_fields, "document_status_overrides": status_overrides}
 
     db.add(case)
+
+    # document_access_log required for approve/reject (Phase 3)
+    if case_document_row and normalized_status in ("approved", "rejected"):
+        doc_action = "approve" if normalized_status == "approved" else "reject"
+        log_document_access(
+            db,
+            organization_id=case.organization_id,
+            document_id=UUID(case_document_row["id"]),
+            user_id=auth.user_id,
+            action=doc_action,
+            ip_address=None,
+            user_agent=None,
+        )
+
     db.commit()
 
     return CaseDocumentStatusUpdateResponse(
         document_id=str(document_uuid),
         status=normalized_status,
     )
+
+
+@router.patch(
+    "/by-number/{case_number}/documents/{document_id}/retention",
+    response_model=CaseDocumentRetentionUpdateResponse,
+)
+def update_case_document_retention(
+    case_number: str,
+    document_id: str,
+    payload: CaseDocumentRetentionUpdateRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentRetentionUpdateResponse:
+    """Set legal_hold and/or retain_until on a case document (retention/legal hold)."""
+    case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
+    try:
+        document_uuid = UUID(document_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid document id") from exc
+
+    try:
+        updates = []
+        params = {"document_id": str(document_uuid), "case_id": str(case.id)}
+        if payload.legal_hold is not None:
+            updates.append("legal_hold = :legal_hold")
+            params["legal_hold"] = payload.legal_hold
+        if payload.retain_until is not None:
+            updates.append("retain_until = :retain_until")
+            params["retain_until"] = payload.retain_until
+        if not updates:
+            raise HTTPException(status_code=400, detail="Provide legal_hold and/or retain_until")
+
+        set_clause = ", ".join(updates)
+        row = db.execute(
+            text(
+                f"""
+                UPDATE case_documents
+                SET {set_clause}, updated_at = NOW()
+                WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
+                RETURNING id, legal_hold, retain_until
+                """
+            ),
+            params,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Document not found for this case")
+
+        log_activity(
+            db,
+            organization_id=case.organization_id,
+            user_id=auth.user_id,
+            action="updated",
+            entity_type="document_retention",
+            entity_id=None,
+            case_id=case.id,
+            client_id=case.client_id,
+            new_values={"document_id": document_id, "legal_hold": getattr(row, "legal_hold", None), "retain_until": getattr(row, "retain_until", None)},
+        )
+        db.commit()
+        return CaseDocumentRetentionUpdateResponse(
+            document_id=str(document_uuid),
+            legal_hold=getattr(row, "legal_hold", False),
+            retain_until=getattr(row, "retain_until"),
+        )
+    except ProgrammingError as e:
+        if "does not exist" in str(e).lower() or "undefined_column" in str(e).lower():
+            raise HTTPException(
+                status_code=501,
+                detail="Retention columns (legal_hold, retain_until) not available; run Phase 5 migration",
+            ) from e
+        raise
 
 
 @router.post(
@@ -2527,6 +2655,7 @@ def complete_case_document_upload(
         text(
             """
             INSERT INTO case_documents (
+                organization_id,
                 case_id,
                 template_id,
                 name,
@@ -2543,6 +2672,7 @@ def complete_case_document_upload(
                 expiry_date,
                 uploaded_by
             ) VALUES (
+                :organization_id,
                 :case_id,
                 CAST(:template_id AS uuid),
                 :name,
@@ -2563,6 +2693,7 @@ def complete_case_document_upload(
             """
         ),
         {
+            "organization_id": str(case.organization_id),
             "case_id": str(case.id),
             "template_id": slot["template_id"],
             "name": slot["name"],
@@ -2615,6 +2746,7 @@ def complete_case_document_upload(
     )
     log_document_access(
         db,
+        organization_id=case.organization_id,
         document_id=insert_result["id"],
         user_id=auth.user_id,
         action="upload",
@@ -2752,6 +2884,7 @@ def get_case_document_download_url(
 
     log_document_access(
         db,
+        organization_id=case.organization_id,
         document_id=case_document["id"],
         user_id=auth.user_id,
         action="view",
@@ -2866,6 +2999,7 @@ def download_all_case_documents(
                 archive.writestr(archive_name, file_bytes)
                 log_document_access(
                     db,
+                    organization_id=case.organization_id,
                     document_id=row["id"],
                     user_id=auth.user_id,
                     action="download",
