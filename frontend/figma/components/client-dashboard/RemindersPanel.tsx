@@ -1,5 +1,5 @@
 import { BellRing, CheckCircle2, MailCheck, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { DashboardReminder } from './types';
 
@@ -20,7 +20,7 @@ export function RemindersPanel({
   onAcknowledge,
   updatingReminderId,
 }: RemindersPanelProps) {
-  const [selectedReminder, setSelectedReminder] = useState<DashboardReminder | null>(null);
+  const [selectedReminderId, setSelectedReminderId] = useState<string | null>(null);
   const [isBoardOpen, setIsBoardOpen] = useState(false);
 
   const reminderList = useMemo(
@@ -28,19 +28,13 @@ export function RemindersPanel({
     [allReminders, recentReminders]
   );
 
-  useEffect(() => {
-    if (!selectedReminder) {
-      return;
-    }
-    const refreshedSelection = reminderList.find((reminder) => reminder.id === selectedReminder.id);
-    if (!refreshedSelection) {
-      return;
-    }
-    setSelectedReminder(refreshedSelection);
-  }, [reminderList, selectedReminder]);
+  const selectedReminder = useMemo(
+    () => reminderList.find((reminder) => reminder.id === selectedReminderId) ?? null,
+    [reminderList, selectedReminderId]
+  );
 
   const openReminder = (reminder: DashboardReminder) => {
-    setSelectedReminder(reminder);
+    setSelectedReminderId(reminder.id);
     if (reminder.unread) {
       void onMarkRead(reminder.id).catch(() => {
         // Handled by dashboard state; swallow to avoid unhandled promise rejections in UI handlers.
@@ -117,7 +111,7 @@ export function RemindersPanel({
               <button
                 type="button"
                 className="p-1 rounded hover:bg-gray-100"
-                onClick={() => setSelectedReminder(null)}
+                onClick={() => setSelectedReminderId(null)}
                 aria-label="Close reminder"
               >
                 <X className="w-4 h-4 text-gray-600" />
