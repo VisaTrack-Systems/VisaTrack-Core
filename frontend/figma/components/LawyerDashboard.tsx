@@ -21,6 +21,7 @@ export function LawyerDashboard({
 }: LawyerDashboardProps) {
   const { cases, stats, derivedActivity, isLoading, error, retry } = useLawyerDashboardData();
   const displayName = lawyerName?.trim().split(/\s+/)[0] || 'Attorney';
+  const showNoClients = !isLoading && !error && stats.totalUsers === 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +59,13 @@ export function LawyerDashboard({
           </div>
         ) : null}
 
-        <StatsGrid stats={stats} />
+        <StatsGrid stats={stats} isLoading={isLoading} />
+
+        {showNoClients ? (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <p className="text-sm text-gray-600">No clients found. Create your first case to add a client.</p>
+          </div>
+        ) : null}
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">

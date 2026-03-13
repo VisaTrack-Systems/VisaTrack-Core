@@ -4,9 +4,25 @@ import type { DashboardStats } from './types';
 
 type StatsGridProps = {
   stats: DashboardStats;
+  isLoading?: boolean;
 };
 
-export function StatsGrid({ stats }: StatsGridProps) {
+export function StatsGrid({ stats, isLoading = false }: StatsGridProps) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={`stat-skeleton-${index}`} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+            <div className="w-8 h-8 rounded bg-gray-200 mb-4" />
+            <div className="w-16 h-8 rounded bg-gray-200 mb-2" />
+            <div className="w-24 h-4 rounded bg-gray-200 mb-2" />
+            <div className="w-28 h-3 rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const cards = [
     {
       label: 'Active Cases',

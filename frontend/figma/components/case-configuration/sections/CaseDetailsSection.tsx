@@ -194,16 +194,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
               onChange={(event) => setDraft((previous) => ({ ...previous, target_filing_date: event.target.value }))}
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Completion</label>
-            <input
-              type="text"
-              value={`${formatDate(workspace.case.estimated_completion_from)} - ${formatDate(workspace.case.estimated_completion_to)}`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-              readOnly
-            />
-          </div>
         </div>
 
         <div className="mt-6">
