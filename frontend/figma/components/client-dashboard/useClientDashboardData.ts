@@ -315,17 +315,22 @@ export function useClientDashboardData(): ClientDashboardData {
       return [];
     }
 
-    return workspace.documents.map((document) => ({
-      id: document.id,
-      name: document.name,
-      status: documentDisplayStatus(document.status, document.required),
-      lawyerStatus: titleize(document.status),
-      uploadedDate: formatDate(document.uploaded_at),
-      required: document.required,
-      instructions: document.instructions,
-      fileName: document.file_name,
-      canDownload: document.can_download,
-    }));
+    return workspace.documents.map((document) => {
+      const isRejected = document.status === 'rejected';
+
+      return {
+        id: document.id,
+        name: document.name,
+        status: documentDisplayStatus(document.status, document.required),
+        lawyerStatus: titleize(document.status),
+        rejectionNote: document.rejection_note ?? null,
+        uploadedDate: isRejected ? 'Not set' : formatDate(document.uploaded_at),
+        required: document.required,
+        instructions: document.instructions,
+        fileName: isRejected ? null : document.file_name,
+        canDownload: isRejected ? false : document.can_download,
+      };
+    });
   }, [workspace, capabilities.canViewDocuments]);
 
   const uploadDocument = async (
