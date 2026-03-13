@@ -328,14 +328,14 @@ export type CaseWorkspace = {
     paid_date: string | null;
     invoice_number: string | null;
   }>;
-  messages: Array<{
+  reminders: Array<{
     id: string;
     sender_name: string;
-    subject: string;
+    title: string;
     body: string;
     sent_at: string | null;
     read_at: string | null;
-    from_client: boolean;
+    acknowledged_at: string | null;
   }>;
   appointments: Array<{
     title: string;
@@ -365,7 +365,7 @@ export type CasePortalPermissions = {
   show_document_requirements: boolean;
   portal_access: 'full_access' | 'limited_access' | 'read_only' | 'disabled';
   document_upload: 'enabled' | 'disabled';
-  messaging: 'two_way' | 'one_way' | 'disabled';
+  reminders: 'enabled' | 'disabled';
 };
 
 export type CaseCustomDocumentSuiteCreateInput = {
@@ -415,10 +415,10 @@ export type CaseMilestoneUpdateInput = {
   client_visible?: boolean;
 };
 
-export type CaseMessageCreateInput = {
-  subject: string;
+export type CaseReminderCreateInput = {
+  title: string;
   body: string;
-  send_email?: boolean;
+  send_email_notification?: boolean;
   visible_to_client?: boolean;
 };
 
@@ -932,16 +932,36 @@ export async function deleteCaseMilestone(caseNumber: string, milestoneId: strin
   );
 }
 
-export async function sendCaseMessage(
+export async function createCaseReminder(
   caseNumber: string,
-  payload: CaseMessageCreateInput
-): Promise<CaseWorkspace['messages'][number]> {
-  return requestJson<CaseWorkspace['messages'][number]>(
-    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/messages`,
+  payload: CaseReminderCreateInput
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders`,
     {
       method: 'POST',
       body: JSON.stringify(payload),
     }
+  );
+}
+
+export async function markCaseReminderRead(
+  caseNumber: string,
+  reminderId: string
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/read`,
+    { method: 'POST' }
+  );
+}
+
+export async function acknowledgeCaseReminder(
+  caseNumber: string,
+  reminderId: string
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/acknowledge`,
+    { method: 'POST' }
   );
 }
 

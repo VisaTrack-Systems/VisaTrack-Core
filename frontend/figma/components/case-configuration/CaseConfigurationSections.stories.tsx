@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { expect, fn, userEvent, within } from 'storybook/test';
 
 import { SidebarNav } from './SidebarNav';
 import { CaseDetailsSection } from './sections/CaseDetailsSection';
 import { DocumentsSection } from './sections/DocumentsSection';
-import { MessagesSection } from './sections/MessagesSection';
+import { RemindersSection } from './sections/RemindersSection';
 import { MilestonesSection } from './sections/MilestonesSection';
 import { OverviewSection } from './sections/OverviewSection';
 import { PaymentsSection } from './sections/PaymentsSection';
@@ -25,6 +26,8 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+const createReminder = fn(async () => true);
+const notifyReminder = fn();
 
 export const Sidebar: Story = {
   parameters: { layout: 'fullscreen' },
@@ -52,7 +55,7 @@ export const Overview: Story = {
       onOpenDocuments={() => {}}
       onOpenMilestones={() => {}}
       onOpenPayments={() => {}}
-      onOpenMessages={() => {}}
+      onOpenReminders={() => {}}
     />
   ),
 };
@@ -121,16 +124,40 @@ export const Payments: Story = {
   render: () => <PaymentsSection workspace={mockCaseWorkspace} />,
 };
 
-export const Messages: Story = {
+export const Reminders: Story = {
   render: () => (
-    <MessagesSection
+    <RemindersSection
       workspace={mockCaseWorkspace}
       caseNumber="C-2026-001"
-      sending={false}
-      onSendMessage={async () => true}
-      onNotify={() => {}}
+      creating={false}
+      onCreateReminder={createReminder}
+      onNotify={notifyReminder}
     />
   ),
+  play: async ({ canvasElement }) => {
+    createReminder.mockClear();
+    notifyReminder.mockClear();
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText('Unread')).toBeInTheDocument();
+    await expect(canvas.getByText('Acknowledged')).toBeInTheDocument();
+
+    await userEvent.type(
+      canvas.getByPlaceholderText('e.g., Document Submission Reminder'),
+      'Portal Follow-up'
+    );
+    await userEvent.type(
+      canvas.getByPlaceholderText('Write the reminder for the client...'),
+      'Please upload the revised employer letter.'
+    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Post Reminder' }));
+
+    await expect(createReminder).toHaveBeenCalledWith({
+      title: 'Portal Follow-up',
+      body: 'Please upload the revised employer letter.',
+      sendEmail: false,
+    });
+  },
 };
 
 export const Permissions: Story = {

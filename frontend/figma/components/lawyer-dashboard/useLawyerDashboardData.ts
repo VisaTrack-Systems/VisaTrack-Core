@@ -103,7 +103,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
         client: entry.clientName,
         detail: `${entry.caseType} (${entry.id})`,
         time: entry.lastUpdate,
-        type: (['document', 'message', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
+        type: (['document', 'reminder', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
       })),
     [cases]
   );

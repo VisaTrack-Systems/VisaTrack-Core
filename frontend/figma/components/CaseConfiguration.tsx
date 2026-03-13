@@ -13,7 +13,7 @@ import {
   type CasePortalPermissions,
   type CaseWorkspace,
   renameCaseDocument,
-  sendCaseMessage,
+  createCaseReminder,
   updateCaseMilestone,
   getCaseWorkspaceByNumber,
   updateCaseDetails,
@@ -24,7 +24,7 @@ import {
 import { SidebarNav } from './case-configuration/SidebarNav';
 import { CaseDetailsSection } from './case-configuration/sections/CaseDetailsSection';
 import { DocumentsSection } from './case-configuration/sections/DocumentsSection';
-import { MessagesSection } from './case-configuration/sections/MessagesSection';
+import { RemindersSection } from './case-configuration/sections/RemindersSection';
 import { MilestonesSection } from './case-configuration/sections/MilestonesSection';
 import { OverviewSection } from './case-configuration/sections/OverviewSection';
 import { PaymentsSection } from './case-configuration/sections/PaymentsSection';
@@ -39,6 +39,8 @@ import type {
 } from './case-configuration/types';
 import { milestoneStatus } from './case-configuration/utils';
 import { triggerFileDownload } from '../../lib/download';
+
+const AUTO_REFRESH_INTERVAL_MS = 15000;
 
 type NoticeKind = 'success' | 'info' | 'error';
 
@@ -72,8 +74,8 @@ type MilestoneUpdate = {
   client_visible?: boolean;
 };
 
-type OutboundMessage = {
-  subject: string;
+type OutboundReminder = {
+  title: string;
   body: string;
   sendEmail: boolean;
 };
@@ -84,7 +86,7 @@ const DEFAULT_PORTAL_PERMISSIONS: CasePortalPermissions = {
   show_document_requirements: true,
   portal_access: 'full_access',
   document_upload: 'enabled',
-  messaging: 'two_way',
+  reminders: 'enabled',
 };
 
 function normalizePortalPermissions(
@@ -111,7 +113,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
   const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isCreatingReminder, setIsCreatingReminder] = useState(false);
   const [isCreatingDocumentSuite, setIsCreatingDocumentSuite] = useState(false);
   const [isAddingDocument, setIsAddingDocument] = useState(false);
   const [isSendingBulkReminders, setIsSendingBulkReminders] = useState(false);
@@ -174,6 +176,53 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
 
     return () => {
       ignore = true;
+    };
+  }, [caseId]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const refreshIfVisible = async (): Promise<void> => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      try {
+        const data = await getCaseWorkspaceByNumber(caseId);
+        if (!ignore) {
+          setWorkspace({
+            ...data,
+            portal_permissions: normalizePortalPermissions(data.portal_permissions),
+          });
+          setError(null);
+        }
+      } catch {
+        // Keep existing workspace on background refresh failures.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshIfVisible();
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleFocus = () => {
+      void refreshIfVisible();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshIfVisible();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [caseId]);
 
@@ -403,10 +452,10 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     const documentList = pendingRequiredDocuments.map((document) => `- ${document.name}`).join('\n');
     setIsSendingBulkReminders(true);
     try {
-      await sendCaseMessage(workspace.case.case_number, {
-        subject: 'Document Submission Reminder',
+      await createCaseReminder(workspace.case.case_number, {
+        title: 'Document Submission Reminder',
         body: `Please upload the following pending required documents:\n${documentList}`,
-        send_email: true,
+        send_email_notification: true,
         visible_to_client: true,
       });
       await refreshWorkspace(workspace.case.case_number);
@@ -576,10 +625,10 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     const documentName = workspace?.documents.find((document) => document.id === documentId)?.name ?? 'document';
     setSendingDocumentReminderId(documentId);
     try {
-      await sendCaseMessage(workspace.case.case_number, {
-        subject: 'Document Reminder',
+      await createCaseReminder(workspace.case.case_number, {
+        title: 'Document Reminder',
         body: `Please upload or update this document in your client portal: ${documentName}.`,
-        send_email: true,
+        send_email_notification: true,
         visible_to_client: true,
       });
       await refreshWorkspace(workspace.case.case_number);
@@ -684,33 +733,38 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
-  const handleSendMessage = async (message: OutboundMessage): Promise<boolean> => {
+  const handleCreateReminder = async (reminder: OutboundReminder): Promise<boolean> => {
     if (!workspace) {
       return false;
     }
 
-    setIsSendingMessage(true);
+    setIsCreatingReminder(true);
     try {
-      const sentMessage = await sendCaseMessage(workspace.case.case_number, {
-        subject: message.subject,
-        body: message.body,
-        send_email: message.sendEmail,
+      const sentReminder = await createCaseReminder(workspace.case.case_number, {
+        title: reminder.title,
+        body: reminder.body,
+        send_email_notification: reminder.sendEmail,
         visible_to_client: true,
       });
 
       updateWorkspace((current) => ({
         ...current,
-        messages: [sentMessage, ...current.messages],
+        reminders: [sentReminder, ...current.reminders],
       }));
 
-      showNotice('success', message.sendEmail ? 'Message sent to client portal and email queued.' : 'Message sent to client portal.');
+      showNotice(
+        'success',
+        reminder.sendEmail
+          ? 'Reminder posted to client portal and email notification queued.'
+          : 'Reminder posted to client portal.'
+      );
       return true;
     } catch (sendError) {
       const messageText = sendError instanceof Error ? sendError.message : 'Unknown error';
-      showNotice('error', `Failed to send message: ${messageText}`);
+      showNotice('error', `Failed to create reminder: ${messageText}`);
       return false;
     } finally {
-      setIsSendingMessage(false);
+      setIsCreatingReminder(false);
     }
   };
 
@@ -781,7 +835,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onOpenDocuments={() => setActiveSection('documents')}
           onOpenMilestones={() => setActiveSection('milestones')}
           onOpenPayments={() => setActiveSection('payments')}
-          onOpenMessages={() => setActiveSection('messages')}
+          onOpenReminders={() => setActiveSection('reminders')}
         />
       );
     }
@@ -847,14 +901,14 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return <PaymentsSection workspace={workspace} />;
     }
 
-    if (activeSection === 'messages') {
+    if (activeSection === 'reminders') {
       return (
-        <MessagesSection
+        <RemindersSection
           key={workspace.case.case_number}
           workspace={workspace}
           caseNumber={workspace.case.case_number}
-          sending={isSendingMessage}
-          onSendMessage={handleSendMessage}
+          creating={isCreatingReminder}
+          onCreateReminder={handleCreateReminder}
           onNotify={(message) => showNotice('info', message)}
         />
       );

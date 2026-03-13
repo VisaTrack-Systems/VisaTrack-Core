@@ -166,16 +166,16 @@ INSERT INTO roles (organization_id, name, slug, description, is_system, permissi
     "clients:view", "clients:create", "clients:edit",
     "documents:view", "documents:upload", "documents:approve",
     "payments:view", "payments:create",
-    "messages:send", "messages:view"
+    "reminders:create", "reminders:view"
 ]'),
 (NULL, 'Paralegal', 'paralegal', 'Can assist with cases but limited approval rights', TRUE, '[
     "cases:view", "cases:edit",
     "clients:view", "clients:edit",
     "documents:view", "documents:upload",
-    "messages:view", "messages:send"
+    "reminders:view", "reminders:create"
 ]'),
 (NULL, 'Client', 'client', 'Can view own case and upload documents', TRUE, '[
-    "own_case:view", "own_documents:upload", "own_messages:send", "own_payments:view"
+    "own_case:view", "own_documents:upload", "own_reminders:view", "own_reminders:acknowledge", "own_payments:view"
 ]'),
 (NULL, 'Billing Staff', 'billing', 'Can manage invoices and payments', TRUE, '[
     "payments:view", "payments:create", "payments:refund", "payments:edit",
@@ -738,43 +738,28 @@ INSERT INTO milestone_templates (name, case_type, description, is_system, milest
 
 ## 7. Communication & Activity
 
-### `messages` - Client-lawyer messaging
+### `reminders` - One-way lawyer reminders to clients
 ```sql
-CREATE TABLE messages (
+CREATE TABLE reminders (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    case_id             UUID REFERENCES cases(id) ON DELETE CASCADE,
-    
-    -- Sender/Recipient
+    case_id             UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+    organization_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    client_user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     sender_id           UUID NOT NULL REFERENCES users(id),
-    recipient_id        UUID REFERENCES users(id),  -- NULL for broadcast/announcements
-    
-    -- Message content
-    subject             VARCHAR(255),
+    title               VARCHAR(255) NOT NULL,
     body                TEXT NOT NULL,
-    body_html           TEXT,  -- Sanitized HTML for rich text
-    
-    -- Threading
-    parent_message_id   UUID REFERENCES messages(id),
-    thread_id           UUID,  -- For grouping conversation threads
-    
-    -- Status
-    is_draft            BOOLEAN DEFAULT FALSE,
     sent_at             TIMESTAMPTZ,
     read_at             TIMESTAMPTZ,
-    
-    -- Attachments
-    attachment_ids      UUID[],  -- References to case_documents
-    
-    -- Client portal visibility
+    acknowledged_at     TIMESTAMPTZ,
     visible_to_client   BOOLEAN DEFAULT TRUE,
-    
     created_at          TIMESTAMPTZ DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ DEFAULT NOW()
+    updated_at          TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at          TIMESTAMPTZ
 );
 
-CREATE INDEX idx_messages_case ON messages(case_id) WHERE is_draft = FALSE;
-CREATE INDEX idx_messages_recipient ON messages(recipient_id) WHERE read_at IS NULL;
-CREATE INDEX idx_messages_thread ON messages(thread_id);
+CREATE INDEX idx_reminders_case_sent_at ON reminders(case_id, sent_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_reminders_client_visibility ON reminders(client_user_id, read_at) WHERE visible_to_client = TRUE AND deleted_at IS NULL;
+CREATE INDEX idx_reminders_org_created_at ON reminders(organization_id, created_at DESC) WHERE deleted_at IS NULL;
 ```
 
 ### `activity_log` - Comprehensive audit trail
@@ -789,7 +774,7 @@ CREATE TABLE activity_log (
     
     -- Action
     action          VARCHAR(100) NOT NULL,  -- created, updated, deleted, viewed, downloaded, etc.
-    entity_type     VARCHAR(100) NOT NULL,  -- case, document, payment, message, etc.
+    entity_type     VARCHAR(100) NOT NULL,  -- case, document, payment, reminder, etc.
     entity_id       UUID,
     
     -- Context
@@ -829,7 +814,7 @@ CREATE TABLE notifications (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     
-    type            VARCHAR(50) NOT NULL,  -- case_update, document_request, payment_due, milestone_reminder, message
+    type            VARCHAR(50) NOT NULL,  -- case_update, document_request, payment_due, milestone_reminder, reminder
     title           VARCHAR(255) NOT NULL,
     body            TEXT,
     
@@ -881,7 +866,7 @@ CREATE INDEX idx_notifications_created ON notifications(user_id, created_at DESC
     ┌────┼────┬────────────┬────────────┐
     │    │    │            │            │
 ┌───▼──┐┌▼───┐┌▼──────────┐┌▼──────────┐┌▼──────────┐
-│mile- ││in- ││  case_    ││  trust_   ││ messages  │
+│mile- ││in- ││  case_    ││  trust_   ││ reminders │
 │stones││voices│documents ││  account  ││           │
 └──────┘└┬────┘└──────────┘└───────────┘└───────────┘
          │

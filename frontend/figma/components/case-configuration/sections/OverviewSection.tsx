@@ -16,7 +16,7 @@ type OverviewSectionProps = {
   onOpenDocuments: () => void;
   onOpenMilestones: () => void;
   onOpenPayments: () => void;
-  onOpenMessages: () => void;
+  onOpenReminders: () => void;
 };
 
 export function OverviewSection({
@@ -30,7 +30,7 @@ export function OverviewSection({
   onOpenDocuments,
   onOpenMilestones,
   onOpenPayments,
-  onOpenMessages,
+  onOpenReminders,
 }: OverviewSectionProps) {
   return (
     <div className="space-y-6">
@@ -116,12 +116,12 @@ export function OverviewSection({
           </button>
           <button
             className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-            onClick={onOpenMessages}
+            onClick={onOpenReminders}
           >
             <Send className="w-5 h-5 text-red-600" />
             <div>
-              <div className="font-medium text-gray-900">Publish Updates</div>
-              <div className="text-xs text-gray-500">Send update to client portal</div>
+              <div className="font-medium text-gray-900">Send Reminder</div>
+              <div className="text-xs text-gray-500">Post one-way reminder to client portal</div>
             </div>
           </button>
         </div>

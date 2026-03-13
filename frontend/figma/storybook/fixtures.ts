@@ -16,7 +16,7 @@ import type {
   CaseInfo,
   DashboardAppointment,
   DashboardDocument,
-  DashboardMessage,
+  DashboardReminder,
   DashboardMilestone,
 } from '../components/client-dashboard/types';
 import type {
@@ -159,7 +159,7 @@ export const mockPortalPermissions: CasePortalPermissions = {
   show_document_requirements: true,
   portal_access: 'full_access',
   document_upload: 'enabled',
-  messaging: 'two_way',
+  reminders: 'enabled',
 };
 
 export const mockCaseWorkspace: CaseWorkspace = {
@@ -327,24 +327,24 @@ export const mockCaseWorkspace: CaseWorkspace = {
       invoice_number: 'INV-2026-002',
     },
   ],
-  messages: [
+  reminders: [
     {
       id: 'msg-001',
       sender_name: 'Avery Counsel',
-      subject: 'Updated review status',
+      title: 'Updated review status',
       body: 'We reviewed the employer letter. Please upload a revised version with salary information.',
       sent_at: '2026-02-21T14:00:00Z',
       read_at: null,
-      from_client: false,
+      acknowledged_at: null,
     },
     {
       id: 'msg-002',
-      sender_name: 'Jordan Client',
-      subject: 'Travel history draft uploaded',
-      body: 'I uploaded a draft of my travel history summary for review.',
+      sender_name: 'Avery Counsel',
+      title: 'Travel history follow-up',
+      body: 'Please upload the travel history summary draft for review.',
       sent_at: '2026-02-22T17:45:00Z',
       read_at: '2026-02-22T18:00:00Z',
-      from_client: true,
+      acknowledged_at: '2026-02-22T18:15:00Z',
     },
   ],
   appointments: [
@@ -406,7 +406,7 @@ export const mockCaseWorkspaceSecondary: CaseWorkspace = {
   },
   portal_permissions: {
     ...mockPortalPermissions,
-    messaging: 'one_way',
+    reminders: 'disabled',
   },
 };
 
@@ -484,7 +484,7 @@ export const mockDashboardStats: DashboardStats = {
 
 export const mockActivityItems: ActivityItem[] = [
   { action: 'Document uploaded', client: 'Jordan Client', detail: 'Passport Biographical Page', time: '10 minutes ago', type: 'document' },
-  { action: 'Client message', client: 'Jordan Client', detail: 'Asked about revised employer letter', time: '1 hour ago', type: 'message' },
+  { action: 'Reminder sent', client: 'Jordan Client', detail: 'Follow-up for employer letter', time: '1 hour ago', type: 'reminder' },
   { action: 'Payment recorded', client: 'Jordan Client', detail: 'Retainer payment settled', time: 'Yesterday', type: 'payment' },
   { action: 'Milestone completed', client: 'Taylor Family', detail: 'Collect supporting documents', time: '2 days ago', type: 'milestone' },
 ];
@@ -521,22 +521,26 @@ export const mockDashboardMilestones: DashboardMilestone[] = [
   { title: 'Submit application', status: 'upcoming', date: 'Mar 15, 2026', description: 'Ready to file once revisions are approved.' },
 ];
 
-export const mockDashboardMessages: DashboardMessage[] = [
+export const mockDashboardReminders: DashboardReminder[] = [
   {
+    id: 'dash-reminder-1',
     from: 'Avery Counsel',
-    subject: 'Updated review status',
+    title: 'Updated review status',
     preview: 'Please upload a revised employer letter including salary.',
     body: 'Please upload a revised employer letter including salary and responsibilities. Once uploaded, we will review and proceed with the submission package.',
     time: '2 hours ago',
     unread: true,
+    acknowledged: false,
   },
   {
+    id: 'dash-reminder-2',
     from: 'Billing',
-    subject: 'Invoice reminder',
+    title: 'Invoice reminder',
     preview: 'Your filing preparation balance is due next week.',
     body: 'Your filing preparation balance is due next week. You can complete payment in the billing section of your portal.',
     time: '1 day ago',
     unread: false,
+    acknowledged: true,
   },
 ];
 

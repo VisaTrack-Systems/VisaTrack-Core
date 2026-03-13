@@ -8,7 +8,7 @@ CREATE TABLE activity_log (
     
     -- Action
     action          VARCHAR(100) NOT NULL,  -- created, updated, deleted, viewed, downloaded, etc.
-    entity_type     VARCHAR(100) NOT NULL,  -- case, document, payment, message, etc.
+    entity_type     VARCHAR(100) NOT NULL,  -- case, document, payment, reminder, etc.
     entity_id       UUID,
     
     -- Context

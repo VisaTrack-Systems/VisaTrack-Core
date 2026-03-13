@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 
@@ -309,7 +309,7 @@ export function DocumentsSection({
                                 title={document.client_note?.trim() ? 'View client note' : 'No client note'}
                                 disabled={!document.client_note?.trim()}
                               >
-                                <MessageSquare className="w-4 h-4 text-gray-600" />
+                                <StickyNote className="w-4 h-4 text-gray-600" />
                               </button>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded"

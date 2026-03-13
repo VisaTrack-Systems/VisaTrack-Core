@@ -6,14 +6,14 @@ import { BillingSummaryPanel } from './BillingSummaryPanel';
 import { CaseSummaryCard } from './CaseSummaryCard';
 import { DocumentChecklistPanel } from './DocumentChecklistPanel';
 import { DocumentUploadDialog } from './DocumentUploadDialog';
-import { MessagesPanel } from './MessagesPanel';
+import { RemindersPanel } from './RemindersPanel';
 import { MilestonesPanel } from './MilestonesPanel';
 import {
   mockBillingInfo,
   mockCaseInfo,
   mockDashboardAppointments,
   mockDashboardDocuments,
-  mockDashboardMessages,
+  mockDashboardReminders,
   mockDashboardMilestones,
 } from '../../storybook/fixtures';
 
@@ -30,6 +30,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const documentUploadSubmit = fn(async () => {});
+const reminderMarkRead = fn(async () => {});
+const reminderAcknowledge = fn(async () => {});
 
 export const CaseSummary: Story = {
   render: () => <CaseSummaryCard caseInfo={mockCaseInfo} />,
@@ -93,8 +95,28 @@ export const Milestones: Story = {
   render: () => <MilestonesPanel milestones={mockDashboardMilestones} />,
 };
 
-export const Messages: Story = {
-  render: () => <MessagesPanel recentMessages={mockDashboardMessages} canSendMessages />,
+export const Reminders: Story = {
+  render: () => (
+    <RemindersPanel
+      recentReminders={mockDashboardReminders}
+      allReminders={mockDashboardReminders}
+      canAcknowledgeReminders
+      onMarkRead={reminderMarkRead}
+      onAcknowledge={reminderAcknowledge}
+      updatingReminderId={null}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    reminderMarkRead.mockClear();
+    reminderAcknowledge.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole('button', { name: /updated review status/i }));
+    await expect(reminderMarkRead).toHaveBeenCalledWith('dash-reminder-1');
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Acknowledge' }));
+    await expect(reminderAcknowledge).toHaveBeenCalledWith('dash-reminder-1');
+  },
 };
 
 export const Appointments: Story = {

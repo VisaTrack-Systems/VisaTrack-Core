@@ -34,7 +34,7 @@ INSERT INTO roles (organization_id, name, slug, description, is_system, permissi
     "clients:view", "clients:create", "clients:edit",
     "documents:view", "documents:upload", "documents:approve",
     "payments:view", "payments:create",
-    "messages:send", "messages:view",
+    "reminders:create", "reminders:view",
     "reports:view",
     "settings:view", "settings:edit"
 ]'),
@@ -43,16 +43,16 @@ INSERT INTO roles (organization_id, name, slug, description, is_system, permissi
     "clients:view", "clients:create", "clients:edit",
     "documents:view", "documents:upload", "documents:approve",
     "payments:view", "payments:create",
-    "messages:send", "messages:view"
+    "reminders:create", "reminders:view"
 ]'),
 (NULL, 'Paralegal', 'paralegal', 'Can assist with cases but limited approval rights', TRUE, '[
     "cases:view", "cases:edit",
     "clients:view", "clients:edit",
     "documents:view", "documents:upload",
-    "messages:view", "messages:send"
+    "reminders:view", "reminders:create"
 ]'),
 (NULL, 'Client', 'client', 'Can view own case and upload documents', TRUE, '[
-    "own_case:view", "own_documents:upload", "own_messages:send", "own_payments:view"
+    "own_case:view", "own_documents:upload", "own_reminders:view", "own_reminders:acknowledge", "own_payments:view"
 ]'),
 (NULL, 'Billing Staff', 'billing', 'Can manage invoices and payments', TRUE, '[
     "payments:view", "payments:create", "payments:refund", "payments:edit",
