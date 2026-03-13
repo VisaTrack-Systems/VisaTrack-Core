@@ -755,7 +755,7 @@ def list_cases(
     if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
         stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
 
-    if status:
+    if isinstance(status, str) and status.strip():
         normalized_query_status = _canonical_case_status(status)
         if normalized_query_status in ALLOWED_CASE_STATUSES:
             legacy_query_statuses = [
