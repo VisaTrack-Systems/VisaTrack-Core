@@ -1,4 +1,5 @@
 import re
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -712,9 +713,14 @@ def delete_user(
         raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
     now = datetime.now(timezone.utc)
+    original_email = user.email
     user.deleted_at = now
     user.status = "disabled"
     user.updated_at = now
+    # Scrub credentials so the account cannot be used and credentials are not retained
+    user.password_hash = hash_password(secrets.token_urlsafe(64))
+    user.mfa_secret = None
+    user.email = f"deleted_{user.id}@deleted.local"
     db.add(user)
 
     log_activity(
@@ -724,7 +730,7 @@ def delete_user(
         action="deleted",
         entity_type="user",
         entity_id=user.id,
-        new_values={"email": user.email},
+        new_values={"email": original_email},
     )
 
     db.commit()

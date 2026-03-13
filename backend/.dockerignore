@@ -1,0 +1,10 @@
+*
+!app
+!alembic
+!requirements.txt
+!alembic.ini
+!Dockerfile
+**/__pycache__/
+*.pyc
+
+

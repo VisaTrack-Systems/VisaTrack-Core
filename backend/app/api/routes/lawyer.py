@@ -354,6 +354,7 @@ def create_lawyer_case(
 
     db.add(
         CaseClient(
+            organization_id=new_case.organization_id,
             case_id=new_case.id,
             client_user_id=client_user.id,
             relationship_type="primary",
@@ -451,6 +452,7 @@ def invite_client_to_case(
     if case_client is None:
         db.add(
             CaseClient(
+                organization_id=case.organization_id,
                 case_id=case.id,
                 client_user_id=invited_user.id,
                 relationship_type=payload.relationship_type.strip().lower(),
