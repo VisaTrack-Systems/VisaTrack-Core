@@ -218,6 +218,14 @@ class CaseDocumentDownloadResponse(BaseModel):
     expires_in_seconds: int
 
 
+class CaseDocumentViewResponse(BaseModel):
+    document_id: str
+    case_document_id: str
+    file_name: str
+    view_url: str
+    expires_in_seconds: int
+
+
 class CaseCustomDocumentCreateRequest(BaseModel):
     name: str
     suite_id: Optional[str] = None

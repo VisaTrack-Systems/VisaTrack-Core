@@ -9,6 +9,7 @@ import {
   downloadCaseDocumentsArchive,
   type CaseDocumentStatus,
   getCaseDocumentDownloadUrl,
+  getCaseDocumentViewUrl,
   type CasePortalPermissions,
   type CaseWorkspace,
   renameCaseDocument,
@@ -38,6 +39,7 @@ import type {
   SectionType,
 } from './case-configuration/types';
 import { milestoneStatus } from './case-configuration/utils';
+import { triggerFileDownload } from '../../lib/download';
 
 type NoticeKind = 'success' | 'info' | 'error';
 
@@ -118,6 +120,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
+  const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
   const [updatingDocumentId, setUpdatingDocumentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -461,6 +464,43 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
+  const handleViewDocument = async (documentId: string): Promise<void> => {
+    if (!workspace) {
+      return;
+    }
+
+    const targetDocument = workspace.documents.find((document) => document.id === documentId);
+    if (!targetDocument?.can_download) {
+      showNotice('info', 'No uploaded file is available for this document yet.');
+      return;
+    }
+
+    setViewingDocumentId(documentId);
+    // Open a blank window synchronously to preserve the user-gesture token.
+    // NOTE: do NOT pass 'noopener' here — that flag causes window.open() to return null,
+    // which would make the reference unusable. Cross-origin opener access is already
+    // restricted by modern browsers, so omitting noopener is safe for an S3 URL.
+    const viewWindow = window.open('', '_blank');
+    try {
+      const response = await getCaseDocumentViewUrl(workspace.case.case_number, documentId);
+      if (viewWindow && !viewWindow.closed) {
+        viewWindow.location.href = response.view_url;
+      } else {
+        // Popup was blocked (viewWindow is null) — nothing we can do without a gesture.
+        showNotice('error', 'Could not open the document — please allow pop-ups for this site.');
+        return;
+      }
+      showNotice('success', `Viewing ${response.file_name}.`);
+    } catch (viewError) {
+      // Close the orphaned blank tab so it doesn't linger.
+      viewWindow?.close();
+      const message = viewError instanceof Error ? viewError.message : 'Unknown error';
+      showNotice('error', `Failed to open document for viewing: ${message}`);
+    } finally {
+      setViewingDocumentId(null);
+    }
+  };
+
   const handleDownloadDocument = async (documentId: string): Promise<void> => {
     if (!workspace) {
       return;
@@ -475,11 +515,11 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     setDownloadingDocumentId(documentId);
     try {
       const response = await getCaseDocumentDownloadUrl(workspace.case.case_number, documentId);
-      window.open(response.download_url, '_blank', 'noopener,noreferrer');
-      showNotice('success', `Opened ${response.file_name}.`);
+      await triggerFileDownload(response.download_url, response.file_name);
+      showNotice('success', `Downloading ${response.file_name}.`);
     } catch (downloadError) {
       const message = downloadError instanceof Error ? downloadError.message : 'Unknown error';
-      showNotice('error', `Failed to open document: ${message}`);
+      showNotice('error', `Failed to download document: ${message}`);
     } finally {
       setDownloadingDocumentId(null);
     }
@@ -776,6 +816,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onDownloadAll={handleDownloadAllDocuments}
           onRenameDocument={handleRenameDocument}
           renamingDocumentId={renamingDocumentId}
+          onViewDocument={handleViewDocument}
+          viewingDocumentId={viewingDocumentId}
           onDownloadDocument={handleDownloadDocument}
           downloadingDocumentId={downloadingDocumentId}
           onUpdateDocumentStatus={handleUpdateDocumentStatus}
