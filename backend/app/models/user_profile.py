@@ -19,7 +19,6 @@ class UserProfile(Base):
     )
     user_type: Mapped[str] = mapped_column(String(50), nullable=False)
     bar_number: Mapped[Optional[str]] = mapped_column(String(100))
-    jurisdiction: Mapped[Optional[str]] = mapped_column(String(100))
     specialties: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String))
     years_experience: Mapped[Optional[int]] = mapped_column(Integer)
     bio: Mapped[Optional[str]] = mapped_column(Text)
