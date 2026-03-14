@@ -55,7 +55,7 @@ export const DocumentChecklist: Story = {
     const canvas = within(canvasElement);
     const rejectedRow = canvas.getByText('Employer Reference Letter').closest('.p-6');
 
-    if (!rejectedRow) {
+    if (!(rejectedRow instanceof HTMLElement)) {
       throw new Error('Expected rejected document row');
     }
 
