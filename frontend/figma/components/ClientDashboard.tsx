@@ -29,11 +29,9 @@ export function ClientDashboard() {
     deleteUploadedDocument,
     downloadDocument,
     markReminderRead,
-    acknowledgeReminder,
     uploadingDocumentId,
     deletingDocumentId,
     downloadingDocumentId,
-    updatingReminderId,
   } = useClientDashboardData();
 
   if (loading) {
@@ -135,10 +133,7 @@ export function ClientDashboard() {
               <RemindersPanel
                 allReminders={allReminders}
                 recentReminders={recentReminders}
-                canAcknowledgeReminders={capabilities.canAcknowledgeReminders}
                 onMarkRead={markReminderRead}
-                onAcknowledge={acknowledgeReminder}
-                updatingReminderId={updatingReminderId}
               />
             ) : null}
             {capabilities.canViewMilestones ? (

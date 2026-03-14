@@ -193,7 +193,7 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-passport',
           name: 'Passport Biographical Page',
           required: true,
-          status: 'approved',
+          status: 'accepted',
           due_date: '2026-03-01',
           uploaded_at: '2026-02-12T14:00:00Z',
           instructions: 'Upload a clear color scan of the main passport page.',
@@ -225,10 +225,11 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-reference',
           name: 'Employer Reference Letter',
           required: true,
-          status: 'needs_revision',
+          status: 'rejected',
           due_date: '2026-03-05',
           uploaded_at: '2026-02-19T16:30:00Z',
           instructions: 'Must include duties, salary, and duration.',
+          rejection_note: 'Please upload a revised letter that includes salary and a full duties breakdown.',
           file_name: 'reference-letter.pdf',
           latest_case_document_id: 'case-doc-reference',
           can_download: true,
@@ -257,7 +258,7 @@ export const mockCaseWorkspace: CaseWorkspace = {
           id: 'doc-travel-history',
           name: 'Travel History Summary',
           required: false,
-          status: 'pending',
+          status: 'requested',
           due_date: '2026-03-10',
           uploaded_at: null,
           instructions: 'Provide a list of trips taken in the last 10 years.',
@@ -492,29 +493,34 @@ export const mockActivityItems: ActivityItem[] = [
 
 export const mockDashboardDocuments: DashboardDocument[] = mockCaseWorkspace.documents
   .filter((document) => document.status !== 'not_requested')
-  .map((document) => ({
-    id: document.id,
-    name: document.name,
-    status:
-      document.status === 'approved'
-        ? 'completed'
-        : document.status === 'received' || document.status === 'under_review'
-          ? 'review'
-          : document.required
-            ? 'pending'
-            : 'optional',
-    lawyerStatus: document.status
-      .replaceAll('_', ' ')
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0].toUpperCase() + part.slice(1))
-      .join(' '),
-    uploadedDate: document.uploaded_at ?? 'Pending',
-    required: document.required,
-    instructions: document.instructions,
-    fileName: document.file_name,
-    canDownload: document.can_download,
-  }));
+  .map((document) => {
+    const isRejected = document.status === 'rejected';
+
+    return {
+      id: document.id,
+      name: document.name,
+      status:
+        document.status === 'accepted' || document.status === 'approved'
+          ? 'completed'
+          : document.status === 'received' || document.status === 'under_review'
+            ? 'review'
+            : document.required
+              ? 'pending'
+              : 'optional',
+      lawyerStatus: document.status
+        .replaceAll('_', ' ')
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part[0].toUpperCase() + part.slice(1))
+        .join(' '),
+      rejectionNote: document.rejection_note ?? null,
+      uploadedDate: isRejected ? 'Not set' : (document.uploaded_at ?? 'Pending'),
+      required: document.required,
+      instructions: document.instructions,
+      fileName: isRejected ? null : document.file_name,
+      canDownload: isRejected ? false : document.can_download,
+    };
+  });
 
 export const mockDashboardMilestones: DashboardMilestone[] = [
   { title: 'Collect supporting documents', status: 'completed', date: 'Feb 24, 2026', description: 'Identity and employment package completed.' },

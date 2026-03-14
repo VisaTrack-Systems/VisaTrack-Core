@@ -128,13 +128,7 @@ export function OverviewSection({
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Case Progress</h3>
-          <span className="text-sm text-gray-600">{workspace.case.progress_percent}% Complete</span>
-        </div>
-        <div className="bg-gray-200 rounded-full h-3 mb-6">
-          <div className="bg-red-600 h-3 rounded-full" style={{ width: `${workspace.case.progress_percent}%` }} />
-        </div>
+        <h3 className="font-semibold text-gray-900 mb-4">Milestone Summary</h3>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-green-600">{milestoneStats.completed}</div>

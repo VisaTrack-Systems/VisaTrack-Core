@@ -16,7 +16,6 @@ CREATE TABLE cases (
     ircc_file_number    VARCHAR(100),
     uci_number          VARCHAR(50),
     application_number  VARCHAR(50),
-    visa_office         VARCHAR(100),
     
     -- Timeline
     intake_date         DATE DEFAULT CURRENT_DATE,

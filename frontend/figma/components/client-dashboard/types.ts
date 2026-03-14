@@ -5,6 +5,7 @@ export type DashboardDocument = {
   name: string;
   status: DashboardDocumentStatus;
   lawyerStatus: string;
+  rejectionNote: string | null;
   uploadedDate: string;
   required: boolean;
   instructions: string | null;

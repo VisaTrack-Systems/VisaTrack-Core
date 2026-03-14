@@ -83,6 +83,7 @@ class CaseWorkspaceDocument(BaseModel):
     uploaded_at: Optional[datetime]
     instructions: Optional[str]
     client_note: Optional[str] = None
+    rejection_note: Optional[str] = None
     file_name: Optional[str] = None
     latest_case_document_id: Optional[str] = None
     can_download: bool = False
@@ -177,11 +178,13 @@ class CaseCustomDocumentSuiteCreateRequest(BaseModel):
 
 class CaseDocumentStatusUpdateRequest(BaseModel):
     status: str
+    rejection_note: Optional[str] = None
 
 
 class CaseDocumentStatusUpdateResponse(BaseModel):
     document_id: str
     status: str
+    rejection_note: Optional[str] = None
 
 
 class CaseDocumentUploadInitiateRequest(BaseModel):

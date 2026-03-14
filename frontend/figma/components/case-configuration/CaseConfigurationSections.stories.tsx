@@ -28,6 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 const createReminder = fn(async () => true);
 const notifyReminder = fn();
+const updateDocumentStatus = fn(async () => {});
 
 export const Sidebar: Story = {
   parameters: { layout: 'fullscreen' },
@@ -75,7 +76,7 @@ export const Documents: Story = {
   render: () => (
     <DocumentsSection
       workspace={mockCaseWorkspace}
-      documentStats={{ accepted: 1, received: 1, requested: 1, notRequested: 1 }}
+      documentStats={{ accepted: 1, received: 1, requested: 1, notRequested: 1, rejected: 1 }}
       expandedSuites={mockCaseWorkspace.document_suites.map((suite) => suite.id)}
       onToggleSuite={() => {}}
       onAddCustomDocument={async () => true}
@@ -92,14 +93,41 @@ export const Documents: Story = {
       downloadingDocumentId={null}
       onViewDocument={async () => {}}
       viewingDocumentId={null}
-      onUpdateDocumentStatus={async () => {}}
+      onUpdateDocumentStatus={updateDocumentStatus}
       updatingDocumentId={null}
-      onSendDocumentReminder={async () => {}}
-      sendingDocumentReminderId={null}
       onDeleteDocument={async () => true}
       deletingDocumentId={null}
     />
   ),
+  play: async ({ canvasElement }) => {
+    updateDocumentStatus.mockClear();
+    const canvas = within(canvasElement);
+    const referenceRow = canvas.getByText('Employer Reference Letter').closest('tr');
+
+    if (!referenceRow) {
+      throw new Error('Expected employer reference document row');
+    }
+
+    const statusSelect = referenceRow.querySelector('select');
+    if (!statusSelect) {
+      throw new Error('Expected status select to be rendered');
+    }
+
+    await userEvent.selectOptions(statusSelect, 'rejected');
+    await expect(canvas.getByRole('heading', { name: 'Reject Document' })).toBeInTheDocument();
+    await userEvent.clear(canvas.getByLabelText('Rejection note'));
+    await userEvent.type(
+      canvas.getByLabelText('Rejection note'),
+      'Please upload the complete signed letter with salary details.'
+    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Reject Document' }));
+
+    await expect(updateDocumentStatus).toHaveBeenCalledWith(
+      'doc-reference',
+      'rejected',
+      'Please upload the complete signed letter with salary details.'
+    );
+  },
 };
 
 export const Milestones: Story = {
