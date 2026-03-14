@@ -95,8 +95,6 @@ export const Documents: Story = {
       viewingDocumentId={null}
       onUpdateDocumentStatus={updateDocumentStatus}
       updatingDocumentId={null}
-      onSendDocumentReminder={async () => {}}
-      sendingDocumentReminderId={null}
       onDeleteDocument={async () => true}
       deletingDocumentId={null}
     />

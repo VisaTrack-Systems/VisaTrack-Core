@@ -37,8 +37,6 @@ type DocumentsSectionProps = {
     rejectionNote?: string | null
   ) => Promise<void>;
   updatingDocumentId: string | null;
-  onSendDocumentReminder: (documentId: string) => Promise<void>;
-  sendingDocumentReminderId: string | null;
   onDeleteDocument: (documentId: string) => Promise<boolean>;
   deletingDocumentId: string | null;
 };
@@ -64,8 +62,6 @@ export function DocumentsSection({
   downloadingDocumentId,
   onUpdateDocumentStatus,
   updatingDocumentId,
-  onSendDocumentReminder,
-  sendingDocumentReminderId,
   onDeleteDocument,
   deletingDocumentId,
 }: DocumentsSectionProps) {
@@ -375,18 +371,9 @@ export function DocumentsSection({
                                   event.stopPropagation();
                                   setRenameTarget({ id: document.id, name: document.name });
                                 }}
+                                title="Rename Document"
                               >
                                 <Edit2 className="w-4 h-4 text-gray-600" />
-                              </button>
-                              <button
-                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
-                                disabled={sendingDocumentReminderId === document.id}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void onSendDocumentReminder(document.id);
-                                }}
-                              >
-                                <Send className="w-4 h-4 text-gray-600" />
                               </button>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded"
@@ -394,6 +381,7 @@ export function DocumentsSection({
                                   event.stopPropagation();
                                   setDeleteTarget({ id: document.id, name: document.name });
                                 }}
+                                title="Delete Document"
                               >
                                 <Trash2 className="w-4 h-4 text-gray-600" />
                               </button>

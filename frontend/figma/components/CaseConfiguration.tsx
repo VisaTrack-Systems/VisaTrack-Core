@@ -117,7 +117,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [isCreatingDocumentSuite, setIsCreatingDocumentSuite] = useState(false);
   const [isAddingDocument, setIsAddingDocument] = useState(false);
   const [isSendingBulkReminders, setIsSendingBulkReminders] = useState(false);
-  const [sendingDocumentReminderId, setSendingDocumentReminderId] = useState<string | null>(null);
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
@@ -627,30 +626,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
-  const handleSendDocumentReminder = async (documentId: string): Promise<void> => {
-    if (!workspace) {
-      return;
-    }
-
-    const documentName = workspace?.documents.find((document) => document.id === documentId)?.name ?? 'document';
-    setSendingDocumentReminderId(documentId);
-    try {
-      await createCaseReminder(workspace.case.case_number, {
-        title: 'Document Reminder',
-        body: `Please upload or update this document in your client portal: ${documentName}.`,
-        send_email_notification: true,
-        visible_to_client: true,
-      });
-      await refreshWorkspace(workspace.case.case_number);
-      showNotice('success', `Reminder sent for ${documentName}.`);
-    } catch (sendError) {
-      const message = sendError instanceof Error ? sendError.message : 'Unknown error';
-      showNotice('error', `Failed to send reminder: ${message}`);
-    } finally {
-      setSendingDocumentReminderId(null);
-    }
-  };
-
   const handleDeleteDocument = async (documentId: string): Promise<boolean> => {
     if (!workspace) {
       return false;
@@ -885,8 +860,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           downloadingDocumentId={downloadingDocumentId}
           onUpdateDocumentStatus={handleUpdateDocumentStatus}
           updatingDocumentId={updatingDocumentId}
-          onSendDocumentReminder={handleSendDocumentReminder}
-          sendingDocumentReminderId={sendingDocumentReminderId}
           onDeleteDocument={handleDeleteDocument}
           deletingDocumentId={deletingDocumentId}
         />

@@ -118,7 +118,6 @@ export function DocumentChecklistPanel({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900">{document.name}</p>
-                        {document.required ? <span className="text-xs text-red-600 font-medium">*Required</span> : null}
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
                           {document.lawyerStatus}
                         </span>
