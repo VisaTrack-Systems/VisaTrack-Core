@@ -97,7 +97,6 @@ def get_lawyer_profile(
             user_id=auth.user_id,
             user_type="lawyer",
             bar_number=None,
-            jurisdiction=None,
             specialties=[],
             years_experience=None,
             bio=None,
@@ -105,12 +104,11 @@ def get_lawyer_profile(
             onboarding_complete=False,
         )
 
-    onboarding_complete = bool((profile.bar_number or "").strip() and (profile.jurisdiction or "").strip())
+    onboarding_complete = bool((profile.bar_number or "").strip())
     return LawyerProfileResponse(
         user_id=auth.user_id,
         user_type=profile.user_type,
         bar_number=profile.bar_number,
-        jurisdiction=profile.jurisdiction,
         specialties=profile.specialties or [],
         years_experience=profile.years_experience,
         bio=profile.bio,
@@ -258,7 +256,6 @@ def upsert_lawyer_profile(
 
     profile.user_type = "lawyer"
     profile.bar_number = payload.bar_number.strip() if payload.bar_number else None
-    profile.jurisdiction = payload.jurisdiction.strip() if payload.jurisdiction else None
     profile.specialties = [item.strip() for item in payload.specialties if item.strip()]
     profile.years_experience = payload.years_experience
     profile.bio = payload.bio
@@ -275,18 +272,16 @@ def upsert_lawyer_profile(
         entity_id=auth.user_id,
         new_values={
             "bar_number": profile.bar_number,
-            "jurisdiction": profile.jurisdiction,
             "specialties": profile.specialties,
         },
     )
     db.commit()
 
-    onboarding_complete = bool((profile.bar_number or "").strip() and (profile.jurisdiction or "").strip())
+    onboarding_complete = bool((profile.bar_number or "").strip())
     return LawyerProfileResponse(
         user_id=auth.user_id,
         user_type=profile.user_type,
         bar_number=profile.bar_number,
-        jurisdiction=profile.jurisdiction,
         specialties=profile.specialties or [],
         years_experience=profile.years_experience,
         bio=profile.bio,

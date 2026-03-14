@@ -106,16 +106,6 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Jurisdiction / Office</label>
-            <input
-              type="text"
-              value="Federal - IRCC"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-              readOnly
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Lawyer</label>
             <input
               type="text"
