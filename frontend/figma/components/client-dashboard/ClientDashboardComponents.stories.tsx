@@ -31,7 +31,6 @@ type Story = StoryObj<typeof meta>;
 
 const documentUploadSubmit = fn(async () => {});
 const reminderMarkRead = fn(async () => {});
-const reminderAcknowledge = fn(async () => {});
 
 export const CaseSummary: Story = {
   render: () => <CaseSummaryCard caseInfo={mockCaseInfo} />,
@@ -52,6 +51,23 @@ export const DocumentChecklist: Story = {
       downloadingDocumentId={null}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const rejectedRow = canvas.getByText('Employer Reference Letter').closest('.p-6');
+
+    if (!(rejectedRow instanceof HTMLElement)) {
+      throw new Error('Expected rejected document row');
+    }
+
+    const rejectedScope = within(rejectedRow);
+
+    await expect(canvas.getByText('Rejection Note')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('Please upload a revised letter that includes salary and a full duties breakdown.')
+    ).toBeInTheDocument();
+    await expect(rejectedScope.queryByText('File: reference-letter.pdf')).not.toBeInTheDocument();
+    await expect(rejectedScope.queryByRole('button', { name: 'View' })).not.toBeInTheDocument();
+  },
 };
 
 export const DocumentUploadModal: Story = {
@@ -100,22 +116,16 @@ export const Reminders: Story = {
     <RemindersPanel
       recentReminders={mockDashboardReminders}
       allReminders={mockDashboardReminders}
-      canAcknowledgeReminders
       onMarkRead={reminderMarkRead}
-      onAcknowledge={reminderAcknowledge}
-      updatingReminderId={null}
     />
   ),
   play: async ({ canvasElement }) => {
     reminderMarkRead.mockClear();
-    reminderAcknowledge.mockClear();
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole('button', { name: /updated review status/i }));
     await expect(reminderMarkRead).toHaveBeenCalledWith('dash-reminder-1');
-
-    await userEvent.click(canvas.getByRole('button', { name: 'Acknowledge' }));
-    await expect(reminderAcknowledge).toHaveBeenCalledWith('dash-reminder-1');
+    await expect(canvas.queryByRole('button', { name: 'Acknowledge' })).not.toBeInTheDocument();
   },
 };
 

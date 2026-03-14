@@ -118,7 +118,6 @@ export function DocumentChecklistPanel({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900">{document.name}</p>
-                        {document.required ? <span className="text-xs text-red-600 font-medium">*Required</span> : null}
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
                           {document.lawyerStatus}
                         </span>
@@ -131,6 +130,14 @@ export function DocumentChecklistPanel({
                       ) : null}
                       {document.instructions ? (
                         <p className="mt-2 text-xs text-gray-500">{document.instructions}</p>
+                      ) : null}
+                      {document.rejectionNote ? (
+                        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                            Rejection Note
+                          </p>
+                          <p className="mt-1 text-sm text-red-700">{document.rejectionNote}</p>
+                        </div>
                       ) : null}
                     </div>
                   </div>

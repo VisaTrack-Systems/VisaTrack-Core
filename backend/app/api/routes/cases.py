@@ -82,6 +82,7 @@ ALLOWED_DOCUMENT_STATUSES = {
     "received",
     "not_requested",
     "accepted",
+    "rejected",
 }
 ALLOWED_CASE_PRIORITIES = {"low", "medium", "high", "urgent"}
 ALLOWED_CASE_STATUSES = {
@@ -114,8 +115,8 @@ LEGACY_DOCUMENT_STATUS_MAP = {
     "pending": "requested",
     "under_review": "received",
     "approved": "accepted",
-    "rejected": "requested",
-    "needs_revision": "requested",
+    "rejected": "rejected",
+    "needs_revision": "rejected",
     "expired": "requested",
     "optional": "not_requested",
     "completed": "accepted",
@@ -306,6 +307,20 @@ def _normalized_document_status_overrides(raw: Any) -> dict[str, str]:
         if not doc_id or status_value not in ALLOWED_DOCUMENT_STATUSES:
             continue
         normalized[doc_id] = status_value
+    return normalized
+
+
+def _normalized_document_rejection_notes(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for key, value in raw.items():
+        doc_id = str(key).strip()
+        note = str(value or "").strip()
+        if not doc_id or not note:
+            continue
+        normalized[doc_id] = note[:2000]
     return normalized
 
 
@@ -1586,6 +1601,9 @@ def get_case_workspace_by_number(
         custom_fields.get("hidden_document_ids")
     )
     custom_documents = _normalized_custom_documents(custom_fields.get("custom_documents"))
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
     portal_permissions_payload = _normalized_portal_permissions(custom_fields.get("portal_permissions"))
     is_client_portal_view = (
         "client" in auth.roles
@@ -1695,6 +1713,7 @@ def get_case_workspace_by_number(
                     uploaded_at=document_row["uploaded_at"],
                     instructions=document_row["instructions"],
                     client_note=document_row.get("client_note"),
+                    rejection_note=rejection_notes.get(template_id_str),
                     file_name=document_row["file_name"],
                     latest_case_document_id=(
                         str(document_row["latest_case_document_id"])
@@ -1778,6 +1797,7 @@ def get_case_workspace_by_number(
                 uploaded_at=custom_document_row["uploaded_at"],
                 instructions="",
                 client_note=custom_document_row.get("client_note"),
+                rejection_note=rejection_notes.get(custom_document_id),
                 file_name=custom_document_row["file_name"],
                 latest_case_document_id=custom_document_id,
                 can_download=True,
@@ -1836,6 +1856,7 @@ def get_case_workspace_by_number(
                 uploaded_at=bound_uploaded_at,
                 instructions=custom_document["instructions"],
                 client_note=bound_client_note,
+                rejection_note=rejection_notes.get(custom_document_id),
                 file_name=bound_file_name,
                 latest_case_document_id=str(bound_case_document["id"]) if bound_case_document else None,
                 can_download=bound_case_document is not None,
@@ -2484,6 +2505,8 @@ def delete_case_document(
     name_overrides.pop(str(document_uuid), None)
     status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
     status_overrides.pop(str(document_uuid), None)
+    rejection_notes = _normalized_document_rejection_notes(custom_fields.get("document_rejection_notes"))
+    rejection_notes.pop(str(document_uuid), None)
 
     case.custom_fields = {
         **custom_fields,
@@ -2491,6 +2514,7 @@ def delete_case_document(
         "hidden_document_ids": sorted(hidden_document_ids),
         "document_name_overrides": name_overrides,
         "document_status_overrides": status_overrides,
+        "document_rejection_notes": rejection_notes,
     }
 
     log_activity(
@@ -2525,6 +2549,12 @@ def update_case_document_status(
     normalized_status = _canonical_document_status(payload.status)
     if normalized_status not in ALLOWED_DOCUMENT_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid document status")
+
+    normalized_rejection_note = (payload.rejection_note or "").strip() or None
+    if normalized_rejection_note and len(normalized_rejection_note) > 2000:
+        raise HTTPException(status_code=400, detail="Rejection note must be 2000 characters or fewer")
+    if normalized_status == "rejected" and not normalized_rejection_note:
+        raise HTTPException(status_code=400, detail="Rejection note is required when rejecting a document")
 
     try:
         document_uuid = UUID(document_id)
@@ -2582,6 +2612,9 @@ def update_case_document_status(
     status_overrides = _normalized_document_status_overrides(
         custom_fields.get("document_status_overrides")
     )
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
 
     if custom_document_exists:
         for custom_document in custom_documents:
@@ -2589,14 +2622,27 @@ def update_case_document_status(
                 custom_document["status"] = normalized_status
                 break
         status_overrides.pop(str(document_uuid), None)
+        if normalized_status == "rejected" and normalized_rejection_note:
+            rejection_notes[str(document_uuid)] = normalized_rejection_note
+        else:
+            rejection_notes.pop(str(document_uuid), None)
         case.custom_fields = {
             **custom_fields,
             "custom_documents": custom_documents,
             "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
         }
     else:
         status_overrides[str(document_uuid)] = normalized_status
-        case.custom_fields = {**custom_fields, "document_status_overrides": status_overrides}
+        if normalized_status == "rejected" and normalized_rejection_note:
+            rejection_notes[str(document_uuid)] = normalized_rejection_note
+        else:
+            rejection_notes.pop(str(document_uuid), None)
+        case.custom_fields = {
+            **custom_fields,
+            "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
+        }
 
     db.add(case)
     db.commit()
@@ -2604,6 +2650,7 @@ def update_case_document_status(
     return CaseDocumentStatusUpdateResponse(
         document_id=str(document_uuid),
         status=normalized_status,
+        rejection_note=normalized_rejection_note if normalized_status == "rejected" else None,
     )
 
 
@@ -2766,18 +2813,32 @@ def complete_case_document_upload(
     if insert_result is None:
         raise HTTPException(status_code=500, detail="Failed to record uploaded document")
 
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
+    rejection_notes.pop(slot["logical_document_id"], None)
+
     if slot["kind"] == "custom_request":
-        custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
         upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
-        status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
-        status_overrides.pop(slot["logical_document_id"], None)
+        status_overrides[slot["logical_document_id"]] = "received"
         case.custom_fields = {
             **custom_fields,
             "document_upload_bindings": upload_bindings,
             "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
         }
-        db.add(case)
+    else:
+        status_overrides.pop(slot["logical_document_id"], None)
+        case.custom_fields = {
+            **custom_fields,
+            "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
+        }
+
+    db.add(case)
 
     log_activity(
         db,
@@ -2816,6 +2877,7 @@ def complete_case_document_upload(
         uploaded_at=insert_result["uploaded_at"],
         instructions=slot["instructions"],
         client_note=normalized_client_note,
+        rejection_note=None,
         file_name=actual_file_name,
         latest_case_document_id=str(insert_result["id"]),
         can_download=True,
@@ -2868,9 +2930,17 @@ def delete_client_uploaded_document(
     if slot["kind"] == "custom_request":
         custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+        status_overrides = _normalized_document_status_overrides(
+            custom_fields.get("document_status_overrides")
+        )
         if upload_bindings.get(slot["logical_document_id"]) == str(case_document["id"]):
             upload_bindings.pop(slot["logical_document_id"], None)
-            case.custom_fields = {**custom_fields, "document_upload_bindings": upload_bindings}
+            status_overrides.pop(slot["logical_document_id"], None)
+            case.custom_fields = {
+                **custom_fields,
+                "document_upload_bindings": upload_bindings,
+                "document_status_overrides": status_overrides,
+            }
             db.add(case)
 
     log_activity(

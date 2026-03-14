@@ -1,4 +1,4 @@
-import { BellRing, CheckCircle2, MailCheck, X } from 'lucide-react';
+import { BellRing, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { DashboardReminder } from './types';
@@ -6,19 +6,13 @@ import type { DashboardReminder } from './types';
 type RemindersPanelProps = {
   allReminders?: DashboardReminder[];
   recentReminders: DashboardReminder[];
-  canAcknowledgeReminders: boolean;
   onMarkRead: (reminderId: string) => Promise<void>;
-  onAcknowledge: (reminderId: string) => Promise<void>;
-  updatingReminderId: string | null;
 };
 
 export function RemindersPanel({
   allReminders,
   recentReminders,
-  canAcknowledgeReminders,
   onMarkRead,
-  onAcknowledge,
-  updatingReminderId,
 }: RemindersPanelProps) {
   const [selectedReminderId, setSelectedReminderId] = useState<string | null>(null);
   const [isBoardOpen, setIsBoardOpen] = useState(false);
@@ -86,15 +80,9 @@ export function RemindersPanel({
           ))}
         </div>
         <div className="p-4 border-t border-gray-200">
-          <div
-            className={`w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
-              canAcknowledgeReminders
-                ? 'bg-red-50 text-red-700 border border-red-200'
-                : 'bg-gray-200 text-gray-500'
-            }`}
-          >
+          <div className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200">
             <BellRing className="w-4 h-4" />
-            {canAcknowledgeReminders ? 'lawyer reminders' : 'Reminder actions disabled'}
+            Laywer Reminders
           </div>
         </div>
       </div>
@@ -119,28 +107,6 @@ export function RemindersPanel({
             </div>
             <div className="px-5 py-4">
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedReminder.body}</p>
-              <div className="mt-4 flex items-center gap-2">
-                {selectedReminder.acknowledged ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                    <MailCheck className="h-3 w-3" />
-                    Acknowledged
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void onAcknowledge(selectedReminder.id).catch(() => {
-                        // Handled by dashboard state; swallow to avoid unhandled promise rejections in UI handlers.
-                      });
-                    }}
-                    disabled={!canAcknowledgeReminders || updatingReminderId === selectedReminder.id}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    <CheckCircle2 className="h-3 w-3" />
-                    {updatingReminderId === selectedReminder.id ? 'Saving...' : 'Acknowledge'}
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </div>

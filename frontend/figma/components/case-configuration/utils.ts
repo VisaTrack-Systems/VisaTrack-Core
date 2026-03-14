@@ -50,6 +50,8 @@ export function statusColor(status: string): string {
       return 'bg-blue-100 text-blue-700 border-blue-200';
     case 'requested':
       return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    case 'rejected':
+      return 'bg-red-100 text-red-700 border-red-200';
     case 'not_requested':
     case 'not-requested':
       return 'bg-gray-100 text-gray-700 border-gray-200';
