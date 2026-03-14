@@ -102,7 +102,6 @@ def test_upsert_lawyer_profile_returns_completed_profile(monkeypatch, make_auth_
     result = lawyer.upsert_lawyer_profile(
         payload=LawyerProfileUpsertRequest(
             bar_number='BAR-123',
-            jurisdiction='Ontario',
             specialties=['Express Entry', '  '],
             years_experience=5,
             bio='Immigration lawyer',

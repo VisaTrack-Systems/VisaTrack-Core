@@ -4,7 +4,6 @@ CREATE TABLE user_profiles (
     
     -- Lawyer-specific fields
     bar_number      VARCHAR(100),
-    jurisdiction    VARCHAR(100),  -- e.g., "Ontario", "Federal"
     specialties     TEXT[],  -- ['Express Entry', 'Work Permit', 'Family Sponsorship']
     years_experience INTEGER,
     bio             TEXT,

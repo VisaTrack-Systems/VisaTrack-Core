@@ -58,7 +58,7 @@ def _lawyer_onboarding_required(db: Session, user: User, roles: list[str]) -> bo
     if profile is None:
         return True
 
-    return not bool((profile.bar_number or "").strip() and (profile.jurisdiction or "").strip())
+    return not bool((profile.bar_number or "").strip())
 
 
 def _to_current_user_settings(user: User) -> CurrentUserSettingsResponse:
