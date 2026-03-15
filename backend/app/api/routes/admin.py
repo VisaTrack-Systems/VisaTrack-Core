@@ -25,6 +25,7 @@ from app.schemas.admin import (
     AdminCreateUserRequest,
     AdminCreateUserResponse,
     AdminOperationsResponse,
+    SendInvitationEmailRequest,
     AdminOpsCaseItem,
     AdminOpsInvitationItem,
     AdminOpsLawyerWorkloadItem,
@@ -38,6 +39,7 @@ from app.schemas.admin import (
 from app.schemas.organization import OrganizationRead
 from app.schemas.user import UserListItem
 from app.services.audit import log_activity
+from app.services.email import EmailNotConfiguredError, send_invitation_email
 from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -586,6 +588,23 @@ def revoke_invitation(
     db.commit()
 
 
+@router.post("/send-invitation-email", status_code=status.HTTP_204_NO_CONTENT)
+def send_invitation_email_endpoint(
+    payload: SendInvitationEmailRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+) -> None:
+    try:
+        send_invitation_email(
+            to_email=payload.to_email,
+            recipient_name=payload.recipient_name,
+            invitation_url=payload.invitation_url,
+        )
+    except EmailNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to send email: {exc}") from exc
+
+
 @router.get("/roles", response_model=list[AdminRoleItem])
 def list_roles(
     auth: AuthContext = Depends(require_permissions("roles:manage")),
@@ -718,7 +737,8 @@ def create_user(
             invited_by=auth.user_id,
         )
         db.add(invitation)
-        invitation_url = f"{settings.frontend_origin}/invite?token={plain_token}"
+        primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
+        invitation_url = f"{primary_origin}/invite?token={plain_token}"
 
     log_activity(
         db,

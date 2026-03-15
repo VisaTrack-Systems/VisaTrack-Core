@@ -27,6 +27,9 @@ class Settings:
     s3_endpoint_url: str = os.getenv("S3_ENDPOINT_URL", "")
     s3_presign_expires_seconds: int = int(os.getenv("S3_PRESIGN_EXPIRES_SECONDS", "900"))
     s3_max_upload_bytes: int = int(os.getenv("S3_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+    resend_api_key: str = os.getenv("RESEND_API_KEY", "")
+    resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.app")
+    resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
 
     @property
     def frontend_origins(self) -> list[str]:

@@ -657,3 +657,11 @@ export const mockAdminOverview: AdminOverview = {
     created_at: entry.created_at,
   })),
 };
+
+export const mockAdminOperations: AdminOperations = {
+  organization_id: organizationId,
+  unassigned_cases: [],
+  aging_cases: [],
+  lawyer_workload: [],
+  pending_invitations: [],
+};
