@@ -75,6 +75,7 @@ def send_invitation_email(
         "subject": f"You have been invited to join {organization_name}",
         "text": plain,
         "html": html,
+        "click_tracking": False,
     })
 
     logger.info("Invitation email sent to %s via Resend", to_email)

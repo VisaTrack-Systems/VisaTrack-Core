@@ -14,6 +14,7 @@ from app.core.security import generate_invitation_token, hash_invitation_token, 
 from app.db.deps import get_db
 from app.models.case import Case
 from app.models.case_client import CaseClient
+from app.models.organization import Organization
 from app.models.role import Role
 from app.models.user import User
 from app.models.user_invitation import UserInvitation
@@ -217,7 +218,7 @@ def create_lawyer_client(
             invited_by=auth.user_id,
         )
         db.add(invitation)
-        invitation_url = f"{settings.frontend_origin.rstrip('/')}/invite?token={plain_token}"
+        invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite?token={plain_token}"
 
     log_activity(
         db,
@@ -235,11 +236,15 @@ def create_lawyer_client(
 
     db.commit()
 
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    org_name = org.name if org else "VisaTrack"
+
     return LawyerClientCreateResponse(
         user_id=user.id,
         email=user.email,
         full_name=f"{user.first_name} {user.last_name}",
         status=user.status,
+        organization_name=org_name,
         invitation_url=invitation_url,
     )
 
@@ -504,7 +509,7 @@ def invite_client_to_case(
 
     db.commit()
 
-    invitation_url = f"{settings.frontend_origin.rstrip('/')}/invite?token={plain_token}"
+    invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite?token={plain_token}"
     return InviteClientResponse(
         case_number=case.case_number,
         client_email=email,

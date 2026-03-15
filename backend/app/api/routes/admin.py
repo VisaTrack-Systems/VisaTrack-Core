@@ -591,7 +591,7 @@ def revoke_invitation(
 @router.post("/send-invitation-email", status_code=status.HTTP_204_NO_CONTENT)
 def send_invitation_email_endpoint(
     payload: SendInvitationEmailRequest,
-    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
 ) -> None:
     try:
         send_invitation_email(

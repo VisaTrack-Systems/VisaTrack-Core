@@ -58,4 +58,5 @@ class LawyerClientCreateResponse(BaseModel):
     email: str
     full_name: str
     status: str
+    organization_name: str
     invitation_url: Optional[str] = None

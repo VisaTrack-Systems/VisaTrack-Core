@@ -94,6 +94,7 @@ export type LawyerClientCreateResponse = {
   email: string;
   full_name: string;
   status: string;
+  organization_name: string;
   invitation_url: string | null;
 };
 
