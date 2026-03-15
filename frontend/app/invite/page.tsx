@@ -38,20 +38,22 @@ function InviteForm() {
     event.preventDefault();
     if (state.kind !== "ready") return;
 
+    const { info } = state;
+
     if (password !== confirmPassword) {
       setFieldError("Passwords do not match.");
       return;
     }
 
     setFieldError(null);
-    setState({ kind: "submitting", info: state.info });
+    setState({ kind: "submitting", info });
 
     try {
       const result = await acceptInvitation(token, password);
       setState({ kind: "success", email: result.email });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to accept invitation.";
-      setState({ kind: "ready", info: (state as { kind: "submitting"; info: VerifyInvitationResult }).info });
+      setState({ kind: "ready", info });
       setFieldError(message);
     }
   };
