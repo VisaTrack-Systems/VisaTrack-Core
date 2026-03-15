@@ -21,6 +21,7 @@ import {
   getAdminUsers,
   removeAdminRole,
   revokeAdminInvitation,
+  sendInvitationEmail,
 } from '@/lib/api';
 
 type ConfirmDialogState = {
@@ -204,6 +205,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
   const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
   const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
+  const [inviteEmailDraft, setInviteEmailDraft] = useState('');
+  const [inviteEmailStatus, setInviteEmailStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
   const [userNameFilter, setUserNameFilter] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
 
@@ -704,6 +708,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <input
                   required
                   type="text"
+                  placeholder="First"
                   value={userForm.first_name}
                   onChange={(event) => setUserForm((previous) => ({ ...previous, first_name: event.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -714,6 +719,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <input
                   required
                   type="text"
+                  placeholder="Last"
                   value={userForm.last_name}
                   onChange={(event) => setUserForm((previous) => ({ ...previous, last_name: event.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -725,6 +731,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <input
                 required
                 type="email"
+                placeholder="first@example.com"
                 value={userForm.email}
                 onChange={(event) => setUserForm((previous) => ({ ...previous, email: event.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -736,6 +743,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 required
                 minLength={8}
                 type="password"
+                placeholder="Min. 8 characters"
                 value={userForm.password}
                 onChange={(event) => setUserForm((previous) => ({ ...previous, password: event.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -1068,35 +1076,76 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <h2 className="text-lg font-semibold text-gray-900">Invitation link ready</h2>
               <button
                 type="button"
-                onClick={() => setInvitationUrl(null)}
+                onClick={() => { setInvitationUrl(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
                 className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="px-6 py-5">
-              <p className="text-sm text-gray-600 mb-3">
-                Share this link with the user so they can set their password and activate their account. It expires in 72 hours.
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  readOnly
-                  value={invitationUrl}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 bg-gray-50 truncate"
-                />
-                <button
-                  type="button"
-                  onClick={() => void navigator.clipboard.writeText(invitationUrl)}
-                  className="border border-gray-300 px-3 py-2 rounded-lg text-xs hover:bg-gray-100 transition-colors"
-                >
-                  Copy
-                </button>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Share this link with the user so they can set their password and activate their account. It expires in 72 hours.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={invitationUrl}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 bg-gray-50 truncate"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void navigator.clipboard.writeText(invitationUrl)}
+                    className="border border-gray-300 px-3 py-2 rounded-lg text-xs hover:bg-gray-100 transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Send via email</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    placeholder="recipient@example.com"
+                    value={inviteEmailDraft}
+                    onChange={(e) => { setInviteEmailDraft(e.target.value); setInviteEmailError(null); }}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={!inviteEmailDraft || inviteEmailStatus === 'sending' || inviteEmailStatus === 'sent'}
+                    onClick={() => {
+                      if (!inviteEmailDraft || !invitationUrl) return;
+                      setInviteEmailStatus('sending');
+                      setInviteEmailError(null);
+                      const recipientName = pendingUserCreate
+                        ? `${pendingUserCreate.first_name} ${pendingUserCreate.last_name}`.trim()
+                        : inviteEmailDraft;
+                      void sendInvitationEmail(inviteEmailDraft, recipientName, invitationUrl)
+                        .then(() => setInviteEmailStatus('sent'))
+                        .catch((err: unknown) => {
+                          setInviteEmailStatus('idle');
+                          setInviteEmailError(err instanceof Error ? err.message : 'Failed to send email.');
+                        });
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition-colors"
+                  >
+                    {inviteEmailStatus === 'sending' ? 'Sending…' : inviteEmailStatus === 'sent' ? 'Sent ✓' : 'Send'}
+                  </button>
+                </div>
+                {inviteEmailStatus === 'sent' && (
+                  <p className="mt-1.5 text-xs text-green-600">Email sent successfully.</p>
+                )}
+                {inviteEmailError ? (
+                  <p className="mt-1.5 text-xs text-red-600">{inviteEmailError}</p>
+                ) : null}
               </div>
             </div>
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
               <button
                 type="button"
-                onClick={() => setInvitationUrl(null)}
+                onClick={() => { setInvitationUrl(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
               >
                 Done

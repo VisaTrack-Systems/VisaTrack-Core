@@ -905,6 +905,21 @@ export async function assignAdminCaseLawyer(
   });
 }
 
+export async function sendInvitationEmail(
+  toEmail: string,
+  recipientName: string,
+  invitationUrl: string,
+): Promise<void> {
+  return requestVoid('/api/v1/admin/send-invitation-email', {
+    method: 'POST',
+    body: JSON.stringify({
+      to_email: toEmail,
+      recipient_name: recipientName,
+      invitation_url: invitationUrl,
+    }),
+  });
+}
+
 export async function revokeAdminInvitation(invitationId: string): Promise<void> {
   return requestVoid(`/api/v1/admin/invitations/${encodeURIComponent(invitationId)}/revoke`, {
     method: 'POST',

@@ -131,6 +131,12 @@ class AdminOpsInvitationItem(BaseModel):
     invited_by_name: Optional[str]
 
 
+class SendInvitationEmailRequest(BaseModel):
+    to_email: str = Field(min_length=3, max_length=255)
+    recipient_name: str = Field(min_length=1, max_length=200)
+    invitation_url: str = Field(min_length=10, max_length=2000)
+
+
 class AdminOperationsResponse(BaseModel):
     organization_id: UUID
     unassigned_cases: list[AdminOpsCaseItem]
