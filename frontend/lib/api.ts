@@ -174,7 +174,7 @@ export type AdminCreateUserInput = {
   email: string;
   first_name: string;
   last_name: string;
-  password: string;
+  password?: string;
   status?: string;
   role_slug?: string;
 };

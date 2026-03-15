@@ -205,6 +205,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
   const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
   const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
+  const [invitedUserName, setInvitedUserName] = useState<string | null>(null);
   const [inviteEmailDraft, setInviteEmailDraft] = useState('');
   const [inviteEmailStatus, setInviteEmailStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
@@ -296,7 +297,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const handleCreateUser = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPendingUserCreate({ ...userForm });
+    const payload = { ...userForm };
+    if (payload.status === 'invited') {
+      delete payload.password;
+    }
+    setPendingUserCreate(payload);
   };
 
   const executeCreateUser = async () => {
@@ -308,6 +313,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         organization_id: previous.organization_id,
       }));
       if (created.invitation_url) {
+        setInvitedUserName(`${pendingUserCreate.first_name} ${pendingUserCreate.last_name}`.trim());
+        setInviteEmailDraft(pendingUserCreate.email);
         setInvitationUrl(created.invitation_url);
       } else {
         setFlash({ kind: 'success', message: `User created: ${created.full_name}` });
@@ -737,18 +744,24 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-              <input
-                required
-                minLength={8}
-                type="password"
-                placeholder="Min. 8 characters"
-                value={userForm.password}
-                onChange={(event) => setUserForm((previous) => ({ ...previous, password: event.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-              />
-            </div>
+            {userForm.status !== 'invited' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+                <input
+                  required
+                  minLength={8}
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  value={userForm.password}
+                  onChange={(event) => setUserForm((previous) => ({ ...previous, password: event.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                No password needed — the user will set one via the invitation link.
+              </p>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -1062,7 +1075,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             { label: 'Email', value: pendingUserCreate.email },
             { label: 'Role', value: pendingUserCreate.role_slug ?? '' },
             { label: 'Status', value: pendingUserCreate.status ?? '' },
-            { label: 'Temporary Password', value: '••••••••' },
+            ...(pendingUserCreate.status !== 'invited' ? [{ label: 'Temporary Password', value: '••••••••' }] : []),
           ]}
           onConfirm={() => void executeCreateUser()}
           onClose={() => setPendingUserCreate(null)}
@@ -1076,7 +1089,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <h2 className="text-lg font-semibold text-gray-900">Invitation link ready</h2>
               <button
                 type="button"
-                onClick={() => { setInvitationUrl(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
+                onClick={() => { setInvitationUrl(null); setInvitedUserName(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
                 className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -1119,9 +1132,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       if (!inviteEmailDraft || !invitationUrl) return;
                       setInviteEmailStatus('sending');
                       setInviteEmailError(null);
-                      const recipientName = pendingUserCreate
-                        ? `${pendingUserCreate.first_name} ${pendingUserCreate.last_name}`.trim()
-                        : inviteEmailDraft;
+                      const recipientName = invitedUserName ?? inviteEmailDraft;
                       const orgName = organizations.find((o) => o.id === userForm.organization_id)?.name;
                       void sendInvitationEmail(inviteEmailDraft, recipientName, invitationUrl, orgName)
                         .then(() => setInviteEmailStatus('sent'))
@@ -1146,7 +1157,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
               <button
                 type="button"
-                onClick={() => { setInvitationUrl(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
+                onClick={() => { setInvitationUrl(null); setInvitedUserName(null); setInviteEmailDraft(''); setInviteEmailStatus('idle'); setInviteEmailError(null); }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
               >
                 Done
