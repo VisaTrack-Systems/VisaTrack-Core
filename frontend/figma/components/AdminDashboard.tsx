@@ -1122,7 +1122,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       const recipientName = pendingUserCreate
                         ? `${pendingUserCreate.first_name} ${pendingUserCreate.last_name}`.trim()
                         : inviteEmailDraft;
-                      void sendInvitationEmail(inviteEmailDraft, recipientName, invitationUrl)
+                      const orgName = organizations.find((o) => o.id === userForm.organization_id)?.name;
+                      void sendInvitationEmail(inviteEmailDraft, recipientName, invitationUrl, orgName)
                         .then(() => setInviteEmailStatus('sent'))
                         .catch((err: unknown) => {
                           setInviteEmailStatus('idle');

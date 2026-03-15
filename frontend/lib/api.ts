@@ -909,6 +909,7 @@ export async function sendInvitationEmail(
   toEmail: string,
   recipientName: string,
   invitationUrl: string,
+  organizationName?: string,
 ): Promise<void> {
   return requestVoid('/api/v1/admin/send-invitation-email', {
     method: 'POST',
@@ -916,6 +917,7 @@ export async function sendInvitationEmail(
       to_email: toEmail,
       recipient_name: recipientName,
       invitation_url: invitationUrl,
+      organization_name: organizationName,
     }),
   });
 }

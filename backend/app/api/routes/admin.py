@@ -597,6 +597,7 @@ def send_invitation_email_endpoint(
             to_email=payload.to_email,
             recipient_name=payload.recipient_name,
             invitation_url=payload.invitation_url,
+            organization_name=payload.organization_name or "VisaTrack",
         )
     except EmailNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
