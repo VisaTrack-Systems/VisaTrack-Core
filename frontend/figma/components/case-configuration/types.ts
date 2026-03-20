@@ -8,16 +8,16 @@ export type SectionType =
   | 'details'
   | 'documents'
   | 'milestones'
-  | 'timeline'
   | 'payments'
-  | 'messages'
+  | 'reminders'
   | 'permissions';
 
 export type DocumentStats = {
-  approved: number;
+  accepted: number;
   received: number;
-  pending: number;
-  needsRevision: number;
+  requested: number;
+  notRequested: number;
+  rejected: number;
 };
 
 export type MilestoneStats = {

@@ -4,12 +4,14 @@ import {
   type CasePortalPermissions,
   type CaseWorkspace,
   type ClientCaseListItem,
+  acknowledgeCaseReminder,
   completeCaseDocumentUpload,
   deleteClientUploadedDocument,
   getCaseWorkspaceByNumber,
   getCaseDocumentDownloadUrl,
   getClientCases,
   initiateCaseDocumentUpload,
+  markCaseReminderRead,
 } from '@/lib/api';
 
 import {
@@ -17,11 +19,14 @@ import {
   type CaseInfo,
   type DashboardAppointment,
   type DashboardDocument,
-  type DashboardMessage,
+  type DashboardReminder,
   type DashboardMilestone,
   type ClientPortalCapabilities,
 } from './types';
 import { documentDisplayStatus, formatDate, relativeTime, titleize } from './utils';
+import { triggerFileDownload } from '../../../lib/download';
+
+const AUTO_REFRESH_INTERVAL_MS = 15000;
 
 type ClientDashboardData = {
   clientCases: ClientCaseListItem[];
@@ -34,8 +39,8 @@ type ClientDashboardData = {
   caseInfo: CaseInfo | null;
   documents: DashboardDocument[];
   milestones: DashboardMilestone[];
-  allMessages: DashboardMessage[];
-  recentMessages: DashboardMessage[];
+  allReminders: DashboardReminder[];
+  recentReminders: DashboardReminder[];
   upcomingAppointments: DashboardAppointment[];
   billingInfo: BillingInfo;
   requiredDocuments: number;
@@ -44,9 +49,12 @@ type ClientDashboardData = {
   uploadDocument: (documentId: string, file: File, note: string | null) => Promise<void>;
   deleteUploadedDocument: (documentId: string) => Promise<void>;
   downloadDocument: (documentId: string) => Promise<void>;
+  markReminderRead: (reminderId: string) => Promise<void>;
+  acknowledgeReminder: (reminderId: string) => Promise<void>;
   uploadingDocumentId: string | null;
   deletingDocumentId: string | null;
   downloadingDocumentId: string | null;
+  updatingReminderId: string | null;
 };
 
 const fallbackBillingInfo: BillingInfo = {
@@ -63,7 +71,7 @@ const defaultPortalPermissions: CasePortalPermissions = {
   show_document_requirements: true,
   portal_access: 'full_access',
   document_upload: 'enabled',
-  messaging: 'two_way',
+  reminders: 'enabled',
 };
 
 function normalizePortalPermissions(
@@ -112,6 +120,7 @@ export function useClientDashboardData(): ClientDashboardData {
   const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
+  const [updatingReminderId, setUpdatingReminderId] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -189,6 +198,53 @@ export function useClientDashboardData(): ClientDashboardData {
     };
   }, [selectedCaseNumber]);
 
+  useEffect(() => {
+    if (!selectedCaseNumber) {
+      return;
+    }
+
+    let ignore = false;
+    const refreshIfVisible = async (): Promise<void> => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      try {
+        const data = await getCaseWorkspaceByNumber(selectedCaseNumber);
+        if (!ignore) {
+          setWorkspace(data);
+          setError(null);
+        }
+      } catch {
+        // Keep stale dashboard state in place for background refresh failures.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshIfVisible();
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleFocus = () => {
+      void refreshIfVisible();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshIfVisible();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedCaseNumber]);
+
   const setSelectedCaseNumber = (caseNumber: string) => {
     setSelectedCaseNumberState(caseNumber);
   };
@@ -213,24 +269,24 @@ export function useClientDashboardData(): ClientDashboardData {
     const canViewMilestones =
       portalAccess === 'full_access' && permissions.show_milestone_details;
     const canViewDocuments = baseReadable && permissions.show_document_requirements;
-    const canViewMessages = baseReadable && permissions.messaging !== 'disabled';
+    const canViewReminders = baseReadable && permissions.reminders === 'enabled';
     const canViewBilling = portalAccess === 'full_access' || portalAccess === 'read_only';
     const canUploadDocuments =
       canViewDocuments &&
       portalAccess !== 'read_only' &&
       permissions.document_upload === 'enabled';
-    const canSendMessages =
-      canViewMessages && portalAccess !== 'read_only' && permissions.messaging === 'two_way';
+    const canAcknowledgeReminders =
+      canViewReminders && portalAccess !== 'read_only';
 
     return {
       portalAccess,
       canViewCaseStatus,
       canViewMilestones,
       canViewDocuments,
-      canViewMessages,
+      canViewReminders,
       canViewBilling,
       canUploadDocuments,
-      canSendMessages,
+      canAcknowledgeReminders,
     };
   }, [workspace]);
 
@@ -251,7 +307,6 @@ export function useClientDashboardData(): ClientDashboardData {
       assignedLawyer: workspace.case.primary_lawyer_name ?? 'Unassigned',
       startDate: formatDate(workspace.case.start_date),
       estimatedCompletion,
-      progress: workspace.case.progress_percent,
     };
   }, [workspace, capabilities.canViewCaseStatus]);
 
@@ -260,17 +315,22 @@ export function useClientDashboardData(): ClientDashboardData {
       return [];
     }
 
-    return workspace.documents.map((document) => ({
-      id: document.id,
-      name: document.name,
-      status: documentDisplayStatus(document.status, document.required),
-      lawyerStatus: titleize(document.status),
-      uploadedDate: formatDate(document.uploaded_at),
-      required: document.required,
-      instructions: document.instructions,
-      fileName: document.file_name,
-      canDownload: document.can_download,
-    }));
+    return workspace.documents.map((document) => {
+      const isRejected = document.status === 'rejected';
+
+      return {
+        id: document.id,
+        name: document.name,
+        status: documentDisplayStatus(document.status, document.required),
+        lawyerStatus: titleize(document.status),
+        rejectionNote: document.rejection_note ?? null,
+        uploadedDate: isRejected ? 'Not set' : formatDate(document.uploaded_at),
+        required: document.required,
+        instructions: document.instructions,
+        fileName: isRejected ? null : document.file_name,
+        canDownload: isRejected ? false : document.can_download,
+      };
+    });
   }, [workspace, capabilities.canViewDocuments]);
 
   const uploadDocument = async (
@@ -352,7 +412,7 @@ export function useClientDashboardData(): ClientDashboardData {
     setDownloadingDocumentId(documentId);
     try {
       const response = await getCaseDocumentDownloadUrl(selectedCaseNumber, documentId);
-      window.open(response.download_url, '_blank', 'noopener,noreferrer');
+      await triggerFileDownload(response.download_url, response.file_name);
     } finally {
       setDownloadingDocumentId(null);
     }
@@ -396,25 +456,90 @@ export function useClientDashboardData(): ClientDashboardData {
       });
   }, [workspace, capabilities.canViewMilestones]);
 
-  const allMessages = useMemo<DashboardMessage[]>(() => {
-    if (!workspace || !capabilities.canViewMessages) {
+  const allReminders = useMemo<DashboardReminder[]>(() => {
+    if (!workspace || !capabilities.canViewReminders) {
       return [];
     }
 
-    return workspace.messages.map((message) => ({
-      from: message.sender_name,
-      subject: message.subject,
-      preview: message.body.slice(0, 96),
-      body: message.body,
-      time: relativeTime(message.sent_at),
-      unread: !message.read_at,
+    return workspace.reminders.map((reminder) => ({
+      id: reminder.id,
+      from: reminder.sender_name,
+      title: reminder.title,
+      preview: reminder.body.slice(0, 96),
+      body: reminder.body,
+      time: relativeTime(reminder.sent_at),
+      unread: !reminder.read_at,
+      acknowledged: Boolean(reminder.acknowledged_at),
     }));
-  }, [workspace, capabilities.canViewMessages]);
+  }, [workspace, capabilities.canViewReminders]);
 
-  const recentMessages = useMemo<DashboardMessage[]>(
-    () => allMessages.slice(0, 4),
-    [allMessages]
+  const recentReminders = useMemo<DashboardReminder[]>(
+    () => allReminders.slice(0, 4),
+    [allReminders]
   );
+
+  const markReminderReadAction = async (reminderId: string): Promise<void> => {
+    if (!selectedCaseNumber) {
+      throw new Error('No active case selected');
+    }
+    setWorkspace((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        reminders: current.reminders.map((reminder) =>
+          reminder.id === reminderId && !reminder.read_at
+            ? { ...reminder, read_at: new Date().toISOString() }
+            : reminder
+        ),
+      };
+    });
+    setUpdatingReminderId(reminderId);
+    try {
+      await markCaseReminderRead(selectedCaseNumber, reminderId);
+      await refreshSelectedCaseWorkspace();
+    } catch (markError) {
+      // Non-blocking sync failure: keep dashboard usable even if read receipt call fails.
+      console.warn('Failed to sync reminder read state:', markError);
+    } finally {
+      setUpdatingReminderId(null);
+    }
+  };
+
+  const acknowledgeReminderAction = async (reminderId: string): Promise<void> => {
+    if (!selectedCaseNumber) {
+      throw new Error('No active case selected');
+    }
+    const nowIso = new Date().toISOString();
+    setWorkspace((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        reminders: current.reminders.map((reminder) =>
+          reminder.id === reminderId
+            ? {
+                ...reminder,
+                read_at: reminder.read_at ?? nowIso,
+                acknowledged_at: reminder.acknowledged_at ?? nowIso,
+              }
+            : reminder
+        ),
+      };
+    });
+    setUpdatingReminderId(reminderId);
+    try {
+      await acknowledgeCaseReminder(selectedCaseNumber, reminderId);
+      await refreshSelectedCaseWorkspace();
+    } catch (ackError) {
+      // Non-blocking sync failure: keep dashboard usable even if acknowledgement call fails.
+      console.warn('Failed to sync reminder acknowledgement:', ackError);
+    } finally {
+      setUpdatingReminderId(null);
+    }
+  };
 
   const upcomingAppointments = useMemo<DashboardAppointment[]>(() => {
     if (!workspace || !capabilities.canViewMilestones) {
@@ -465,8 +590,8 @@ export function useClientDashboardData(): ClientDashboardData {
     caseInfo,
     documents,
     milestones,
-    allMessages,
-    recentMessages,
+    allReminders,
+    recentReminders,
     upcomingAppointments,
     billingInfo,
     requiredDocuments,
@@ -475,8 +600,11 @@ export function useClientDashboardData(): ClientDashboardData {
     uploadDocument,
     deleteUploadedDocument,
     downloadDocument,
+    markReminderRead: markReminderReadAction,
+    acknowledgeReminder: acknowledgeReminderAction,
     uploadingDocumentId,
     deletingDocumentId,
     downloadingDocumentId,
+    updatingReminderId,
   };
 }

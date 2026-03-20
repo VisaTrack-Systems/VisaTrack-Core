@@ -2,7 +2,7 @@ CREATE TABLE notifications (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     
-    type            VARCHAR(50) NOT NULL,  -- case_update, document_request, payment_due, milestone_reminder, message
+    type            VARCHAR(50) NOT NULL,  -- case_update, document_request, payment_due, milestone_reminder, reminder
     title           VARCHAR(255) NOT NULL,
     body            TEXT,
     

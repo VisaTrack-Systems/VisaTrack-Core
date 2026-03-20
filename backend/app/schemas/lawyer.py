@@ -9,7 +9,6 @@ class LawyerProfileResponse(BaseModel):
     user_id: UUID
     user_type: str
     bar_number: Optional[str]
-    jurisdiction: Optional[str]
     specialties: list[str]
     years_experience: Optional[int]
     bio: Optional[str]
@@ -19,7 +18,6 @@ class LawyerProfileResponse(BaseModel):
 
 class LawyerProfileUpsertRequest(BaseModel):
     bar_number: Optional[str] = Field(default=None, max_length=100)
-    jurisdiction: Optional[str] = Field(default=None, max_length=100)
     specialties: list[str] = []
     years_experience: Optional[int] = Field(default=None, ge=0, le=80)
     bio: Optional[str] = None

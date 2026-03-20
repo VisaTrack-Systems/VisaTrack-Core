@@ -17,8 +17,22 @@ export function relativeTime(value: string | null): string {
     return 'Just now';
   }
 
-  const diffMs = Date.now() - new Date(value).getTime();
-  const hours = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60)));
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) {
+    return 'Just now';
+  }
+
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < 60 * 1000) {
+    return 'Just now';
+  }
+
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 60) {
+    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) {
     return `${hours} hour${hours > 1 ? 's' : ''} ago`;
   }
@@ -37,16 +51,20 @@ export function titleize(value: string): string {
 }
 
 export function documentDisplayStatus(status: string, required: boolean): DashboardDocumentStatus {
-  if (['approved', 'received', 'completed'].includes(status)) {
+  if (['accepted', 'approved', 'completed'].includes(status)) {
     return 'completed';
   }
 
-  if (['under_review', 'review', 'needs_revision'].includes(status)) {
+  if (['received', 'under_review', 'review'].includes(status)) {
     return 'review';
   }
 
   if (!required && ['not_requested', 'optional'].includes(status)) {
     return 'optional';
+  }
+
+  if (['requested', 'pending', 'needs_revision', 'rejected', 'expired'].includes(status)) {
+    return 'pending';
   }
 
   return 'pending';

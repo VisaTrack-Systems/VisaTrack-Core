@@ -7,11 +7,16 @@ import { completionFromStatus, relativeTime, titleize } from './utils';
 
 export function useActiveCasesData() {
   const [cases, setCases] = useState<UiCase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let ignore = false;
 
     async function loadCases() {
+      setIsLoading(true);
+      setError(null);
       try {
         const data = await getLawyerCases(100);
         if (ignore) {
@@ -42,6 +47,11 @@ export function useActiveCasesData() {
       } catch {
         if (!ignore) {
           setCases([]);
+          setError('Failed to load active cases.');
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
         }
       }
     }
@@ -51,7 +61,11 @@ export function useActiveCasesData() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [reloadToken]);
 
-  return { cases };
+  const retry = () => {
+    setReloadToken((current) => current + 1);
+  };
+
+  return { cases, isLoading, error, retry };
 }

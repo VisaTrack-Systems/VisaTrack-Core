@@ -16,7 +16,6 @@ CREATE TABLE cases (
     ircc_file_number    VARCHAR(100),
     uci_number          VARCHAR(50),
     application_number  VARCHAR(50),
-    visa_office         VARCHAR(100),
     
     -- Timeline
     intake_date         DATE DEFAULT CURRENT_DATE,
@@ -53,9 +52,7 @@ CREATE TABLE cases (
     UNIQUE(organization_id, case_number)
 );
 
--- Status enum values: intake, document_collection, document_review, 
--- application_prep, ready_to_submit, submitted, under_review, 
--- additional_documents_requested, decision_pending, approved, refused, withdrawn, closed
+-- Status enum values: intake, awaiting_client, in_progress, closed
 
 CREATE INDEX idx_cases_org ON cases(organization_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_cases_client ON cases(client_id);

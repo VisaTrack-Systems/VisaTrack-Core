@@ -9,10 +9,11 @@ import {
   downloadCaseDocumentsArchive,
   type CaseDocumentStatus,
   getCaseDocumentDownloadUrl,
+  getCaseDocumentViewUrl,
   type CasePortalPermissions,
   type CaseWorkspace,
   renameCaseDocument,
-  sendCaseMessage,
+  createCaseReminder,
   updateCaseMilestone,
   getCaseWorkspaceByNumber,
   updateCaseDetails,
@@ -23,12 +24,11 @@ import {
 import { SidebarNav } from './case-configuration/SidebarNav';
 import { CaseDetailsSection } from './case-configuration/sections/CaseDetailsSection';
 import { DocumentsSection } from './case-configuration/sections/DocumentsSection';
-import { MessagesSection } from './case-configuration/sections/MessagesSection';
+import { RemindersSection } from './case-configuration/sections/RemindersSection';
 import { MilestonesSection } from './case-configuration/sections/MilestonesSection';
 import { OverviewSection } from './case-configuration/sections/OverviewSection';
 import { PaymentsSection } from './case-configuration/sections/PaymentsSection';
 import { PermissionsSection } from './case-configuration/sections/PermissionsSection';
-import { TimelineSection } from './case-configuration/sections/TimelineSection';
 import type {
   CaseConfigurationProps,
   DocumentStats,
@@ -38,6 +38,9 @@ import type {
   SectionType,
 } from './case-configuration/types';
 import { milestoneStatus } from './case-configuration/utils';
+import { triggerFileDownload } from '../../lib/download';
+
+const AUTO_REFRESH_INTERVAL_MS = 15000;
 
 type NoticeKind = 'success' | 'info' | 'error';
 
@@ -71,8 +74,8 @@ type MilestoneUpdate = {
   client_visible?: boolean;
 };
 
-type OutboundMessage = {
-  subject: string;
+type OutboundReminder = {
+  title: string;
   body: string;
   sendEmail: boolean;
 };
@@ -83,7 +86,7 @@ const DEFAULT_PORTAL_PERMISSIONS: CasePortalPermissions = {
   show_document_requirements: true,
   portal_access: 'full_access',
   document_upload: 'enabled',
-  messaging: 'two_way',
+  reminders: 'enabled',
 };
 
 function normalizePortalPermissions(
@@ -110,14 +113,14 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
   const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isCreatingReminder, setIsCreatingReminder] = useState(false);
   const [isCreatingDocumentSuite, setIsCreatingDocumentSuite] = useState(false);
   const [isAddingDocument, setIsAddingDocument] = useState(false);
   const [isSendingBulkReminders, setIsSendingBulkReminders] = useState(false);
-  const [sendingDocumentReminderId, setSendingDocumentReminderId] = useState<string | null>(null);
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
+  const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
   const [updatingDocumentId, setUpdatingDocumentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -175,6 +178,53 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     };
   }, [caseId]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const refreshIfVisible = async (): Promise<void> => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      try {
+        const data = await getCaseWorkspaceByNumber(caseId);
+        if (!ignore) {
+          setWorkspace({
+            ...data,
+            portal_permissions: normalizePortalPermissions(data.portal_permissions),
+          });
+          setError(null);
+        }
+      } catch {
+        // Keep existing workspace on background refresh failures.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshIfVisible();
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    const handleFocus = () => {
+      void refreshIfVisible();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshIfVisible();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [caseId]);
+
   const updateWorkspace = (updater: (current: CaseWorkspace) => CaseWorkspace) => {
     setWorkspace((current) => (current ? updater(current) : current));
   };
@@ -189,10 +239,11 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
 
   const documentStats = useMemo<DocumentStats>(() => {
     const stats = {
-      approved: 0,
+      accepted: 0,
       received: 0,
-      pending: 0,
-      needsRevision: 0,
+      requested: 0,
+      notRequested: 0,
+      rejected: 0,
     };
 
     if (!workspace) {
@@ -200,14 +251,16 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     for (const document of workspace.documents) {
-      if (document.status === 'approved') {
-        stats.approved += 1;
+      if (document.status === 'accepted') {
+        stats.accepted += 1;
+      } else if (document.status === 'rejected') {
+        stats.rejected += 1;
       } else if (document.status === 'received') {
         stats.received += 1;
-      } else if (['needs_revision', 'needs-revision'].includes(document.status)) {
-        stats.needsRevision += 1;
+      } else if (document.status === 'not_requested') {
+        stats.notRequested += 1;
       } else {
-        stats.pending += 1;
+        stats.requested += 1;
       }
     }
 
@@ -268,7 +321,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return 0;
     }
 
-    return workspace.documents.filter((document) => document.required && !['approved', 'received'].includes(document.status)).length;
+    return workspace.documents.filter((document) => document.required && document.status !== 'accepted').length;
   }, [workspace]);
 
   const toggleSuite = (suiteId: string) => {
@@ -391,7 +444,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     const pendingRequiredDocuments = workspace.documents.filter(
-      (document) => document.required && !['approved', 'received', 'completed'].includes(document.status)
+      (document) => document.required && document.status !== 'accepted'
     );
     if (pendingRequiredDocuments.length === 0) {
       showNotice('info', 'No pending required documents for reminders.');
@@ -401,10 +454,10 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     const documentList = pendingRequiredDocuments.map((document) => `- ${document.name}`).join('\n');
     setIsSendingBulkReminders(true);
     try {
-      await sendCaseMessage(workspace.case.case_number, {
-        subject: 'Document Submission Reminder',
+      await createCaseReminder(workspace.case.case_number, {
+        title: 'Document Submission Reminder',
         body: `Please upload the following pending required documents:\n${documentList}`,
-        send_email: true,
+        send_email_notification: true,
         visible_to_client: true,
       });
       await refreshWorkspace(workspace.case.case_number);
@@ -461,6 +514,43 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
+  const handleViewDocument = async (documentId: string): Promise<void> => {
+    if (!workspace) {
+      return;
+    }
+
+    const targetDocument = workspace.documents.find((document) => document.id === documentId);
+    if (!targetDocument?.can_download) {
+      showNotice('info', 'No uploaded file is available for this document yet.');
+      return;
+    }
+
+    setViewingDocumentId(documentId);
+    // Open a blank window synchronously to preserve the user-gesture token.
+    // NOTE: do NOT pass 'noopener' here — that flag causes window.open() to return null,
+    // which would make the reference unusable. Cross-origin opener access is already
+    // restricted by modern browsers, so omitting noopener is safe for an S3 URL.
+    const viewWindow = window.open('', '_blank');
+    try {
+      const response = await getCaseDocumentViewUrl(workspace.case.case_number, documentId);
+      if (viewWindow && !viewWindow.closed) {
+        viewWindow.location.href = response.view_url;
+      } else {
+        // Popup was blocked (viewWindow is null) — nothing we can do without a gesture.
+        showNotice('error', 'Could not open the document — please allow pop-ups for this site.');
+        return;
+      }
+      showNotice('success', `Viewing ${response.file_name}.`);
+    } catch (viewError) {
+      // Close the orphaned blank tab so it doesn't linger.
+      viewWindow?.close();
+      const message = viewError instanceof Error ? viewError.message : 'Unknown error';
+      showNotice('error', `Failed to open document for viewing: ${message}`);
+    } finally {
+      setViewingDocumentId(null);
+    }
+  };
+
   const handleDownloadDocument = async (documentId: string): Promise<void> => {
     if (!workspace) {
       return;
@@ -475,17 +565,21 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     setDownloadingDocumentId(documentId);
     try {
       const response = await getCaseDocumentDownloadUrl(workspace.case.case_number, documentId);
-      window.open(response.download_url, '_blank', 'noopener,noreferrer');
-      showNotice('success', `Opened ${response.file_name}.`);
+      await triggerFileDownload(response.download_url, response.file_name);
+      showNotice('success', `Downloading ${response.file_name}.`);
     } catch (downloadError) {
       const message = downloadError instanceof Error ? downloadError.message : 'Unknown error';
-      showNotice('error', `Failed to open document: ${message}`);
+      showNotice('error', `Failed to download document: ${message}`);
     } finally {
       setDownloadingDocumentId(null);
     }
   };
 
-  const handleUpdateDocumentStatus = async (documentId: string, status: CaseDocumentStatus) => {
+  const handleUpdateDocumentStatus = async (
+    documentId: string,
+    status: CaseDocumentStatus,
+    rejectionNote?: string | null
+  ) => {
     if (!workspace) {
       return;
     }
@@ -495,7 +589,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       const updated = await updateCaseDocumentStatus(
         workspace.case.case_number,
         documentId,
-        status
+        status,
+        rejectionNote
       );
 
       updateWorkspace((current) => ({
@@ -507,6 +602,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
               ? {
                   ...document,
                   status: updated.status,
+                  rejection_note: updated.rejection_note ?? null,
                 }
               : document
           ),
@@ -516,6 +612,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
             ? {
                 ...document,
                 status: updated.status,
+                rejection_note: updated.rejection_note ?? null,
               }
             : document
         ),
@@ -526,30 +623,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       showNotice('error', `Failed to update document status: ${message}`);
     } finally {
       setUpdatingDocumentId(null);
-    }
-  };
-
-  const handleSendDocumentReminder = async (documentId: string): Promise<void> => {
-    if (!workspace) {
-      return;
-    }
-
-    const documentName = workspace?.documents.find((document) => document.id === documentId)?.name ?? 'document';
-    setSendingDocumentReminderId(documentId);
-    try {
-      await sendCaseMessage(workspace.case.case_number, {
-        subject: 'Document Reminder',
-        body: `Please upload or update this document in your client portal: ${documentName}.`,
-        send_email: true,
-        visible_to_client: true,
-      });
-      await refreshWorkspace(workspace.case.case_number);
-      showNotice('success', `Reminder sent for ${documentName}.`);
-    } catch (sendError) {
-      const message = sendError instanceof Error ? sendError.message : 'Unknown error';
-      showNotice('error', `Failed to send reminder: ${message}`);
-    } finally {
-      setSendingDocumentReminderId(null);
     }
   };
 
@@ -645,33 +718,38 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
-  const handleSendMessage = async (message: OutboundMessage): Promise<boolean> => {
+  const handleCreateReminder = async (reminder: OutboundReminder): Promise<boolean> => {
     if (!workspace) {
       return false;
     }
 
-    setIsSendingMessage(true);
+    setIsCreatingReminder(true);
     try {
-      const sentMessage = await sendCaseMessage(workspace.case.case_number, {
-        subject: message.subject,
-        body: message.body,
-        send_email: message.sendEmail,
+      const sentReminder = await createCaseReminder(workspace.case.case_number, {
+        title: reminder.title,
+        body: reminder.body,
+        send_email_notification: reminder.sendEmail,
         visible_to_client: true,
       });
 
       updateWorkspace((current) => ({
         ...current,
-        messages: [sentMessage, ...current.messages],
+        reminders: [sentReminder, ...current.reminders],
       }));
 
-      showNotice('success', message.sendEmail ? 'Message sent to client portal and email queued.' : 'Message sent to client portal.');
+      showNotice(
+        'success',
+        reminder.sendEmail
+          ? 'Reminder posted to client portal and email notification queued.'
+          : 'Reminder posted to client portal.'
+      );
       return true;
     } catch (sendError) {
       const messageText = sendError instanceof Error ? sendError.message : 'Unknown error';
-      showNotice('error', `Failed to send message: ${messageText}`);
+      showNotice('error', `Failed to create reminder: ${messageText}`);
       return false;
     } finally {
-      setIsSendingMessage(false);
+      setIsCreatingReminder(false);
     }
   };
 
@@ -742,7 +820,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onOpenDocuments={() => setActiveSection('documents')}
           onOpenMilestones={() => setActiveSection('milestones')}
           onOpenPayments={() => setActiveSection('payments')}
-          onOpenMessages={() => setActiveSection('messages')}
+          onOpenReminders={() => setActiveSection('reminders')}
         />
       );
     }
@@ -776,12 +854,12 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onDownloadAll={handleDownloadAllDocuments}
           onRenameDocument={handleRenameDocument}
           renamingDocumentId={renamingDocumentId}
+          onViewDocument={handleViewDocument}
+          viewingDocumentId={viewingDocumentId}
           onDownloadDocument={handleDownloadDocument}
           downloadingDocumentId={downloadingDocumentId}
           onUpdateDocumentStatus={handleUpdateDocumentStatus}
           updatingDocumentId={updatingDocumentId}
-          onSendDocumentReminder={handleSendDocumentReminder}
-          sendingDocumentReminderId={sendingDocumentReminderId}
           onDeleteDocument={handleDeleteDocument}
           deletingDocumentId={deletingDocumentId}
         />
@@ -802,28 +880,18 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       );
     }
 
-    if (activeSection === 'timeline') {
-      return (
-        <TimelineSection
-          workspace={workspace}
-          missingDocuments={missingDocuments}
-          pendingPaymentsAmount={pendingPaymentsAmount}
-        />
-      );
-    }
-
     if (activeSection === 'payments') {
       return <PaymentsSection workspace={workspace} />;
     }
 
-    if (activeSection === 'messages') {
+    if (activeSection === 'reminders') {
       return (
-        <MessagesSection
+        <RemindersSection
           key={workspace.case.case_number}
           workspace={workspace}
           caseNumber={workspace.case.case_number}
-          sending={isSendingMessage}
-          onSendMessage={handleSendMessage}
+          creating={isCreatingReminder}
+          onCreateReminder={handleCreateReminder}
           onNotify={(message) => showNotice('info', message)}
         />
       );

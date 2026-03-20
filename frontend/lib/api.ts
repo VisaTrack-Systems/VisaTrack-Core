@@ -288,6 +288,7 @@ export type CaseWorkspace = {
       uploaded_at: string | null;
       instructions: string | null;
       client_note?: string | null;
+      rejection_note?: string | null;
       file_name: string | null;
       latest_case_document_id: string | null;
       can_download: boolean;
@@ -302,6 +303,7 @@ export type CaseWorkspace = {
     uploaded_at: string | null;
     instructions: string | null;
     client_note?: string | null;
+    rejection_note?: string | null;
     file_name: string | null;
     latest_case_document_id: string | null;
     can_download: boolean;
@@ -328,14 +330,14 @@ export type CaseWorkspace = {
     paid_date: string | null;
     invoice_number: string | null;
   }>;
-  messages: Array<{
+  reminders: Array<{
     id: string;
     sender_name: string;
-    subject: string;
+    title: string;
     body: string;
     sent_at: string | null;
     read_at: string | null;
-    from_client: boolean;
+    acknowledged_at: string | null;
   }>;
   appointments: Array<{
     title: string;
@@ -365,7 +367,7 @@ export type CasePortalPermissions = {
   show_document_requirements: boolean;
   portal_access: 'full_access' | 'limited_access' | 'read_only' | 'disabled';
   document_upload: 'enabled' | 'disabled';
-  messaging: 'two_way' | 'one_way' | 'disabled';
+  reminders: 'enabled' | 'disabled';
 };
 
 export type CaseCustomDocumentSuiteCreateInput = {
@@ -374,13 +376,10 @@ export type CaseCustomDocumentSuiteCreateInput = {
 };
 
 export type CaseDocumentStatus =
-  | 'pending'
+  | 'requested'
   | 'received'
-  | 'under_review'
-  | 'approved'
+  | 'accepted'
   | 'rejected'
-  | 'needs_revision'
-  | 'expired'
   | 'not_requested';
 
 export type CaseDetailsUpdateInput = {
@@ -419,10 +418,10 @@ export type CaseMilestoneUpdateInput = {
   client_visible?: boolean;
 };
 
-export type CaseMessageCreateInput = {
-  subject: string;
+export type CaseReminderCreateInput = {
+  title: string;
   body: string;
-  send_email?: boolean;
+  send_email_notification?: boolean;
   visible_to_client?: boolean;
 };
 
@@ -474,6 +473,14 @@ export type CaseDocumentDownloadResponse = {
   case_document_id: string;
   file_name: string;
   download_url: string;
+  expires_in_seconds: number;
+};
+
+export type CaseDocumentViewResponse = {
+  document_id: string;
+  case_document_id: string;
+  file_name: string;
+  view_url: string;
   expires_in_seconds: number;
 };
 
@@ -928,16 +935,36 @@ export async function deleteCaseMilestone(caseNumber: string, milestoneId: strin
   );
 }
 
-export async function sendCaseMessage(
+export async function createCaseReminder(
   caseNumber: string,
-  payload: CaseMessageCreateInput
-): Promise<CaseWorkspace['messages'][number]> {
-  return requestJson<CaseWorkspace['messages'][number]>(
-    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/messages`,
+  payload: CaseReminderCreateInput
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders`,
     {
       method: 'POST',
       body: JSON.stringify(payload),
     }
+  );
+}
+
+export async function markCaseReminderRead(
+  caseNumber: string,
+  reminderId: string
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/read`,
+    { method: 'POST' }
+  );
+}
+
+export async function acknowledgeCaseReminder(
+  caseNumber: string,
+  reminderId: string
+): Promise<CaseWorkspace['reminders'][number]> {
+  return requestJson<CaseWorkspace['reminders'][number]>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/acknowledge`,
+    { method: 'POST' }
   );
 }
 
@@ -1003,13 +1030,14 @@ export async function createCaseCustomDocumentSuite(
 export async function updateCaseDocumentStatus(
   caseNumber: string,
   documentId: string,
-  status: CaseDocumentStatus
-): Promise<{ document_id: string; status: CaseDocumentStatus }> {
-  return requestJson<{ document_id: string; status: CaseDocumentStatus }>(
+  status: CaseDocumentStatus,
+  rejectionNote?: string | null
+): Promise<{ document_id: string; status: CaseDocumentStatus; rejection_note?: string | null }> {
+  return requestJson<{ document_id: string; status: CaseDocumentStatus; rejection_note?: string | null }>(
     `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/status`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, rejection_note: rejectionNote ?? null }),
     }
   );
 }
@@ -1051,6 +1079,15 @@ export async function deleteClientUploadedDocument(
     {
       method: 'DELETE',
     }
+  );
+}
+
+export async function getCaseDocumentViewUrl(
+  caseNumber: string,
+  documentId: string
+): Promise<CaseDocumentViewResponse> {
+  return requestJson<CaseDocumentViewResponse>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/${encodeURIComponent(documentId)}/view-url`
   );
 }
 

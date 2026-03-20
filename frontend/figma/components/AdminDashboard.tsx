@@ -1,4 +1,4 @@
-import { RefreshCw, Shield } from 'lucide-react';
+import { RefreshCw, Shield, X } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 
 import {
@@ -22,6 +22,125 @@ import {
   removeAdminRole,
   revokeAdminInvitation,
 } from '@/lib/api';
+
+type ConfirmDialogState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  variant: 'danger' | 'info';
+  onConfirm: () => void;
+};
+
+function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  variant,
+  onConfirm,
+  onClose,
+}: ConfirmDialogState & { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-80 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-700">{message}</p>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className={`px-4 py-2 text-white rounded-lg transition-colors ${
+              variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type CreateSummaryField = { label: string; value: string };
+
+function CreateSummaryDialog({
+  title,
+  fields,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  fields: CreateSummaryField[];
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-80 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-500 mb-4">Please review the details below before confirming.</p>
+          <dl className="space-y-3">
+            {fields.map(({ label, value }) => (
+              <div key={label} className="flex justify-between gap-4 text-sm">
+                <dt className="text-gray-500 font-medium shrink-0">{label}</dt>
+                <dd className="text-gray-900 text-right break-all">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('en-US', {
@@ -78,6 +197,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const [busyOrganizationId, setBusyOrganizationId] = useState<string | null>(null);
   const [busyDeleteUserId, setBusyDeleteUserId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+
+  const openConfirm = (options: ConfirmDialogState) => setConfirmDialog(options);
+  const closeConfirm = () => setConfirmDialog(null);
+  const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
+  const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
+  const [userNameFilter, setUserNameFilter] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('');
 
   const isSuperAdmin = currentUser?.active_role === 'super_admin';
 
@@ -142,14 +269,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.active_role]);
 
-  const handleCreateOrganization = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setPendingOrgCreate({ ...orgForm, slug: orgForm.slug.trim() });
+  };
 
+  const executeCreateOrganization = async () => {
+    if (!pendingOrgCreate) return;
     try {
-      const created = await createAdminOrganization({
-        ...orgForm,
-        slug: orgForm.slug.trim(),
-      });
+      const created = await createAdminOrganization(pendingOrgCreate);
       setOrgForm(initialOrgForm);
       setFlash({ kind: 'success', message: `Organization created: ${created.name}` });
       await loadAdminData(true);
@@ -161,11 +289,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
-  const handleCreateUser = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateUser = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setPendingUserCreate({ ...userForm });
+  };
 
+  const executeCreateUser = async () => {
+    if (!pendingUserCreate) return;
     try {
-      const created = await createAdminUser(userForm);
+      const created = await createAdminUser(pendingUserCreate);
       setUserForm((previous) => ({
         ...initialUserForm,
         organization_id: previous.organization_id,
@@ -243,13 +375,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete organization \"${organization.name}\"? This blocks login for this organization.`
-    );
-    if (!confirmed) {
-      return;
-    }
-
     setBusyOrganizationId(organization.id);
     try {
       await deleteAdminOrganization(organization.id);
@@ -266,11 +391,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   const handleDeleteUser = async (user: UserListItem) => {
-    const confirmed = window.confirm(`Delete user \"${user.full_name}\" (${user.email})?`);
-    if (!confirmed) {
-      return;
-    }
-
     setBusyDeleteUserId(user.id);
     try {
       await deleteAdminUser(user.id);
@@ -639,11 +759,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 {roles.length === 0 ? (
                   <option value="lawyer">Lawyer</option>
                 ) : (
-                  roles.map((role) => (
-                    <option key={role.id} value={role.slug}>
-                      {role.name}
-                    </option>
-                  ))
+                  roles
+                    .filter((role) => isSuperAdmin || role.slug !== 'super_admin')
+                    .map((role) => (
+                      <option key={role.id} value={role.slug}>
+                        {role.name}
+                      </option>
+                    ))
                 )}
               </select>
             </div>
@@ -676,7 +798,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           disabled={
                             busyOrganizationId === organization.id || currentUser?.organization_id === organization.id
                           }
-                          onClick={() => void handleDeleteOrganization(organization)}
+                          onClick={() =>
+                            openConfirm({
+                              title: 'Delete Organization',
+                              message: `Delete "${organization.name}"? This will block all logins for this organization and cannot be undone.`,
+                              confirmLabel: 'Delete',
+                              variant: 'danger',
+                              onConfirm: () => {
+                                void handleDeleteOrganization(organization);
+                              },
+                            })
+                          }
                         >
                           Delete
                         </button>
@@ -712,8 +844,38 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-900">All Users</h3>
+          <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <h3 className="font-semibold text-gray-900 mr-auto">All Users</h3>
+            <input
+              type="text"
+              placeholder="Filter by name…"
+              value={userNameFilter}
+              onChange={(event) => setUserNameFilter(event.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-500 w-48"
+            />
+            <select
+              value={userRoleFilter}
+              onChange={(event) => setUserRoleFilter(event.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white"
+            >
+              <option value="">All roles</option>
+              {roles
+                .filter((role) => role.slug !== 'super_admin')
+                .map((role) => (
+                  <option key={role.id} value={role.slug}>
+                    {role.name}
+                  </option>
+                ))}
+            </select>
+            {(userNameFilter !== '' || userRoleFilter !== '') && (
+              <button
+                type="button"
+                onClick={() => { setUserNameFilter(''); setUserRoleFilter(''); }}
+                className="bg-red-500 border border-gray-300 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors text-amber-50 hover:text-amber-700"
+              >
+                Reset filters
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -730,9 +892,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {users.map((user) => {
+                {users
+                  .filter((user) => {
+                    const nameMatch = user.full_name.toLowerCase().includes(userNameFilter.toLowerCase());
+                    const roleMatch = userRoleFilter === '' || user.roles.includes(userRoleFilter);
+                    return nameMatch && roleMatch;
+                  })
+                  .map((user) => {
                   const organization = organizations.find((entry) => entry.id === user.organization_id);
-                  const assignableRoles = roles.filter((role) => !user.roles.includes(role.slug));
+                  const assignableRoles = roles.filter(
+                    (role) => !user.roles.includes(role.slug) && (isSuperAdmin || role.slug !== 'super_admin')
+                  );
                   const selectedRole = roleDraftByUserId[user.id] ?? assignableRoles[0]?.slug ?? '';
                   const roleBusy = busyRoleUserId === user.id;
                   return (
@@ -749,7 +919,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               <button
                                 key={role}
                                 type="button"
-                                onClick={() => void handleRemoveRole(user, role)}
+                                onClick={() =>
+                                  openConfirm({
+                                    title: 'Remove Role',
+                                    message: `Remove "${role}" from ${user.full_name}? They will lose access to features granted by this role.`,
+                                    confirmLabel: 'Remove',
+                                    variant: 'danger',
+                                    onConfirm: () => {
+                                      void handleRemoveRole(user, role);
+                                    },
+                                  })
+                                }
                                 className="inline-flex items-center rounded-full border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                                 disabled={roleBusy}
                                 title="Remove role"
@@ -789,7 +969,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             type="button"
                             className="border border-gray-300 px-3 py-1 rounded-lg text-xs hover:bg-gray-100 disabled:opacity-50"
                             disabled={roleBusy || !selectedRole || assignableRoles.length === 0}
-                            onClick={() => void handleAssignRole(user)}
+                            onClick={() =>
+                              openConfirm({
+                                title: 'Assign Role',
+                                message: `Assign "${selectedRole}" to ${user.full_name}?`,
+                                confirmLabel: 'Assign',
+                                variant: 'info',
+                                onConfirm: () => {
+                                  void handleAssignRole(user);
+                                },
+                              })
+                            }
                           >
                             Add
                           </button>
@@ -800,7 +990,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           type="button"
                           className="border border-red-200 text-red-700 px-3 py-1 rounded-lg text-xs hover:bg-red-50 disabled:opacity-50"
                           disabled={busyDeleteUserId === user.id || currentUser?.id === user.id}
-                          onClick={() => void handleDeleteUser(user)}
+                          onClick={() =>
+                            openConfirm({
+                              title: 'Delete User',
+                              message: `Permanently delete ${user.full_name} (${user.email})? This action cannot be undone.`,
+                              confirmLabel: 'Delete',
+                              variant: 'danger',
+                              onConfirm: () => {
+                                void handleDeleteUser(user);
+                              },
+                            })
+                          }
                         >
                           Delete
                         </button>
@@ -813,6 +1013,48 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </div>
         </div>
       </div>
+
+      {confirmDialog ? (
+        <ConfirmDialog
+          {...confirmDialog}
+          onClose={closeConfirm}
+        />
+      ) : null}
+
+      {pendingOrgCreate ? (
+        <CreateSummaryDialog
+          title="Confirm Create Organization"
+          fields={[
+            { label: 'Organization Name', value: pendingOrgCreate.name },
+            { label: 'Contact Email', value: pendingOrgCreate.contact_email },
+            { label: 'Slug', value: pendingOrgCreate.slug },
+            { label: 'Subscription Tier', value: pendingOrgCreate.subscription_tier ?? '' },
+            { label: 'Subscription Status', value: pendingOrgCreate.subscription_status ?? '' },
+          ]}
+          onConfirm={() => void executeCreateOrganization()}
+          onClose={() => setPendingOrgCreate(null)}
+        />
+      ) : null}
+
+      {pendingUserCreate ? (
+        <CreateSummaryDialog
+          title="Confirm Create User"
+          fields={[
+            {
+              label: 'Organization',
+              value: organizations.find((o) => o.id === pendingUserCreate.organization_id)?.name ?? pendingUserCreate.organization_id,
+            },
+            { label: 'First Name', value: pendingUserCreate.first_name },
+            { label: 'Last Name', value: pendingUserCreate.last_name },
+            { label: 'Email', value: pendingUserCreate.email },
+            { label: 'Role', value: pendingUserCreate.role_slug ?? "" },
+            { label: 'Status', value: pendingUserCreate.status  ?? "" },
+            { label: 'Temporary Password', value: '••••••••' },
+          ]}
+          onConfirm={() => void executeCreateUser()}
+          onClose={() => setPendingUserCreate(null)}
+        />
+      ) : null}
     </div>
   );
 }

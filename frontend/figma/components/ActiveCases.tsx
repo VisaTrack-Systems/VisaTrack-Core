@@ -14,7 +14,7 @@ interface ActiveCasesProps {
 export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const { cases } = useActiveCasesData();
+  const { cases, isLoading, error, retry } = useActiveCasesData();
 
   const filteredCases = useMemo(
     () =>
@@ -52,9 +52,29 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
           onFilterStatusChange={setFilterStatus}
         />
 
-        <SummaryCards cases={cases} />
+        {error ? (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-red-700">{error}</p>
+            <button
+              className="text-sm font-medium text-red-700 hover:text-red-800"
+              onClick={retry}
+              type="button"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
 
-        <CasesTable filteredCases={filteredCases} onSelectCase={onSelectCase} />
+        {isLoading ? (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-sm text-gray-500">Loading active cases...</div>
+        ) : null}
+
+        {!isLoading ? (
+          <>
+            <SummaryCards cases={cases} />
+            <CasesTable filteredCases={filteredCases} onSelectCase={onSelectCase} />
+          </>
+        ) : null}
       </div>
     </div>
   );

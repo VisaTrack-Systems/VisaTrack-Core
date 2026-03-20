@@ -5,6 +5,7 @@ export type DashboardDocument = {
   name: string;
   status: DashboardDocumentStatus;
   lawyerStatus: string;
+  rejectionNote: string | null;
   uploadedDate: string;
   required: boolean;
   instructions: string | null;
@@ -19,13 +20,15 @@ export type DashboardMilestone = {
   description: string;
 };
 
-export type DashboardMessage = {
+export type DashboardReminder = {
+  id: string;
   from: string;
-  subject: string;
+  title: string;
   preview: string;
   body: string;
   time: string;
   unread: boolean;
+  acknowledged: boolean;
 };
 
 export type DashboardAppointment = {
@@ -50,7 +53,6 @@ export type CaseInfo = {
   assignedLawyer: string;
   startDate: string;
   estimatedCompletion: string;
-  progress: number;
 };
 
 export type ClientPortalCapabilities = {
@@ -58,8 +60,8 @@ export type ClientPortalCapabilities = {
   canViewCaseStatus: boolean;
   canViewMilestones: boolean;
   canViewDocuments: boolean;
-  canViewMessages: boolean;
+  canViewReminders: boolean;
   canViewBilling: boolean;
   canUploadDocuments: boolean;
-  canSendMessages: boolean;
+  canAcknowledgeReminders: boolean;
 };

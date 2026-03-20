@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, FolderPlus, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 
 import { AddDocumentDialog } from '../dialogs/AddDocumentDialog';
+import { CaseConfigDialog } from '../dialogs/CaseConfigDialog';
 import { CreateSuiteDialog } from '../dialogs/CreateSuiteDialog';
 import { DeleteDocumentDialog } from '../dialogs/DeleteDocumentDialog';
 import { RenameDocumentDialog } from '../dialogs/RenameDocumentDialog';
@@ -26,12 +27,16 @@ type DocumentsSectionProps = {
   onDownloadAll: () => void;
   onRenameDocument: (documentId: string, name: string) => Promise<boolean>;
   renamingDocumentId: string | null;
+  onViewDocument: (documentId: string) => Promise<void>;
+  viewingDocumentId: string | null;
   onDownloadDocument: (documentId: string) => Promise<void>;
   downloadingDocumentId: string | null;
-  onUpdateDocumentStatus: (documentId: string, status: CaseDocumentStatus) => Promise<void>;
+  onUpdateDocumentStatus: (
+    documentId: string,
+    status: CaseDocumentStatus,
+    rejectionNote?: string | null
+  ) => Promise<void>;
   updatingDocumentId: string | null;
-  onSendDocumentReminder: (documentId: string) => Promise<void>;
-  sendingDocumentReminderId: string | null;
   onDeleteDocument: (documentId: string) => Promise<boolean>;
   deletingDocumentId: string | null;
 };
@@ -51,12 +56,12 @@ export function DocumentsSection({
   onDownloadAll,
   onRenameDocument,
   renamingDocumentId,
+  onViewDocument,
+  viewingDocumentId,
   onDownloadDocument,
   downloadingDocumentId,
   onUpdateDocumentStatus,
   updatingDocumentId,
-  onSendDocumentReminder,
-  sendingDocumentReminderId,
   onDeleteDocument,
   deletingDocumentId,
 }: DocumentsSectionProps) {
@@ -66,6 +71,12 @@ export function DocumentsSection({
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [noteTarget, setNoteTarget] = useState<{ name: string; note: string } | null>(null);
+  const [rejectionTarget, setRejectionTarget] = useState<{
+    id: string;
+    name: string;
+    note: string;
+  } | null>(null);
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
 
   const handleCreateSuite = async (input: NewDocumentSuiteInput): Promise<boolean> => {
     setIsCreatingSuite(true);
@@ -97,14 +108,46 @@ export function DocumentsSection({
     }
   };
 
+  const handleStatusChange = (
+    documentId: string,
+    documentName: string,
+    currentRejectionNote: string | null | undefined,
+    nextStatus: CaseDocumentStatus
+  ) => {
+    if (nextStatus === 'rejected') {
+      setRejectionError(null);
+      setRejectionTarget({
+        id: documentId,
+        name: documentName,
+        note: currentRejectionNote ?? '',
+      });
+      return;
+    }
+
+    void onUpdateDocumentStatus(documentId, nextStatus, null);
+  };
+
+  const handleRejectDocument = async (): Promise<void> => {
+    if (!rejectionTarget) {
+      return;
+    }
+
+    const normalizedNote = rejectionTarget.note.trim();
+    if (!normalizedNote) {
+      setRejectionError('Add a short note explaining why the document was rejected.');
+      return;
+    }
+
+    setRejectionError(null);
+    await onUpdateDocumentStatus(rejectionTarget.id, 'rejected', normalizedNote);
+    setRejectionTarget(null);
+  };
+
   const documentStatusOptions: Array<{ value: CaseDocumentStatus; label: string }> = [
-    { value: 'pending', label: 'Pending' },
+    { value: 'requested', label: 'Requested' },
     { value: 'received', label: 'Received' },
-    { value: 'under_review', label: 'Under Review' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'needs_revision', label: 'Needs Revision' },
+    { value: 'accepted', label: 'Accepted' },
     { value: 'rejected', label: 'Rejected' },
-    { value: 'expired', label: 'Expired' },
     { value: 'not_requested', label: 'Not Requested' },
   ];
 
@@ -116,22 +159,26 @@ export function DocumentsSection({
           <p className="text-gray-600">Configure and manage document requests for this case</p>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-green-700">{documentStats.approved}</div>
-            <div className="text-sm text-green-600">Approved</div>
+            <div className="text-2xl font-bold text-green-700">{documentStats.accepted}</div>
+            <div className="text-sm text-green-600">Accepted</div>
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="text-2xl font-bold text-blue-700">{documentStats.received}</div>
             <div className="text-sm text-blue-600">Received</div>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-yellow-700">{documentStats.pending}</div>
-            <div className="text-sm text-yellow-600">Pending</div>
+            <div className="text-2xl font-bold text-yellow-700">{documentStats.requested}</div>
+            <div className="text-sm text-yellow-600">Requested</div>
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-orange-700">{documentStats.needsRevision}</div>
-            <div className="text-sm text-orange-600">Needs Revision</div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="text-2xl font-bold text-red-700">{documentStats.rejected}</div>
+            <div className="text-sm text-red-600">Rejected</div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="text-2xl font-bold text-gray-700">{documentStats.notRequested}</div>
+            <div className="text-sm text-gray-600">Not Requested</div>
           </div>
         </div>
 
@@ -201,7 +248,7 @@ export function DocumentsSection({
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-sm text-gray-600">
-                    {suite.documents.filter((document) => ['approved', 'received'].includes(document.status)).length} /{' '}
+                    {suite.documents.filter((document) => document.status === 'accepted').length} /{' '}
                     {suite.documents.length} complete
                   </div>
                 </div>
@@ -246,8 +293,10 @@ export function DocumentsSection({
                                 value={document.status}
                                 onClick={(event) => event.stopPropagation()}
                                 onChange={(event) =>
-                                  void onUpdateDocumentStatus(
+                                  handleStatusChange(
                                     document.id,
+                                    document.name,
+                                    document.rejection_note,
                                     event.target.value as CaseDocumentStatus
                                   )
                                 }
@@ -260,6 +309,11 @@ export function DocumentsSection({
                                   </option>
                                 ))}
                               </select>
+                              {document.rejection_note?.trim() ? (
+                                <p className="max-w-xs text-xs text-red-600">
+                                  Rejection note: {document.rejection_note}
+                                </p>
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{formatDate(document.due_date)}</td>
@@ -274,12 +328,23 @@ export function DocumentsSection({
                             <div className="flex items-center gap-2">
                               <button
                                 className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                                disabled={!document.can_download || viewingDocumentId === document.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void onViewDocument(document.id);
+                                }}
+                                title={document.can_download ? 'View submitted file in browser' : 'No file uploaded yet'}
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
                                 disabled={!document.can_download || downloadingDocumentId === document.id}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   void onDownloadDocument(document.id);
                                 }}
-                                title={document.can_download ? 'Open submitted file' : 'No file uploaded yet'}
+                                title={document.can_download ? 'Download submitted file' : 'No file uploaded yet'}
                               >
                                 <Download className="w-4 h-4 text-gray-600" />
                               </button>
@@ -298,7 +363,7 @@ export function DocumentsSection({
                                 title={document.client_note?.trim() ? 'View client note' : 'No client note'}
                                 disabled={!document.client_note?.trim()}
                               >
-                                <MessageSquare className="w-4 h-4 text-gray-600" />
+                                <StickyNote className="w-4 h-4 text-gray-600" />
                               </button>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded"
@@ -306,18 +371,9 @@ export function DocumentsSection({
                                   event.stopPropagation();
                                   setRenameTarget({ id: document.id, name: document.name });
                                 }}
+                                title="Rename Document"
                               >
                                 <Edit2 className="w-4 h-4 text-gray-600" />
-                              </button>
-                              <button
-                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
-                                disabled={sendingDocumentReminderId === document.id}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void onSendDocumentReminder(document.id);
-                                }}
-                              >
-                                <Send className="w-4 h-4 text-gray-600" />
                               </button>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded"
@@ -325,6 +381,7 @@ export function DocumentsSection({
                                   event.stopPropagation();
                                   setDeleteTarget({ id: document.id, name: document.name });
                                 }}
+                                title="Delete Document"
                               >
                                 <Trash2 className="w-4 h-4 text-gray-600" />
                               </button>
@@ -403,6 +460,70 @@ export function DocumentsSection({
             </div>
           </div>
         </div>
+      ) : null}
+      {rejectionTarget ? (
+        <CaseConfigDialog
+          title="Reject Document"
+          description="Explain why this document was rejected so the client knows what to replace."
+          onClose={() => {
+            setRejectionTarget(null);
+            setRejectionError(null);
+          }}
+        >
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-gray-700">
+              Reject <span className="font-semibold text-gray-900">{rejectionTarget.name}</span>?
+            </p>
+            <div>
+              <label htmlFor="rejection-note" className="block text-sm font-medium text-gray-700 mb-2">
+                Rejection note
+              </label>
+              <textarea
+                id="rejection-note"
+                value={rejectionTarget.note}
+                onChange={(event) => {
+                  setRejectionError(null);
+                  setRejectionTarget((current) =>
+                    current
+                      ? {
+                          ...current,
+                          note: event.target.value,
+                        }
+                      : current
+                  );
+                }}
+                rows={4}
+                maxLength={2000}
+                placeholder="Tell the client what is wrong with this file and what they should upload instead."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+              />
+              {rejectionError ? <p className="mt-2 text-xs text-red-600">{rejectionError}</p> : null}
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setRejectionTarget(null);
+                setRejectionError(null);
+              }}
+              disabled={updatingDocumentId === rejectionTarget.id}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleRejectDocument();
+              }}
+              disabled={updatingDocumentId === rejectionTarget.id}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+            >
+              {updatingDocumentId === rejectionTarget.id ? 'Saving...' : 'Reject Document'}
+            </button>
+          </div>
+        </CaseConfigDialog>
       ) : null}
     </>
   );

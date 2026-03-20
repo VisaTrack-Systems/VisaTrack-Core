@@ -16,7 +16,7 @@ type OverviewSectionProps = {
   onOpenDocuments: () => void;
   onOpenMilestones: () => void;
   onOpenPayments: () => void;
-  onOpenMessages: () => void;
+  onOpenReminders: () => void;
 };
 
 export function OverviewSection({
@@ -30,7 +30,7 @@ export function OverviewSection({
   onOpenDocuments,
   onOpenMilestones,
   onOpenPayments,
-  onOpenMessages,
+  onOpenReminders,
 }: OverviewSectionProps) {
   return (
     <div className="space-y-6">
@@ -116,25 +116,19 @@ export function OverviewSection({
           </button>
           <button
             className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-            onClick={onOpenMessages}
+            onClick={onOpenReminders}
           >
             <Send className="w-5 h-5 text-red-600" />
             <div>
-              <div className="font-medium text-gray-900">Publish Updates</div>
-              <div className="text-xs text-gray-500">Send update to client portal</div>
+              <div className="font-medium text-gray-900">Send Reminder</div>
+              <div className="text-xs text-gray-500">Post one-way reminder to client portal</div>
             </div>
           </button>
         </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Case Progress</h3>
-          <span className="text-sm text-gray-600">{workspace.case.progress_percent}% Complete</span>
-        </div>
-        <div className="bg-gray-200 rounded-full h-3 mb-6">
-          <div className="bg-red-600 h-3 rounded-full" style={{ width: `${workspace.case.progress_percent}%` }} />
-        </div>
+        <h3 className="font-semibold text-gray-900 mb-4">Milestone Summary</h3>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-green-600">{milestoneStats.completed}</div>

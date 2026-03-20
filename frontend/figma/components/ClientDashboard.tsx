@@ -2,7 +2,7 @@ import { AppointmentsPanel } from './client-dashboard/AppointmentsPanel';
 import { BillingSummaryPanel } from './client-dashboard/BillingSummaryPanel';
 import { CaseSummaryCard } from './client-dashboard/CaseSummaryCard';
 import { DocumentChecklistPanel } from './client-dashboard/DocumentChecklistPanel';
-import { MessagesPanel } from './client-dashboard/MessagesPanel';
+import { RemindersPanel } from './client-dashboard/RemindersPanel';
 import { MilestonesPanel } from './client-dashboard/MilestonesPanel';
 import { useClientDashboardData } from './client-dashboard/useClientDashboardData';
 
@@ -18,8 +18,8 @@ export function ClientDashboard() {
     caseInfo,
     documents,
     milestones,
-    allMessages,
-    recentMessages,
+    allReminders,
+    recentReminders,
     upcomingAppointments,
     billingInfo,
     requiredDocuments,
@@ -28,6 +28,7 @@ export function ClientDashboard() {
     uploadDocument,
     deleteUploadedDocument,
     downloadDocument,
+    markReminderRead,
     uploadingDocumentId,
     deletingDocumentId,
     downloadingDocumentId,
@@ -50,7 +51,7 @@ export function ClientDashboard() {
     capabilities.canViewCaseStatus ||
     capabilities.canViewDocuments ||
     capabilities.canViewMilestones ||
-    capabilities.canViewMessages ||
+    capabilities.canViewReminders ||
     capabilities.canViewBilling;
   const firstName = workspace.case.client_name.trim().split(/\s+/)[0] || workspace.case.client_name;
 
@@ -128,11 +129,11 @@ export function ClientDashboard() {
           </div>
 
           <div className="space-y-6">
-            {capabilities.canViewMessages ? (
-              <MessagesPanel
-                allMessages={allMessages}
-                recentMessages={recentMessages}
-                canSendMessages={capabilities.canSendMessages}
+            {capabilities.canViewReminders ? (
+              <RemindersPanel
+                allReminders={allReminders}
+                recentReminders={recentReminders}
+                onMarkRead={markReminderRead}
               />
             ) : null}
             {capabilities.canViewMilestones ? (

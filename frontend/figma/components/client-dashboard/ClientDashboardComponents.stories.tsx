@@ -6,14 +6,14 @@ import { BillingSummaryPanel } from './BillingSummaryPanel';
 import { CaseSummaryCard } from './CaseSummaryCard';
 import { DocumentChecklistPanel } from './DocumentChecklistPanel';
 import { DocumentUploadDialog } from './DocumentUploadDialog';
-import { MessagesPanel } from './MessagesPanel';
+import { RemindersPanel } from './RemindersPanel';
 import { MilestonesPanel } from './MilestonesPanel';
 import {
   mockBillingInfo,
   mockCaseInfo,
   mockDashboardAppointments,
   mockDashboardDocuments,
-  mockDashboardMessages,
+  mockDashboardReminders,
   mockDashboardMilestones,
 } from '../../storybook/fixtures';
 
@@ -30,6 +30,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const documentUploadSubmit = fn(async () => {});
+const reminderMarkRead = fn(async () => {});
 
 export const CaseSummary: Story = {
   render: () => <CaseSummaryCard caseInfo={mockCaseInfo} />,
@@ -50,6 +51,23 @@ export const DocumentChecklist: Story = {
       downloadingDocumentId={null}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const rejectedRow = canvas.getByText('Employer Reference Letter').closest('.p-6');
+
+    if (!(rejectedRow instanceof HTMLElement)) {
+      throw new Error('Expected rejected document row');
+    }
+
+    const rejectedScope = within(rejectedRow);
+
+    await expect(canvas.getByText('Rejection Note')).toBeInTheDocument();
+    await expect(
+      canvas.getByText('Please upload a revised letter that includes salary and a full duties breakdown.')
+    ).toBeInTheDocument();
+    await expect(rejectedScope.queryByText('File: reference-letter.pdf')).not.toBeInTheDocument();
+    await expect(rejectedScope.queryByRole('button', { name: 'View' })).not.toBeInTheDocument();
+  },
 };
 
 export const DocumentUploadModal: Story = {
@@ -93,8 +111,22 @@ export const Milestones: Story = {
   render: () => <MilestonesPanel milestones={mockDashboardMilestones} />,
 };
 
-export const Messages: Story = {
-  render: () => <MessagesPanel recentMessages={mockDashboardMessages} canSendMessages />,
+export const Reminders: Story = {
+  render: () => (
+    <RemindersPanel
+      recentReminders={mockDashboardReminders}
+      allReminders={mockDashboardReminders}
+      onMarkRead={reminderMarkRead}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    reminderMarkRead.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole('button', { name: /updated review status/i }));
+    await expect(reminderMarkRead).toHaveBeenCalledWith('dash-reminder-1');
+    await expect(canvas.queryByRole('button', { name: 'Acknowledge' })).not.toBeInTheDocument();
+  },
 };
 
 export const Appointments: Story = {

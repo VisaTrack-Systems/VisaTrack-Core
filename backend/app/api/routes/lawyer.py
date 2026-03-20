@@ -35,6 +35,26 @@ from app.services.rbac import assign_role_to_user
 
 router = APIRouter(prefix="/lawyer", tags=["lawyer"])
 
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "ready_to_submit": "in_progress",
+    "submitted": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+
+
+def _normalized_case_status(value: str) -> str:
+    token = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
 
 def _normalize_email(value: str) -> str:
     normalized = value.strip().lower()
@@ -77,7 +97,6 @@ def get_lawyer_profile(
             user_id=auth.user_id,
             user_type="lawyer",
             bar_number=None,
-            jurisdiction=None,
             specialties=[],
             years_experience=None,
             bio=None,
@@ -85,12 +104,11 @@ def get_lawyer_profile(
             onboarding_complete=False,
         )
 
-    onboarding_complete = bool((profile.bar_number or "").strip() and (profile.jurisdiction or "").strip())
+    onboarding_complete = bool((profile.bar_number or "").strip())
     return LawyerProfileResponse(
         user_id=auth.user_id,
         user_type=profile.user_type,
         bar_number=profile.bar_number,
-        jurisdiction=profile.jurisdiction,
         specialties=profile.specialties or [],
         years_experience=profile.years_experience,
         bio=profile.bio,
@@ -238,7 +256,6 @@ def upsert_lawyer_profile(
 
     profile.user_type = "lawyer"
     profile.bar_number = payload.bar_number.strip() if payload.bar_number else None
-    profile.jurisdiction = payload.jurisdiction.strip() if payload.jurisdiction else None
     profile.specialties = [item.strip() for item in payload.specialties if item.strip()]
     profile.years_experience = payload.years_experience
     profile.bio = payload.bio
@@ -255,18 +272,16 @@ def upsert_lawyer_profile(
         entity_id=auth.user_id,
         new_values={
             "bar_number": profile.bar_number,
-            "jurisdiction": profile.jurisdiction,
             "specialties": profile.specialties,
         },
     )
     db.commit()
 
-    onboarding_complete = bool((profile.bar_number or "").strip() and (profile.jurisdiction or "").strip())
+    onboarding_complete = bool((profile.bar_number or "").strip())
     return LawyerProfileResponse(
         user_id=auth.user_id,
         user_type=profile.user_type,
         bar_number=profile.bar_number,
-        jurisdiction=profile.jurisdiction,
         specialties=profile.specialties or [],
         years_experience=profile.years_experience,
         bio=profile.bio,
@@ -306,7 +321,7 @@ def list_lawyer_cases(
             organization_id=case.organization_id,
             case_number=case.case_number,
             case_type=case.case_type,
-            status=case.status,
+            status=_normalized_case_status(case.status),
             priority=case.priority,
             client_name=f"{client_first} {client_last}",
             primary_lawyer_name=(
@@ -386,7 +401,7 @@ def create_lawyer_case(
         organization_id=new_case.organization_id,
         case_number=new_case.case_number,
         case_type=new_case.case_type,
-        status=new_case.status,
+        status=_normalized_case_status(new_case.status),
         priority=new_case.priority,
         client_name=f"{client_user.first_name} {client_user.last_name}",
         primary_lawyer_name=f"{auth.user.first_name} {auth.user.last_name}",

@@ -29,7 +29,7 @@ from app.schemas.case import (
     CaseDocumentUploadInitiateResponse,
     CaseDetailsUpdateRequest,
     CaseDetailsUpdateResponse,
-    CaseMessageCreateRequest,
+    CaseReminderCreateRequest,
     CaseMilestoneCreateRequest,
     CaseMilestoneUpdateRequest,
     CaseCustomDocumentSuiteCreateRequest,
@@ -46,7 +46,8 @@ from app.schemas.case import (
     CaseWorkspaceDocument,
     CaseWorkspaceDocumentSuite,
     CaseWorkspaceInfo,
-    CaseWorkspaceMessage,
+    CaseDocumentViewResponse,
+    CaseWorkspaceReminder,
     CaseWorkspaceMilestone,
     CaseWorkspacePaymentItem,
     MilestoneSummary,
@@ -56,6 +57,7 @@ from app.services.storage import (
     StorageConfigurationError,
     StorageOperationError,
     create_presigned_download,
+    create_presigned_force_download,
     create_presigned_upload,
     get_object_bytes,
     head_object,
@@ -69,37 +71,56 @@ DEFAULT_PORTAL_PERMISSIONS = {
     "show_document_requirements": True,
     "portal_access": "full_access",
     "document_upload": "enabled",
-    "messaging": "two_way",
+    "reminders": "enabled",
 }
 
 ALLOWED_PORTAL_ACCESS = {"full_access", "limited_access", "read_only", "disabled"}
 ALLOWED_DOCUMENT_UPLOAD = {"enabled", "disabled"}
-ALLOWED_MESSAGING = {"two_way", "one_way", "disabled"}
+ALLOWED_REMINDERS = {"enabled", "disabled"}
 ALLOWED_DOCUMENT_STATUSES = {
-    "pending",
+    "requested",
     "received",
-    "under_review",
-    "approved",
-    "rejected",
-    "needs_revision",
-    "expired",
     "not_requested",
+    "accepted",
+    "rejected",
 }
 ALLOWED_CASE_PRIORITIES = {"low", "medium", "high", "urgent"}
 ALLOWED_CASE_STATUSES = {
     "intake",
-    "document_collection",
-    "document_review",
-    "application_prep",
-    "ready_to_submit",
-    "submitted",
-    "under_review",
-    "additional_documents_requested",
-    "decision_pending",
-    "approved",
-    "refused",
-    "withdrawn",
+    "awaiting_client",
+    "in_progress",
     "closed",
+}
+LEGACY_CASE_STATUS_MAP = {
+    "document_collection": "awaiting_client",
+    "document_review": "in_progress",
+    "application_prep": "in_progress",
+    "in_preparation": "in_progress",
+    "ready_to_submit": "in_progress",
+    "ready_to_file": "in_progress",
+    "submitted": "in_progress",
+    "filed": "in_progress",
+    "under_review": "in_progress",
+    "decision_pending": "in_progress",
+    "biometrics_scheduled": "in_progress",
+    "interview_scheduled": "in_progress",
+    "additional_documents_requested": "awaiting_client",
+    "rfe_received": "awaiting_client",
+    "rfe_response_drafting": "in_progress",
+    "approved": "closed",
+    "refused": "closed",
+    "withdrawn": "closed",
+}
+LEGACY_DOCUMENT_STATUS_MAP = {
+    "pending": "requested",
+    "under_review": "received",
+    "approved": "accepted",
+    "rejected": "rejected",
+    "needs_revision": "rejected",
+    "expired": "requested",
+    "optional": "not_requested",
+    "completed": "accepted",
+    "review": "received",
 }
 ALLOWED_MILESTONE_STATUSES = {
     "not_started",
@@ -150,24 +171,57 @@ def _workspace_milestone_from_row(row: Any) -> CaseWorkspaceMilestone:
 
 
 def _progress_from_status(status: str) -> int:
+    normalized = _normalized_case_status(status)
     progress_map = {
         "intake": 15,
-        "document_collection": 35,
-        "document_review": 55,
-        "application_prep": 70,
-        "ready_to_submit": 85,
-        "submitted": 92,
-        "under_review": 95,
-        "approved": 100,
+        "awaiting_client": 45,
+        "in_progress": 75,
         "closed": 100,
-        "withdrawn": 100,
-        "refused": 100,
     }
-    return progress_map.get(status, 40)
+    return progress_map.get(normalized, 50)
 
 
 def _normalize_token(value: str) -> str:
     return value.strip().lower().replace(" ", "_")
+
+
+def _canonical_case_status(value: str) -> str:
+    token = _normalize_token(value).replace("-", "_")
+    return LEGACY_CASE_STATUS_MAP.get(token, token)
+
+
+def _canonical_document_status(value: str) -> str:
+    token = _normalize_token(value).replace("-", "_")
+    return LEGACY_DOCUMENT_STATUS_MAP.get(token, token)
+
+
+def _normalized_case_status(value: str, *, default: str = "in_progress") -> str:
+    canonical = _canonical_case_status(value)
+    if canonical in ALLOWED_CASE_STATUSES:
+        return canonical
+    return default
+
+
+def _normalized_document_status(value: str, *, default: str = "requested") -> str:
+    canonical = _canonical_document_status(value)
+    if canonical in ALLOWED_DOCUMENT_STATUSES:
+        return canonical
+    return default
+
+
+def _case_sender_name(case: Case) -> str:
+    lawyer = getattr(case, "primary_lawyer", None)
+    if lawyer is None:
+        return "Firm"
+
+    first_name = (getattr(lawyer, "first_name", "") or "").strip()
+    last_name = (getattr(lawyer, "last_name", "") or "").strip()
+    full_name = f"{first_name} {last_name}".strip()
+    if full_name:
+        return full_name
+
+    email = (getattr(lawyer, "email", "") or "").strip()
+    return email or "Firm"
 
 
 def _generate_case_number(db: Session, organization_id: UUID) -> str:
@@ -213,9 +267,9 @@ def _normalized_portal_permissions(raw: Any) -> dict[str, Any]:
     if document_upload in ALLOWED_DOCUMENT_UPLOAD:
         normalized["document_upload"] = document_upload
 
-    messaging = str(raw.get("messaging", normalized["messaging"])).strip().lower()
-    if messaging in ALLOWED_MESSAGING:
-        normalized["messaging"] = messaging
+    reminders = str(raw.get("reminders", normalized["reminders"])).strip().lower()
+    if reminders in ALLOWED_REMINDERS:
+        normalized["reminders"] = reminders
 
     return normalized
 
@@ -249,10 +303,24 @@ def _normalized_document_status_overrides(raw: Any) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in raw.items():
         doc_id = str(key).strip()
-        status_value = _normalize_token(str(value)) if value is not None else ""
+        status_value = _canonical_document_status(str(value)) if value is not None else ""
         if not doc_id or status_value not in ALLOWED_DOCUMENT_STATUSES:
             continue
         normalized[doc_id] = status_value
+    return normalized
+
+
+def _normalized_document_rejection_notes(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for key, value in raw.items():
+        doc_id = str(key).strip()
+        note = str(value or "").strip()
+        if not doc_id or not note:
+            continue
+        normalized[doc_id] = note[:2000]
     return normalized
 
 
@@ -320,7 +388,7 @@ def _normalized_custom_documents(raw: Any) -> list[dict[str, Any]]:
             continue
 
         suite_id = str(doc.get("suite_id") or "").strip() or None
-        status_value = _normalize_token(str(doc.get("status") or ""))
+        status_value = _canonical_document_status(str(doc.get("status") or ""))
         status = status_value if status_value in ALLOWED_DOCUMENT_STATUSES else None
 
         normalized.append(
@@ -366,6 +434,7 @@ def _client_portal_capabilities(case: Case) -> dict[str, bool | str]:
         "portal_access": portal_access,
         "can_view_documents": can_view_documents,
         "can_upload_documents": can_upload_documents,
+        "can_view_reminders": portal_access != "disabled" and permissions["reminders"] == "enabled",
     }
 
 
@@ -620,7 +689,7 @@ def create_case(
     if normalized_priority not in ALLOWED_CASE_PRIORITIES:
         raise HTTPException(status_code=400, detail="Invalid priority value")
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_case_status(payload.status)
     if normalized_status not in ALLOWED_CASE_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status value")
 
@@ -676,7 +745,7 @@ def create_case(
         organization_id=new_case.organization_id,
         case_number=new_case.case_number,
         case_type=new_case.case_type,
-        status=new_case.status,
+        status=_normalized_case_status(new_case.status, default="intake"),
         priority=new_case.priority,
         client_name=f"{client_user.first_name} {client_user.last_name}",
         primary_lawyer_name=(
@@ -719,8 +788,15 @@ def list_cases(
     if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
         stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
 
-    if status:
-        stmt = stmt.where(cast(Case.status, String) == status)
+    if isinstance(status, str) and status.strip():
+        normalized_query_status = _canonical_case_status(status)
+        if normalized_query_status in ALLOWED_CASE_STATUSES:
+            legacy_query_statuses = [
+                key for key, value in LEGACY_CASE_STATUS_MAP.items() if value == normalized_query_status
+            ]
+            stmt = stmt.where(cast(Case.status, String).in_([normalized_query_status, *legacy_query_statuses]))
+        else:
+            stmt = stmt.where(cast(Case.status, String) == normalized_query_status)
 
     rows = db.execute(stmt).all()
 
@@ -730,7 +806,7 @@ def list_cases(
             organization_id=case.organization_id,
             case_number=case.case_number,
             case_type=case.case_type,
-            status=case.status,
+            status=_normalized_case_status(case.status),
             priority=case.priority,
             client_name=f"{client_first} {client_last}",
             primary_lawyer_name=(
@@ -807,7 +883,7 @@ def get_case_by_number(
         id=case.id,
         case_number=case.case_number,
         case_type=case.case_type,
-        status=case.status,
+        status=_normalized_case_status(case.status),
         priority=case.priority,
         client_name=f"{client_first} {client_last}",
         primary_lawyer_name=(f"{lawyer_first} {lawyer_last}" if lawyer_first and lawyer_last else None),
@@ -848,7 +924,7 @@ def update_case_details_by_number(
     if normalized_priority not in ALLOWED_CASE_PRIORITIES:
         raise HTTPException(status_code=400, detail="Invalid priority value")
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_case_status(payload.status)
     if normalized_status not in ALLOWED_CASE_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status value")
 
@@ -858,7 +934,7 @@ def update_case_details_by_number(
     old_values = {
         "case_type": case.case_type,
         "priority": case.priority,
-        "status": case.status,
+        "status": _normalized_case_status(case.status),
         "target_filing_date": _date_or_none(case.target_filing_date),
         "description": case.description,
         "internal_notes": case.internal_notes,
@@ -875,7 +951,7 @@ def update_case_details_by_number(
     new_values = {
         "case_type": case.case_type,
         "priority": case.priority,
-        "status": case.status,
+        "status": _normalized_case_status(case.status),
         "target_filing_date": _date_or_none(case.target_filing_date),
         "description": case.description,
         "internal_notes": case.internal_notes,
@@ -902,7 +978,7 @@ def update_case_details_by_number(
         case_number=case.case_number,
         case_type=case.case_type,
         priority=case.priority,
-        status=case.status,
+        status=_normalized_case_status(case.status),
         target_filing_date=case.target_filing_date,
         description=case.description,
         internal_notes=case.internal_notes,
@@ -1230,37 +1306,37 @@ def delete_case_milestone(
 
 
 @router.post(
-    "/by-number/{case_number}/messages",
-    response_model=CaseWorkspaceMessage,
+    "/by-number/{case_number}/reminders",
+    response_model=CaseWorkspaceReminder,
     status_code=status.HTTP_201_CREATED,
 )
-def create_case_message(
+def create_case_reminder(
     case_number: str,
-    payload: CaseMessageCreateRequest,
+    payload: CaseReminderCreateRequest,
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
-) -> CaseWorkspaceMessage:
+) -> CaseWorkspaceReminder:
     case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
 
-    subject = payload.subject.strip()
+    title = payload.title.strip()
     body = payload.body.strip()
-    if not subject:
-        raise HTTPException(status_code=400, detail="Subject is required")
-    if len(subject) > 255:
-        raise HTTPException(status_code=400, detail="Subject must be 255 characters or fewer")
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if len(title) > 255:
+        raise HTTPException(status_code=400, detail="Title must be 255 characters or fewer")
     if not body:
-        raise HTTPException(status_code=400, detail="Message body is required")
+        raise HTTPException(status_code=400, detail="Reminder body is required")
 
     inserted_row = db.execute(
         text(
             """
-            INSERT INTO messages (
+            INSERT INTO reminders (
                 case_id,
+                organization_id,
+                client_user_id,
                 sender_id,
-                recipient_id,
-                subject,
+                title,
                 body,
-                is_draft,
                 sent_at,
                 visible_to_client,
                 created_at,
@@ -1268,24 +1344,25 @@ def create_case_message(
             )
             VALUES (
                 :case_id,
+                :organization_id,
+                :client_user_id,
                 :sender_id,
-                :recipient_id,
-                :subject,
+                :title,
                 :body,
-                FALSE,
                 NOW(),
                 :visible_to_client,
                 NOW(),
                 NOW()
             )
-            RETURNING id, subject, body, sent_at, read_at
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
             """
         ),
         {
             "case_id": str(case.id),
+            "organization_id": str(case.organization_id),
+            "client_user_id": str(case.client_id),
             "sender_id": str(auth.user_id),
-            "recipient_id": str(case.client_id),
-            "subject": subject,
+            "title": title,
             "body": body,
             "visible_to_client": payload.visible_to_client,
         },
@@ -1300,26 +1377,141 @@ def create_case_message(
         organization_id=case.organization_id,
         user_id=auth.user_id,
         action="created",
-        entity_type="message",
+        entity_type="reminder",
         entity_id=inserted_row["id"],
         case_id=case.id,
         client_id=case.client_id,
         new_values={
-            "subject": subject,
+            "title": title,
             "visible_to_client": payload.visible_to_client,
-            "send_email": payload.send_email,
+            "send_email_notification": payload.send_email_notification,
         },
     )
 
     db.commit()
-    return CaseWorkspaceMessage(
+    return CaseWorkspaceReminder(
         id=inserted_row["id"],
         sender_name=sender_name,
-        subject=inserted_row["subject"] or "(No subject)",
+        title=inserted_row["title"] or "(No title)",
         body=inserted_row["body"] or "",
         sent_at=inserted_row["sent_at"],
         read_at=inserted_row["read_at"],
-        from_client=False,
+        acknowledged_at=inserted_row["acknowledged_at"],
+    )
+
+
+@router.post(
+    "/by-number/{case_number}/reminders/{reminder_id}/read",
+    response_model=CaseWorkspaceReminder,
+)
+def mark_case_reminder_read(
+    case_number: str,
+    reminder_id: str,
+    auth: AuthContext = Depends(require_roles("client")),
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceReminder:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    client_capabilities = _client_portal_capabilities(case)
+    if not client_capabilities["can_view_reminders"]:
+        raise HTTPException(status_code=403, detail="Reminder access is disabled for this portal")
+
+    reminder_row = db.execute(
+        text(
+            """
+            UPDATE reminders
+            SET read_at = COALESCE(read_at, NOW()), updated_at = NOW()
+            WHERE
+                id = CAST(:reminder_id AS uuid)
+                AND case_id = :case_id
+                AND client_user_id = :client_user_id
+                AND visible_to_client = TRUE
+                AND deleted_at IS NULL
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
+            """
+        ),
+        {
+            "reminder_id": reminder_id,
+            "case_id": str(case.id),
+            "client_user_id": str(auth.user_id),
+        },
+    ).mappings().first()
+    if reminder_row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+    sender_name = _case_sender_name(case)
+    db.commit()
+    return CaseWorkspaceReminder(
+        id=reminder_row["id"],
+        sender_name=sender_name,
+        title=reminder_row["title"] or "(No title)",
+        body=reminder_row["body"] or "",
+        sent_at=reminder_row["sent_at"],
+        read_at=reminder_row["read_at"],
+        acknowledged_at=reminder_row["acknowledged_at"],
+    )
+
+
+@router.post(
+    "/by-number/{case_number}/reminders/{reminder_id}/acknowledge",
+    response_model=CaseWorkspaceReminder,
+)
+def acknowledge_case_reminder(
+    case_number: str,
+    reminder_id: str,
+    auth: AuthContext = Depends(require_roles("client")),
+    db: Session = Depends(get_db),
+) -> CaseWorkspaceReminder:
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    client_capabilities = _client_portal_capabilities(case)
+    if not client_capabilities["can_view_reminders"]:
+        raise HTTPException(status_code=403, detail="Reminder access is disabled for this portal")
+
+    reminder_row = db.execute(
+        text(
+            """
+            UPDATE reminders
+            SET
+                read_at = COALESCE(read_at, NOW()),
+                acknowledged_at = COALESCE(acknowledged_at, NOW()),
+                updated_at = NOW()
+            WHERE
+                id = CAST(:reminder_id AS uuid)
+                AND case_id = :case_id
+                AND client_user_id = :client_user_id
+                AND visible_to_client = TRUE
+                AND deleted_at IS NULL
+            RETURNING id, title, body, sent_at, read_at, acknowledged_at
+            """
+        ),
+        {
+            "reminder_id": reminder_id,
+            "case_id": str(case.id),
+            "client_user_id": str(auth.user_id),
+        },
+    ).mappings().first()
+    if reminder_row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+    sender_name = _case_sender_name(case)
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="acknowledged",
+        entity_type="reminder",
+        entity_id=reminder_row["id"],
+        case_id=case.id,
+        client_id=case.client_id,
+    )
+    db.commit()
+    return CaseWorkspaceReminder(
+        id=reminder_row["id"],
+        sender_name=sender_name,
+        title=reminder_row["title"] or "(No title)",
+        body=reminder_row["body"] or "",
+        sent_at=reminder_row["sent_at"],
+        read_at=reminder_row["read_at"],
+        acknowledged_at=reminder_row["acknowledged_at"],
     )
 
 
@@ -1343,6 +1535,7 @@ def get_case_workspace_by_number(
                 c.status,
                 c.priority,
                 c.start_date,
+                c.created_at::date AS created_date,
                 c.target_filing_date,
                 c.estimated_completion_from,
                 c.estimated_completion_to,
@@ -1408,6 +1601,9 @@ def get_case_workspace_by_number(
         custom_fields.get("hidden_document_ids")
     )
     custom_documents = _normalized_custom_documents(custom_fields.get("custom_documents"))
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
     portal_permissions_payload = _normalized_portal_permissions(custom_fields.get("portal_permissions"))
     is_client_portal_view = (
         "client" in auth.roles
@@ -1428,9 +1624,9 @@ def get_case_workspace_by_number(
         portal_access != "disabled"
         and bool(portal_permissions_payload["show_document_requirements"])
     )
-    client_can_view_messages = (
+    client_can_view_reminders = (
         portal_access != "disabled"
-        and portal_permissions_payload["messaging"] != "disabled"
+        and portal_permissions_payload["reminders"] == "enabled"
     )
     client_can_view_billing = portal_access in {"full_access", "read_only"}
 
@@ -1447,7 +1643,7 @@ def get_case_workspace_by_number(
                 dt.instructions,
                 dt.is_required,
                 cd.id AS latest_case_document_id,
-                COALESCE(cd.status, CASE WHEN dt.is_required THEN 'pending' ELSE 'not_requested' END) AS doc_status,
+                COALESCE(cd.status, CASE WHEN dt.is_required THEN 'requested' ELSE 'not_requested' END) AS doc_status,
                 cd.uploaded_at,
                 cd.expiry_date,
                 cd.file_name,
@@ -1510,11 +1706,14 @@ def get_case_workspace_by_number(
                     id=template_id_str,
                     name=document_name_overrides.get(template_id_str, document_row["template_name"]),
                     required=bool(document_row["is_required"]),
-                    status=document_status_overrides.get(template_id_str, document_row["doc_status"]),
+                    status=_normalized_document_status(
+                        document_status_overrides.get(template_id_str, document_row["doc_status"]),
+                    ),
                     due_date=document_row["expiry_date"],
                     uploaded_at=document_row["uploaded_at"],
                     instructions=document_row["instructions"],
                     client_note=document_row.get("client_note"),
+                    rejection_note=rejection_notes.get(template_id_str),
                     file_name=document_row["file_name"],
                     latest_case_document_id=(
                         str(document_row["latest_case_document_id"])
@@ -1588,14 +1787,17 @@ def get_case_workspace_by_number(
                 id=custom_document_id,
                 name=document_name_overrides.get(custom_document_id, custom_document_row["name"]),
                 required=False,
-                status=document_status_overrides.get(
-                    custom_document_id,
-                    custom_document_row["status"] or "received",
+                status=_normalized_document_status(
+                    document_status_overrides.get(
+                        custom_document_id,
+                        custom_document_row["status"] or "received",
+                    ),
                 ),
                 due_date=custom_document_row["expiry_date"],
                 uploaded_at=custom_document_row["uploaded_at"],
                 instructions="",
                 client_note=custom_document_row.get("client_note"),
+                rejection_note=rejection_notes.get(custom_document_id),
                 file_name=custom_document_row["file_name"],
                 latest_case_document_id=custom_document_id,
                 can_download=True,
@@ -1636,7 +1838,7 @@ def get_case_workspace_by_number(
                 "documents": [],
             }
 
-        default_status = custom_document["status"] or ("pending" if custom_document["required"] else "not_requested")
+        default_status = custom_document["status"] or ("requested" if custom_document["required"] else "not_requested")
         bound_case_document = bound_case_document_rows.get(upload_bindings.get(custom_document_id, ""))
         bound_status = bound_case_document["status"] if bound_case_document else None
         bound_uploaded_at = bound_case_document["uploaded_at"] if bound_case_document else None
@@ -1647,11 +1849,14 @@ def get_case_workspace_by_number(
                 id=custom_document_id,
                 name=document_name_overrides.get(custom_document_id, custom_document["name"]),
                 required=bool(custom_document["required"]),
-                status=document_status_overrides.get(custom_document_id, bound_status or default_status),
+                status=_normalized_document_status(
+                    document_status_overrides.get(custom_document_id, bound_status or default_status)
+                ),
                 due_date=custom_document["due_date"],
                 uploaded_at=bound_uploaded_at,
                 instructions=custom_document["instructions"],
                 client_note=bound_client_note,
+                rejection_note=rejection_notes.get(custom_document_id),
                 file_name=bound_file_name,
                 latest_case_document_id=str(bound_case_document["id"]) if bound_case_document else None,
                 can_download=bound_case_document is not None,
@@ -1740,48 +1945,47 @@ def get_case_workspace_by_number(
         for payment_row in payment_rows
     ]
 
-    message_rows = db.execute(
+    reminder_rows = db.execute(
         text(
             """
             SELECT
-                m.id,
+                r.id,
                 COALESCE(CONCAT(su.first_name, ' ', su.last_name), 'System') AS sender_name,
-                m.subject,
-                m.body,
-                m.sent_at,
-                m.read_at,
-                (m.sender_id = :client_id) AS from_client
-            FROM messages m
-            LEFT JOIN users su ON su.id = m.sender_id
+                r.title,
+                r.body,
+                r.sent_at,
+                r.read_at,
+                r.acknowledged_at
+            FROM reminders r
+            LEFT JOIN users su ON su.id = r.sender_id
             WHERE
-                m.case_id = :case_id
-                AND COALESCE(m.is_draft, FALSE) = FALSE
+                r.case_id = :case_id
+                AND r.deleted_at IS NULL
                 AND (
                     :is_client_portal_view = FALSE
-                    OR COALESCE(m.visible_to_client, TRUE) = TRUE
+                    OR COALESCE(r.visible_to_client, TRUE) = TRUE
                 )
-            ORDER BY COALESCE(m.sent_at, m.created_at) DESC
+            ORDER BY COALESCE(r.sent_at, r.created_at) DESC
             LIMIT 25
             """
         ),
         {
             "case_id": case_id,
-            "client_id": client_id,
             "is_client_portal_view": is_client_portal_view,
         },
     ).mappings().all()
 
-    messages = [
-        CaseWorkspaceMessage(
-            id=message_row["id"],
-            sender_name=message_row["sender_name"],
-            subject=message_row["subject"] or "(No subject)",
-            body=message_row["body"] or "",
-            sent_at=message_row["sent_at"],
-            read_at=message_row["read_at"],
-            from_client=bool(message_row["from_client"]),
+    reminders = [
+        CaseWorkspaceReminder(
+            id=reminder_row["id"],
+            sender_name=reminder_row["sender_name"],
+            title=reminder_row["title"] or "(No title)",
+            body=reminder_row["body"] or "",
+            sent_at=reminder_row["sent_at"],
+            read_at=reminder_row["read_at"],
+            acknowledged_at=reminder_row["acknowledged_at"],
         )
-        for message_row in message_rows
+        for reminder_row in reminder_rows
     ]
 
     appointments = [
@@ -1875,12 +2079,12 @@ def get_case_workspace_by_number(
         id=case_row["id"],
         case_number=case_row["case_number"],
         case_type=case_row["case_type"],
-        status=case_row["status"],
+        status=_normalized_case_status(case_row["status"]),
         priority=case_row["priority"],
         client_id=case_row["client_id"],
         client_name=case_row["client_name"],
         primary_lawyer_name=case_row["primary_lawyer_name"],
-        start_date=case_row["start_date"],
+        start_date=case_row["start_date"] or case_row.get("created_date"),
         target_filing_date=case_row["target_filing_date"],
         estimated_completion_from=case_row["estimated_completion_from"],
         estimated_completion_to=case_row["estimated_completion_to"],
@@ -1935,8 +2139,8 @@ def get_case_workspace_by_number(
                 document for suite in document_suites for document in suite.documents
             ]
 
-        if not client_can_view_messages:
-            messages = []
+        if not client_can_view_reminders:
+            reminders = []
 
         if not client_can_view_billing:
             payment_items = []
@@ -1954,7 +2158,7 @@ def get_case_workspace_by_number(
         documents=documents,
         milestones=milestones,
         payment_items=payment_items,
-        messages=messages,
+        reminders=reminders,
         appointments=appointments,
         billing_summary=billing_summary,
         assignments=assignments,
@@ -2083,7 +2287,7 @@ def create_case_custom_document(
     custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
     custom_documents = _normalized_custom_documents(custom_fields.get("custom_documents"))
     new_document_id = str(uuid4())
-    default_status = "pending" if payload.required else "not_requested"
+    default_status = "requested" if payload.required else "not_requested"
     new_document = {
         "id": new_document_id,
         "name": name,
@@ -2301,6 +2505,8 @@ def delete_case_document(
     name_overrides.pop(str(document_uuid), None)
     status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
     status_overrides.pop(str(document_uuid), None)
+    rejection_notes = _normalized_document_rejection_notes(custom_fields.get("document_rejection_notes"))
+    rejection_notes.pop(str(document_uuid), None)
 
     case.custom_fields = {
         **custom_fields,
@@ -2308,6 +2514,7 @@ def delete_case_document(
         "hidden_document_ids": sorted(hidden_document_ids),
         "document_name_overrides": name_overrides,
         "document_status_overrides": status_overrides,
+        "document_rejection_notes": rejection_notes,
     }
 
     log_activity(
@@ -2339,9 +2546,15 @@ def update_case_document_status(
 ) -> CaseDocumentStatusUpdateResponse:
     case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
 
-    normalized_status = _normalize_token(payload.status)
+    normalized_status = _canonical_document_status(payload.status)
     if normalized_status not in ALLOWED_DOCUMENT_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid document status")
+
+    normalized_rejection_note = (payload.rejection_note or "").strip() or None
+    if normalized_rejection_note and len(normalized_rejection_note) > 2000:
+        raise HTTPException(status_code=400, detail="Rejection note must be 2000 characters or fewer")
+    if normalized_status == "rejected" and not normalized_rejection_note:
+        raise HTTPException(status_code=400, detail="Rejection note is required when rejecting a document")
 
     try:
         document_uuid = UUID(document_id)
@@ -2399,6 +2612,9 @@ def update_case_document_status(
     status_overrides = _normalized_document_status_overrides(
         custom_fields.get("document_status_overrides")
     )
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
 
     if custom_document_exists:
         for custom_document in custom_documents:
@@ -2406,14 +2622,27 @@ def update_case_document_status(
                 custom_document["status"] = normalized_status
                 break
         status_overrides.pop(str(document_uuid), None)
+        if normalized_status == "rejected" and normalized_rejection_note:
+            rejection_notes[str(document_uuid)] = normalized_rejection_note
+        else:
+            rejection_notes.pop(str(document_uuid), None)
         case.custom_fields = {
             **custom_fields,
             "custom_documents": custom_documents,
             "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
         }
     else:
         status_overrides[str(document_uuid)] = normalized_status
-        case.custom_fields = {**custom_fields, "document_status_overrides": status_overrides}
+        if normalized_status == "rejected" and normalized_rejection_note:
+            rejection_notes[str(document_uuid)] = normalized_rejection_note
+        else:
+            rejection_notes.pop(str(document_uuid), None)
+        case.custom_fields = {
+            **custom_fields,
+            "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
+        }
 
     db.add(case)
     db.commit()
@@ -2421,6 +2650,7 @@ def update_case_document_status(
     return CaseDocumentStatusUpdateResponse(
         document_id=str(document_uuid),
         status=normalized_status,
+        rejection_note=normalized_rejection_note if normalized_status == "rejected" else None,
     )
 
 
@@ -2583,18 +2813,32 @@ def complete_case_document_upload(
     if insert_result is None:
         raise HTTPException(status_code=500, detail="Failed to record uploaded document")
 
+    custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
+    status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
+    rejection_notes = _normalized_document_rejection_notes(
+        custom_fields.get("document_rejection_notes")
+    )
+    rejection_notes.pop(slot["logical_document_id"], None)
+
     if slot["kind"] == "custom_request":
-        custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
         upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
-        status_overrides = _normalized_document_status_overrides(custom_fields.get("document_status_overrides"))
-        status_overrides.pop(slot["logical_document_id"], None)
+        status_overrides[slot["logical_document_id"]] = "received"
         case.custom_fields = {
             **custom_fields,
             "document_upload_bindings": upload_bindings,
             "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
         }
-        db.add(case)
+    else:
+        status_overrides.pop(slot["logical_document_id"], None)
+        case.custom_fields = {
+            **custom_fields,
+            "document_status_overrides": status_overrides,
+            "document_rejection_notes": rejection_notes,
+        }
+
+    db.add(case)
 
     log_activity(
         db,
@@ -2633,6 +2877,7 @@ def complete_case_document_upload(
         uploaded_at=insert_result["uploaded_at"],
         instructions=slot["instructions"],
         client_note=normalized_client_note,
+        rejection_note=None,
         file_name=actual_file_name,
         latest_case_document_id=str(insert_result["id"]),
         can_download=True,
@@ -2685,9 +2930,17 @@ def delete_client_uploaded_document(
     if slot["kind"] == "custom_request":
         custom_fields = case.custom_fields if isinstance(case.custom_fields, dict) else {}
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
+        status_overrides = _normalized_document_status_overrides(
+            custom_fields.get("document_status_overrides")
+        )
         if upload_bindings.get(slot["logical_document_id"]) == str(case_document["id"]):
             upload_bindings.pop(slot["logical_document_id"], None)
-            case.custom_fields = {**custom_fields, "document_upload_bindings": upload_bindings}
+            status_overrides.pop(slot["logical_document_id"], None)
+            case.custom_fields = {
+                **custom_fields,
+                "document_upload_bindings": upload_bindings,
+                "document_status_overrides": status_overrides,
+            }
             db.add(case)
 
     log_activity(
@@ -2718,6 +2971,59 @@ def delete_client_uploaded_document(
 
 
 @router.get(
+    "/by-number/{case_number}/documents/{document_id}/view-url",
+    response_model=CaseDocumentViewResponse,
+)
+def get_case_document_view_url(
+    case_number: str,
+    document_id: str,
+    request: Request,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentViewResponse:
+    """Return a short-lived inline presigned URL for in-browser viewing.
+
+    This endpoint is restricted to legal staff (lawyer / org_admin / super_admin).
+    Every access is recorded in document_access_log with action='view' to satisfy
+    legal audit requirements around lawyer interactions with client-uploaded documents.
+    """
+    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+
+    slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
+    case_document = slot["bound_case_document"]
+    if case_document is None:
+        raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+
+    try:
+        view_url = create_presigned_download(
+            object_key=str(case_document["file_path"]),
+            download_name=str(case_document["file_name"] or slot["name"]),
+        )
+    except StorageConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except StorageOperationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    log_document_access(
+        db,
+        document_id=case_document["id"],
+        user_id=auth.user_id,
+        action="view",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    db.commit()
+
+    return CaseDocumentViewResponse(
+        document_id=slot["logical_document_id"],
+        case_document_id=str(case_document["id"]),
+        file_name=str(case_document["file_name"] or slot["name"]),
+        view_url=view_url,
+        expires_in_seconds=settings.s3_presign_expires_seconds,
+    )
+
+
+@router.get(
     "/by-number/{case_number}/documents/{document_id}/download-url",
     response_model=CaseDocumentDownloadResponse,
 )
@@ -2741,7 +3047,7 @@ def get_case_document_download_url(
         raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
 
     try:
-        download_url = create_presigned_download(
+        download_url = create_presigned_force_download(
             object_key=str(case_document["file_path"]),
             download_name=str(case_document["file_name"] or slot["name"]),
         )
@@ -2754,7 +3060,7 @@ def get_case_document_download_url(
         db,
         document_id=case_document["id"],
         user_id=auth.user_id,
-        action="view",
+        action="download",
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )

@@ -1,4 +1,4 @@
-import { ChevronDown, Filter, Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 
 type FilterBarProps = {
   searchTerm: string;
@@ -35,17 +35,13 @@ export function FilterBar({
               className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
             >
               <option value="all">All Status</option>
-              <option value="Document Review">Document Review</option>
               <option value="Awaiting Client">Awaiting Client</option>
+              <option value="Intake">Intake</option>
               <option value="In Progress">In Progress</option>
-              <option value="Ready To Submit">Ready To Submit</option>
+              <option value="Closed">Closed</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            <Filter className="w-4 h-4" />
-            <span className="hidden sm:inline">More Filters</span>
-          </button>
         </div>
       </div>
     </div>

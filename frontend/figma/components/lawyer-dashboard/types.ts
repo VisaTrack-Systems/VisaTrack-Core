@@ -8,19 +8,12 @@ export type DashboardCase = {
   nextDeadline: string;
 };
 
-export type DeadlineItem = {
-  task: string;
-  client: string;
-  date: string;
-  daysLeft: number;
-};
-
 export type ActivityItem = {
   action: string;
   client: string;
   detail: string;
   time: string;
-  type: 'document' | 'message' | 'payment' | 'milestone';
+  type: 'document' | 'reminder' | 'payment' | 'milestone';
 };
 
 export type DashboardStats = {

@@ -83,6 +83,7 @@ class CaseWorkspaceDocument(BaseModel):
     uploaded_at: Optional[datetime]
     instructions: Optional[str]
     client_note: Optional[str] = None
+    rejection_note: Optional[str] = None
     file_name: Optional[str] = None
     latest_case_document_id: Optional[str] = None
     can_download: bool = False
@@ -120,14 +121,14 @@ class CaseWorkspacePaymentItem(BaseModel):
     invoice_number: Optional[str]
 
 
-class CaseWorkspaceMessage(BaseModel):
+class CaseWorkspaceReminder(BaseModel):
     id: UUID
     sender_name: str
-    subject: str
+    title: str
     body: str
     sent_at: Optional[datetime]
     read_at: Optional[datetime]
-    from_client: bool
+    acknowledged_at: Optional[datetime]
 
 
 class CaseWorkspaceAppointment(BaseModel):
@@ -158,7 +159,7 @@ class CasePortalPermissions(BaseModel):
     show_document_requirements: bool
     portal_access: str
     document_upload: str
-    messaging: str
+    reminders: str
 
 
 class CasePortalPermissionsUpdateRequest(BaseModel):
@@ -167,7 +168,7 @@ class CasePortalPermissionsUpdateRequest(BaseModel):
     show_document_requirements: bool
     portal_access: str
     document_upload: str
-    messaging: str
+    reminders: str
 
 
 class CaseCustomDocumentSuiteCreateRequest(BaseModel):
@@ -177,11 +178,13 @@ class CaseCustomDocumentSuiteCreateRequest(BaseModel):
 
 class CaseDocumentStatusUpdateRequest(BaseModel):
     status: str
+    rejection_note: Optional[str] = None
 
 
 class CaseDocumentStatusUpdateResponse(BaseModel):
     document_id: str
     status: str
+    rejection_note: Optional[str] = None
 
 
 class CaseDocumentUploadInitiateRequest(BaseModel):
@@ -215,6 +218,14 @@ class CaseDocumentDownloadResponse(BaseModel):
     case_document_id: str
     file_name: str
     download_url: str
+    expires_in_seconds: int
+
+
+class CaseDocumentViewResponse(BaseModel):
+    document_id: str
+    case_document_id: str
+    file_name: str
+    view_url: str
     expires_in_seconds: int
 
 
@@ -271,10 +282,10 @@ class CaseMilestoneUpdateRequest(BaseModel):
     client_visible: Optional[bool] = None
 
 
-class CaseMessageCreateRequest(BaseModel):
-    subject: str
+class CaseReminderCreateRequest(BaseModel):
+    title: str
     body: str
-    send_email: bool = False
+    send_email_notification: bool = False
     visible_to_client: bool = True
 
 
@@ -284,7 +295,7 @@ class CaseWorkspace(BaseModel):
     documents: list[CaseWorkspaceDocument]
     milestones: list[CaseWorkspaceMilestone]
     payment_items: list[CaseWorkspacePaymentItem]
-    messages: list[CaseWorkspaceMessage]
+    reminders: list[CaseWorkspaceReminder]
     appointments: list[CaseWorkspaceAppointment]
     billing_summary: CaseWorkspaceBillingSummary
     assignments: list[CaseWorkspaceAssignment]

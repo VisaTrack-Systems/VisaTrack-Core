@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { getLawyerCases, getLawyerClients } from '@/lib/api';
 
-import type { ActivityItem, DashboardCase, DashboardStats, DeadlineItem } from './types';
-import { daysUntil, relativeTime, titleize } from './utils';
+import type { ActivityItem, DashboardCase, DashboardStats } from './types';
+import { relativeTime, titleize } from './utils';
 
 const fallbackStats: DashboardStats = {
   activeCases: 0,
@@ -12,12 +12,9 @@ const fallbackStats: DashboardStats = {
   completedCases: 0,
 };
 
-const fallbackDeadlines: DeadlineItem[] = [];
-
 type LawyerDashboardData = {
   cases: DashboardCase[];
   stats: DashboardStats;
-  upcomingDeadlines: DeadlineItem[];
   derivedActivity: ActivityItem[];
   isLoading: boolean;
   error: string | null;
@@ -27,7 +24,6 @@ type LawyerDashboardData = {
 export function useLawyerDashboardData(): LawyerDashboardData {
   const [cases, setCases] = useState<DashboardCase[]>([]);
   const [stats, setStats] = useState<DashboardStats>(fallbackStats);
-  const [upcomingDeadlines, setUpcomingDeadlines] = useState<DeadlineItem[]>(fallbackDeadlines);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -69,10 +65,8 @@ export function useLawyerDashboardData(): LawyerDashboardData {
           }))
         );
 
-        const activeCases = caseRows.filter(
-          (entry) => !['approved', 'refused', 'withdrawn', 'closed'].includes(entry.status)
-        ).length;
-        const completedCases = caseRows.filter((entry) => ['approved', 'closed'].includes(entry.status)).length;
+        const activeCases = caseRows.filter((entry) => entry.status !== 'closed').length;
+        const completedCases = caseRows.filter((entry) => entry.status === 'closed').length;
 
         setStats({
           activeCases,
@@ -80,22 +74,6 @@ export function useLawyerDashboardData(): LawyerDashboardData {
           upcomingMilestones: caseRows.filter((entry) => !!entry.target_filing_date).length,
           completedCases,
         });
-
-        const deadlines = caseRows
-          .filter((entry) => entry.target_filing_date)
-          .slice(0, 3)
-          .map((entry) => ({
-            task: `${entry.case_type} filing`,
-            client: entry.case_number,
-            date: entry.target_filing_date
-              ? new Date(entry.target_filing_date).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : 'Not set',
-            daysLeft: entry.target_filing_date ? daysUntil(entry.target_filing_date) : 0,
-          }));
-        setUpcomingDeadlines(deadlines);
       } catch {
         if (ignore) {
           return;
@@ -104,7 +82,6 @@ export function useLawyerDashboardData(): LawyerDashboardData {
         setError('Failed to load dashboard data.');
         setCases([]);
         setStats(fallbackStats);
-        setUpcomingDeadlines(fallbackDeadlines);
       } finally {
         if (!ignore) {
           setIsLoading(false);
@@ -126,7 +103,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
         client: entry.clientName,
         detail: `${entry.caseType} (${entry.id})`,
         time: entry.lastUpdate,
-        type: (['document', 'message', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
+        type: (['document', 'reminder', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
       })),
     [cases]
   );
@@ -135,5 +112,5 @@ export function useLawyerDashboardData(): LawyerDashboardData {
     setReloadToken((current) => current + 1);
   };
 
-  return { cases, stats, upcomingDeadlines, derivedActivity, isLoading, error, retry };
+  return { cases, stats, derivedActivity, isLoading, error, retry };
 }

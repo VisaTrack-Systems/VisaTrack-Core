@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 
-import { Calendar, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 import type { DashboardCase } from './types';
-import { caseStatusColor, priorityColor } from './utils';
+import { caseStatusColor } from './utils';
 
 type ActiveCasesPanelProps = {
   cases: DashboardCase[];
@@ -27,19 +27,7 @@ export function ActiveCasesPanel({
     () => [
       'Intake',
       'Awaiting Client',
-      'Document Collection',
-      'Document Review',
-      'In Preparation',
-      'Ready to File',
-      'Filed',
-      'RFE Received',
-      'RFE Response Drafting',
-      'Biometrics Scheduled',
-      'Interview Scheduled',
-      'Decision Pending',
-      'Approved',
-      'Refused',
-      'Withdrawn',
+      'In Progress',
       'Closed',
     ],
     []
@@ -125,12 +113,7 @@ export function ActiveCasesPanel({
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-gray-900">{case_.clientName}</h3>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${priorityColor(case_.priority)}`}>
-                      {case_.priority.toUpperCase()}
-                    </span>
-                  </div>
+                  <h3 className="font-semibold text-gray-900 mb-2">{case_.clientName}</h3>
                   <p className="text-sm text-gray-600">
                     {case_.caseType} • {case_.id}
                   </p>
@@ -144,10 +127,6 @@ export function ActiveCasesPanel({
                   <span className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     {case_.lastUpdate}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    Deadline: {case_.nextDeadline}
                   </span>
                 </div>
               </div>
