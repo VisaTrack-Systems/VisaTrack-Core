@@ -344,7 +344,7 @@ export default function App() {
 
   const renderDashboardHeader = () => (
     <header className="bg-black text-white sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-2">
             <FileText className="w-6 h-6" />

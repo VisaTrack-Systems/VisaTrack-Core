@@ -631,7 +631,7 @@ export const mockAdminOperations: AdminOperations = {
   unassigned_cases: [],
   aging_cases: [],
   lawyer_workload: [],
-  pending_invitations: [],
+  invitations: [],
 };
 
 export const mockAdminOverview: AdminOverview = {
