@@ -1,5 +1,4 @@
 import { AppointmentsPanel } from './client-dashboard/AppointmentsPanel';
-import { BillingSummaryPanel } from './client-dashboard/BillingSummaryPanel';
 import { CaseSummaryCard } from './client-dashboard/CaseSummaryCard';
 import { DocumentChecklistPanel } from './client-dashboard/DocumentChecklistPanel';
 import { RemindersPanel } from './client-dashboard/RemindersPanel';
@@ -21,7 +20,6 @@ export function ClientDashboard() {
     allReminders,
     recentReminders,
     upcomingAppointments,
-    billingInfo,
     requiredDocuments,
     completedRequiredDocuments,
     capabilities,
@@ -51,8 +49,7 @@ export function ClientDashboard() {
     capabilities.canViewCaseStatus ||
     capabilities.canViewDocuments ||
     capabilities.canViewMilestones ||
-    capabilities.canViewReminders ||
-    capabilities.canViewBilling;
+    capabilities.canViewReminders;
   const firstName = workspace.case.client_name.trim().split(/\s+/)[0] || workspace.case.client_name;
 
   return (
@@ -139,7 +136,6 @@ export function ClientDashboard() {
             {capabilities.canViewMilestones ? (
               <AppointmentsPanel upcomingAppointments={upcomingAppointments} />
             ) : null}
-            {capabilities.canViewBilling ? <BillingSummaryPanel billingInfo={billingInfo} /> : null}
           </div>
           </div>
         ) : null}

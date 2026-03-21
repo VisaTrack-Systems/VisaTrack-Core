@@ -571,6 +571,7 @@ export const mockCaseInfo: CaseInfo = {
   assignedLawyer: 'Avery Counsel',
   startDate: 'Feb 10, 2026',
   estimatedCompletion: 'Jun 1, 2026 - Aug 15, 2026',
+  description: 'We are currently preparing your case package and reviewing the remaining supporting evidence before submission.',
 };
 
 export const mockOrganizations: OrganizationListItem[] = [
