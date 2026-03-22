@@ -9,11 +9,11 @@ setProjectAnnotations(preview);
 window.open = vi.fn();
 
 if (!window.ResizeObserver) {
-  window.ResizeObserver = vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  }));
+  window.ResizeObserver = class ResizeObserver {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  };
 }
 
 if (!URL.createObjectURL) {

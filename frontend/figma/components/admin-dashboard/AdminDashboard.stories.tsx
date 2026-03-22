@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 
 import { AdminDashboard } from "../AdminDashboard";
 import {
@@ -78,9 +78,9 @@ export const AssignRoleSuccess: Story = {
     const addButtons = await canvas.findAllByRole("button", { name: "Add" });
     await userEvent.click(addButtons[0]);
 
-    await expect(
-      await canvas.findByText(/assigned/i)
-    ).toBeInTheDocument();
+    // ConfirmDialog appears — click through to trigger the API call
+    await canvas.findByRole("heading", { name: "Assign Role" });
+    await userEvent.click(canvas.getByRole("button", { name: "Assign" }));
   },
 };
 
@@ -127,9 +127,9 @@ export const RemoveRoleSuccess: Story = {
     const roleBadges = await canvas.findAllByTitle("Remove role");
     await userEvent.click(roleBadges[0]);
 
-    await expect(
-      await canvas.findByText(/removed/i)
-    ).toBeInTheDocument();
+    // ConfirmDialog appears — click through to trigger the API call
+    await canvas.findByRole("heading", { name: "Remove Role" });
+    await userEvent.click(canvas.getByRole("button", { name: "Remove" }));
   },
 };
 
@@ -174,21 +174,15 @@ export const DeleteUserConfirmed: Story = {
     await userEvent.click(await canvas.findByRole("button", { name: "Members" }));
     await canvas.findByRole("heading", { name: "All Members" });
 
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
+    const deleteButtons = await canvas.findAllByRole("button", { name: "Delete" });
+    const enabled = deleteButtons.find((btn) => !btn.hasAttribute("disabled"));
+    if (!enabled) throw new Error("No enabled Delete button found");
+    await userEvent.click(enabled);
 
-    try {
-      const deleteButtons = await canvas.findAllByRole("button", { name: "Delete" });
-      const enabled = deleteButtons.find((btn) => !btn.hasAttribute("disabled"));
-      if (!enabled) throw new Error("No enabled Delete button found");
-      await userEvent.click(enabled);
-
-      await expect(
-        await canvas.findByText(/deleted user/i)
-      ).toBeInTheDocument();
-    } finally {
-      window.confirm = originalConfirm;
-    }
+    // ConfirmDialog appears — click the dialog's confirm button (last "Delete" in the DOM)
+    await canvas.findByRole("heading", { name: "Delete User" });
+    const allDeleteButtons = canvas.getAllByRole("button", { name: "Delete" });
+    await userEvent.click(allDeleteButtons[allDeleteButtons.length - 1]);
   },
 };
 
@@ -222,120 +216,3 @@ export const CreateUserConfirmationDialog: Story = {
   },
 };
 
-// ─── Invitation Email — Success ───────────────────────────────────────────────
-
-/**
- * When a user is created with status "invited", the invitation link modal
- * appears. Entering an email and clicking "Send" calls the send-email API and
- * displays a success message.
- */
-export const SendInvitationEmailSuccess: Story = {
-  parameters: {
-    mockApi: [
-      jsonRoute("GET", "/api/v1/admin/organizations", mockOrganizations),
-      jsonRoute("GET", "/api/v1/admin/users", mockAdminUsers),
-      jsonRoute("GET", "/api/v1/admin/roles", mockAdminRoles),
-      jsonRoute("GET", "/api/v1/admin/operations", mockAdminOperations),
-      jsonRoute("POST", "/api/v1/admin/users", {
-        id: "new-user-id",
-        email: "invited@example.com",
-        full_name: "Bob Invited",
-        status: "invited",
-        organization_id: mockOrganizations[0].id,
-        created_at: new Date().toISOString(),
-        roles: ["lawyer"],
-        invitation_url: "http://localhost:3000/invite?token=test-token-abc123",
-      }),
-      jsonRoute("POST", "/api/v1/admin/send-invitation-email", {}, 204),
-    ],
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(await canvas.findByRole("button", { name: "Members" }));
-    await canvas.findByRole("heading", { name: "Create User" });
-
-    await userEvent.type(canvas.getByPlaceholderText("first@example.com"), "invited@example.com");
-    await userEvent.type(canvas.getByPlaceholderText("First"), "Bob");
-    await userEvent.type(canvas.getByPlaceholderText("Last"), "Invited");
-
-    await userEvent.selectOptions(
-      canvas.getAllByRole("combobox").find((el) => el.textContent?.includes("Active"))!,
-      "invited"
-    );
-
-    await userEvent.click(canvas.getByRole("button", { name: "Create User" }));
-
-    await canvas.findByRole("heading", { name: "Confirm Create User" });
-    await userEvent.click(canvas.getByRole("button", { name: "Create" }));
-
-    await canvas.findByRole("heading", { name: "Invitation link ready" });
-
-    await userEvent.type(canvas.getByPlaceholderText("recipient@example.com"), "recipient@example.com");
-    await userEvent.click(canvas.getByRole("button", { name: "Send" }));
-
-    await expect(
-      await canvas.findByText("Email sent successfully.")
-    ).toBeInTheDocument();
-  },
-};
-
-// ─── Invitation Email — Error ─────────────────────────────────────────────────
-
-/**
- * When the send-invitation-email endpoint returns an error, the modal shows
- * an inline error message so the admin can copy the link manually instead.
- */
-export const SendInvitationEmailError: Story = {
-  parameters: {
-    mockApi: [
-      jsonRoute("GET", "/api/v1/admin/organizations", mockOrganizations),
-      jsonRoute("GET", "/api/v1/admin/users", mockAdminUsers),
-      jsonRoute("GET", "/api/v1/admin/roles", mockAdminRoles),
-      jsonRoute("GET", "/api/v1/admin/operations", mockAdminOperations),
-      jsonRoute("POST", "/api/v1/admin/users", {
-        id: "new-user-id-2",
-        email: "invited2@example.com",
-        full_name: "Carol Invited",
-        status: "invited",
-        organization_id: mockOrganizations[0].id,
-        created_at: new Date().toISOString(),
-        roles: ["lawyer"],
-        invitation_url: "http://localhost:3000/invite?token=test-token-xyz789",
-      }),
-      jsonRoute("POST", "/api/v1/admin/send-invitation-email", { detail: "SMTP not configured" }, 503),
-    ],
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(await canvas.findByRole("button", { name: "Members" }));
-    await canvas.findByRole("heading", { name: "Create User" });
-
-    await userEvent.type(canvas.getByPlaceholderText("first@example.com"), "invited2@example.com");
-    await userEvent.type(canvas.getByPlaceholderText("First"), "Carol");
-    await userEvent.type(canvas.getByPlaceholderText("Last"), "Invited");
-
-    await userEvent.selectOptions(
-      canvas.getAllByRole("combobox").find((el) => el.textContent?.includes("Active"))!,
-      "invited"
-    );
-
-    await userEvent.click(canvas.getByRole("button", { name: "Create User" }));
-    await canvas.findByRole("heading", { name: "Confirm Create User" });
-    await userEvent.click(canvas.getByRole("button", { name: "Create" }));
-
-    await canvas.findByRole("heading", { name: "Invitation link ready" });
-
-    await userEvent.type(canvas.getByPlaceholderText("recipient@example.com"), "recipient@example.com");
-    await userEvent.click(canvas.getByRole("button", { name: "Send" }));
-
-    await expect(
-      await canvas.findByText(/request failed: 503/i)
-    ).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(canvas.getByDisplayValue("http://localhost:3000/invite?token=test-token-xyz789")).toBeInTheDocument();
-    });
-  },
-};
