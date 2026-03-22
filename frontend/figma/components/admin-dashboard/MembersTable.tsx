@@ -1,7 +1,12 @@
+import { type RefObject, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
 import type { AdminRoleItem, OrganizationListItem, UserListItem } from '@/lib/api';
 
 import type { ConfirmDialogState } from './types';
 import { formatDate } from './utils';
+
+const PAGE_SIZE = 15;
 
 type Props = {
   users: UserListItem[];
@@ -21,6 +26,7 @@ type Props = {
   onAssignRole: (user: UserListItem) => void;
   onRemoveRole: (user: UserListItem, roleSlug: string) => void;
   onDeleteUser: (user: UserListItem) => void;
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
 };
 
 export function MembersTable({
@@ -41,12 +47,25 @@ export function MembersTable({
   onAssignRole,
   onRemoveRole,
   onDeleteUser,
+  scrollContainerRef,
 }: Props) {
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filtered = users.filter((u) => {
     const nameMatch = u.full_name.toLowerCase().includes(nameFilter.toLowerCase());
     const roleMatch = roleFilter === '' || u.roles.includes(roleFilter);
     return nameMatch && roleMatch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const handleFilterChange = (change: () => void) => {
+    change();
+    setCurrentPage(1);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
@@ -56,12 +75,12 @@ export function MembersTable({
           type="text"
           placeholder="Filter by name…"
           value={nameFilter}
-          onChange={(e) => onNameFilterChange(e.target.value)}
+          onChange={(e) => handleFilterChange(() => onNameFilterChange(e.target.value))}
           className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-500 w-48"
         />
         <select
           value={roleFilter}
-          onChange={(e) => onRoleFilterChange(e.target.value)}
+          onChange={(e) => handleFilterChange(() => onRoleFilterChange(e.target.value))}
           className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white"
         >
           <option value="">All roles</option>
@@ -76,17 +95,14 @@ export function MembersTable({
         {(nameFilter !== '' || roleFilter !== '') && (
           <button
             type="button"
-            onClick={() => {
-              onNameFilterChange('');
-              onRoleFilterChange('');
-            }}
+            onClick={() => handleFilterChange(() => { onNameFilterChange(''); onRoleFilterChange(''); })}
             className="border border-gray-300 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors text-gray-700"
           >
             Reset filters
           </button>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <div ref={scrollContainerRef} className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -101,7 +117,7 @@ export function MembersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filtered.map((user) => {
+            {paginated.map((user) => {
               const org = organizations.find((o) => o.id === user.organization_id);
               const assignable = roles.filter(
                 (r) => !user.roles.includes(r.slug) && (isSuperAdmin || r.slug !== 'super_admin'),
@@ -203,6 +219,38 @@ export function MembersTable({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 text-sm text-gray-600">
+        <span>
+          {filtered.length === 0
+            ? 'No members'
+            : `${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage === 1}
+            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="px-2">
+            Page {safePage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage === totalPages}
+            className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

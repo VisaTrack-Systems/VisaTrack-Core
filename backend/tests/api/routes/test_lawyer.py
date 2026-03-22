@@ -130,7 +130,7 @@ def test_list_lawyer_cases_returns_case_rows(make_auth_context):
         created_at=datetime.now(timezone.utc),
     )
     db = MagicMock()
-    db.execute.return_value.all.return_value = [(case, 'Client', 'One')]
+    db.execute.return_value.all.return_value = [(case, 'Client', 'One', 'Lawyer', 'Smith')]
 
     result = lawyer.list_lawyer_cases(limit=50, offset=0, auth=auth, db=db)
 

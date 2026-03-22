@@ -100,7 +100,6 @@ export function useAdminData(activeRole?: string): AdminData {
     return () => {
       ignore = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRole, reloadToken]);
 
   return {

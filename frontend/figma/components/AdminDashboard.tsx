@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 import {
   assignAdminRole,
@@ -17,9 +17,15 @@ import {
   revokeAdminInvitation,
 } from '@/lib/api';
 
-import { AgingCasesPanel } from './admin-dashboard/AgingCasesPanel';
+import { ActiveCasesPanel } from './lawyer-dashboard/ActiveCasesPanel';
+import { useLawyerDashboardData } from './lawyer-dashboard/useLawyerDashboardData';
+
+import { AdminCaseHistory } from './admin-dashboard/AdminCaseHistory';
+import { AdminSettingsBilling } from './admin-dashboard/AdminSettingsBilling';
+import { AdminSettingsGeneral } from './admin-dashboard/AdminSettingsGeneral';
 import { AdminSidebar } from './admin-dashboard/AdminSidebar';
 import { AdminStatsGrid } from './admin-dashboard/AdminStatsGrid';
+import { AgingCasesPanel } from './admin-dashboard/AgingCasesPanel';
 import { CaseAssignmentQueue } from './admin-dashboard/CaseAssignmentQueue';
 import { ConfirmDialog } from './admin-dashboard/ConfirmDialog';
 import { CreateOrgPanel } from './admin-dashboard/CreateOrgPanel';
@@ -51,9 +57,10 @@ const initialUserForm: AdminCreateUserInput = {
 
 type AdminDashboardProps = {
   currentUser: CurrentUser | null;
+  onSelectCase?: (caseId: string) => void;
 };
 
-export function AdminDashboard({ currentUser }: AdminDashboardProps) {
+export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProps) {
   const {
     loading,
     error,
@@ -69,6 +76,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     refresh,
   } = useAdminData(currentUser?.active_role);
 
+  const { cases: lawyerCases, isLoading: casesLoading } = useLawyerDashboardData();
+
   const [flash, setFlash] = useState<FlashState>(null);
   const [activeSection, setActiveSection] = useState<AdminSection>('home');
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -83,15 +92,67 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [userForm, setUserForm] = useState(initialUserForm);
   const [userNameFilter, setUserNameFilter] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
+  const [membersStacked, setMembersStacked] = useState(false);
+  const membersScrollRef = useRef<HTMLDivElement>(null);
+  const membersGridRef = useRef<HTMLDivElement>(null);
 
   const isSuperAdmin = currentUser?.active_role === 'super_admin';
 
-  // Seed default org in user form once organizations load
   useEffect(() => {
     if (!userForm.organization_id && organizations.length > 0) {
       setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
     }
   }, [organizations, userForm.organization_id]);
+
+  // ── Members layout: single observer on the stable grid container ────────────
+  // The grid container width never changes when we switch grid-cols — it is
+  // always determined by the viewport minus the sidebar. So observing it is
+  // loop-safe: layout switches don't trigger the observer.
+  // We READ (not observe) the scroll container on each resize event.
+  useEffect(() => {
+    if (activeSection !== 'org-members') return;
+
+    const GAP_PX = 32;       // gap-8
+    const RATIO = 7 / 10;    // 7fr of 7fr+3fr
+    const UNSTACK_BUFFER = 50; // require 50 px of spare room before unstacking
+
+    const gridEl = membersGridRef.current;
+    const scrollEl = membersScrollRef.current;
+    if (!gridEl || !scrollEl) return;
+
+    setMembersStacked(false); // reset to side-by-side; check() will correct immediately
+    let naturalWidth = 0;
+    let isStacked = false;
+    let debounceId: ReturnType<typeof setTimeout>;
+
+    const check = () => {
+      if (isStacked) {
+        if (naturalWidth > 0 && (gridEl.clientWidth - GAP_PX) * RATIO > naturalWidth + UNSTACK_BUFFER) {
+          isStacked = false;
+          setMembersStacked(false);
+        }
+      } else {
+        if (scrollEl.scrollWidth > scrollEl.clientWidth) {
+          naturalWidth = scrollEl.scrollWidth;
+          isStacked = true;
+          setMembersStacked(true);
+        }
+      }
+    };
+
+    const observer = new ResizeObserver(() => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(check, 150);
+    });
+
+    observer.observe(gridEl);
+    setTimeout(check, 50); // initial check after first paint
+
+    return () => {
+      clearTimeout(debounceId);
+      observer.disconnect();
+    };
+  }, [activeSection]);
 
   const flash$ = (msg: string, kind: 'success' | 'error' = 'success') =>
     setFlash({ kind, message: msg });
@@ -280,41 +341,43 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               `Welcome back, ${adminFirstName}`,
               "Here's an overview of your organization today.",
             )}
-            <div className="px-4 sm:px-6 lg:px-8 py-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-8">
               <AdminStatsGrid
                 activeCases={operations?.aging_cases.length ?? 0}
                 totalMembers={users.length}
                 pendingInvitations={pendingInvitationsCount}
                 unassignedCases={operations?.unassigned_cases.length ?? 0}
               />
+
+              {/* Active Cases — clicking a case or "View all" navigates to Case History */}
               <div className="grid lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
-                  <CaseAssignmentQueue
-                    unassignedCases={operations?.unassigned_cases ?? []}
-                    lawyerWorkload={operations?.lawyer_workload ?? []}
-                    assignmentDraft={caseAssignmentDraft}
-                    busyCaseNumber={busyCaseNumber}
-                    onDraftChange={(caseNumber, lawyerId) =>
-                      setCaseAssignmentDraft((prev) => ({ ...prev, [caseNumber]: lawyerId }))
-                    }
-                    onAssign={(caseNumber) => void handleAssignCase(caseNumber)}
+                  <ActiveCasesPanel
+                    cases={lawyerCases}
+                    isLoading={casesLoading}
+                    onSelectCase={() => setActiveSection('case-history')}
+                    onViewActiveCases={() => setActiveSection('case-history')}
                   />
                 </div>
                 <LawyerWorkloadPanel workload={operations?.lawyer_workload ?? []} />
               </div>
-            </div>
-          </>
-        ) : null}
 
-        {/* ── ORG OVERVIEW ──────────────────────────────────────── */}
-        {activeSection === 'org-overview' ? (
-          <>
-            {sectionHeader('Overview', 'Organization-wide case operations and workload.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-              <div className="grid xl:grid-cols-2 gap-8">
+              {/* Case assignment + Aging cases — side-by-side on large screens */}
+              <div className="grid lg:grid-cols-2 gap-8">
+                <CaseAssignmentQueue
+                  unassignedCases={operations?.unassigned_cases ?? []}
+                  lawyerWorkload={operations?.lawyer_workload ?? []}
+                  assignmentDraft={caseAssignmentDraft}
+                  busyCaseNumber={busyCaseNumber}
+                  onDraftChange={(caseNumber, lawyerId) =>
+                    setCaseAssignmentDraft((prev) => ({ ...prev, [caseNumber]: lawyerId }))
+                  }
+                  onAssign={(caseNumber) => void handleAssignCase(caseNumber)}
+                />
                 <AgingCasesPanel cases={operations?.aging_cases ?? []} />
-                <LawyerWorkloadPanel workload={operations?.lawyer_workload ?? []} />
               </div>
+
+              {/* Super admin: org management */}
               {isSuperAdmin ? (
                 <CreateOrgPanel
                   organizations={organizations}
@@ -327,6 +390,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   onDeleteOrganization={(org) => void handleDeleteOrganization(org)}
                 />
               ) : null}
+            </div>
+          </>
+        ) : null}
+
+        {/* ── CASE HISTORY ──────────────────────────────────────── */}
+        {activeSection === 'case-history' ? (
+          <>
+            {sectionHeader('Case History', 'All organization cases — click a row to open the case.')}
+            <div className="px-4 sm:px-6 lg:px-8 py-8">
+              <AdminCaseHistory
+                onSelectCase={onSelectCase ?? (() => {})}
+                orgLawyerNames={operations?.lawyer_workload.map((l) => l.full_name)}
+              />
             </div>
           </>
         ) : null}
@@ -344,41 +420,59 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 onFormChange={setUserForm}
                 onSubmit={handleCreateUser}
               />
-              <MembersTable
-                users={users}
-                organizations={organizations}
-                roles={roles}
-                isSuperAdmin={isSuperAdmin}
-                currentUserId={currentUser?.id}
-                roleDraftByUserId={roleDraftByUserId}
-                busyRoleUserId={busyRoleUserId}
-                busyDeleteUserId={busyDeleteUserId}
-                nameFilter={userNameFilter}
-                roleFilter={userRoleFilter}
-                onNameFilterChange={setUserNameFilter}
-                onRoleFilterChange={setUserRoleFilter}
-                onRoleDraftChange={(userId, roleSlug) =>
-                  setRoleDraftByUserId((prev) => ({ ...prev, [userId]: roleSlug }))
-                }
-                openConfirm={(opts) => setConfirmDialog(opts)}
-                onAssignRole={(user) => void handleAssignRole(user)}
-                onRemoveRole={(user, role) => void handleRemoveRole(user, role)}
-                onDeleteUser={(user) => void handleDeleteUser(user)}
-              />
+              {/* Members table + Invitations: 70/30 side-by-side, stacks on overflow */}
+              <div
+                ref={membersGridRef}
+                className={`grid gap-8 items-start ${membersStacked ? 'grid-cols-1' : 'grid-cols-[7fr_3fr]'}`}
+              >
+                <MembersTable
+                  users={users}
+                  organizations={organizations}
+                  roles={roles}
+                  isSuperAdmin={isSuperAdmin}
+                  currentUserId={currentUser?.id}
+                  roleDraftByUserId={roleDraftByUserId}
+                  busyRoleUserId={busyRoleUserId}
+                  busyDeleteUserId={busyDeleteUserId}
+                  nameFilter={userNameFilter}
+                  roleFilter={userRoleFilter}
+                  onNameFilterChange={setUserNameFilter}
+                  onRoleFilterChange={setUserRoleFilter}
+                  onRoleDraftChange={(userId, roleSlug) =>
+                    setRoleDraftByUserId((prev) => ({ ...prev, [userId]: roleSlug }))
+                  }
+                  openConfirm={(opts) => setConfirmDialog(opts)}
+                  onAssignRole={(user) => void handleAssignRole(user)}
+                  onRemoveRole={(user, role) => void handleRemoveRole(user, role)}
+                  onDeleteUser={(user) => void handleDeleteUser(user)}
+                  scrollContainerRef={membersScrollRef}
+                />
+                <InvitationsPanel
+                  invitations={invitations}
+                  busyInvitationId={busyInvitationId}
+                  onRevoke={(id, email) => void handleRevokeInvitation(id, email)}
+                />
+              </div>
             </div>
           </>
         ) : null}
 
-        {/* ── ORG INVITATIONS ───────────────────────────────────── */}
-        {activeSection === 'org-invitations' ? (
+        {/* ── SETTINGS: GENERAL ─────────────────────────────────── */}
+        {activeSection === 'settings-general' ? (
           <>
-            {sectionHeader('Pending Invitations', 'Manage outstanding invitations to your organization.')}
+            {sectionHeader('General Settings', 'Branding, organization configuration, and email templates.')}
             <div className="px-4 sm:px-6 lg:px-8 py-8">
-              <InvitationsPanel
-                invitations={invitations}
-                busyInvitationId={busyInvitationId}
-                onRevoke={(id, email) => void handleRevokeInvitation(id, email)}
-              />
+              <AdminSettingsGeneral />
+            </div>
+          </>
+        ) : null}
+
+        {/* ── SETTINGS: BILLING ─────────────────────────────────── */}
+        {activeSection === 'settings-billing' ? (
+          <>
+            {sectionHeader('Billing & Plan', 'Manage your subscription and payment details.')}
+            <div className="px-4 sm:px-6 lg:px-8 py-8">
+              <AdminSettingsBilling />
             </div>
           </>
         ) : null}

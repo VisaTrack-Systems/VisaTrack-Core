@@ -1,5 +1,10 @@
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
 import type { Invitation } from './types';
 import { formatDate } from './utils';
+
+const PAGE_SIZE = 10;
 
 type Props = {
   invitations: Invitation[];
@@ -30,9 +35,16 @@ function StatusTag({ status }: { status: string }) {
 }
 
 export function InvitationsPanel({ invitations, busyInvitationId, onRevoke }: Props) {
+  const [currentPage, setCurrentPage] = useState(1);
+
   const pending = invitations.filter((i) => i.status === 'pending');
   const expired = invitations.filter((i) => i.status === 'expired');
   const sorted = [...pending, ...expired];
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const paginated = sorted.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
@@ -53,7 +65,7 @@ export function InvitationsPanel({ invitations, busyInvitationId, onRevoke }: Pr
         {sorted.length === 0 ? (
           <div className="px-6 py-5 text-sm text-gray-500">No invitations found.</div>
         ) : (
-          sorted.map((invite) => (
+          paginated.map((invite) => (
             <div key={invite.invitation_id} className="px-6 py-4 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -85,6 +97,38 @@ export function InvitationsPanel({ invitations, busyInvitationId, onRevoke }: Pr
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {sorted.length > PAGE_SIZE && (
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 text-sm text-gray-600">
+          <span>
+            {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-2">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export type AdminSection = 'home' | 'org-overview' | 'org-members' | 'org-invitations';
+export type AdminSection = 'home' | 'case-history' | 'org-members' | 'settings-general' | 'settings-billing';
 
 export type FlashState = {
   kind: 'success' | 'error';

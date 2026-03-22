@@ -100,6 +100,7 @@ export default function App() {
   const [savingProfileSettings, setSavingProfileSettings] = useState(false);
   const [profileSettingsError, setProfileSettingsError] = useState<string | null>(null);
   const [switchingRole, setSwitchingRole] = useState(false);
+  const [caseReturnView, setCaseReturnView] = useState<AppView>('lawyer');
 
   useEffect(() => {
     let ignore = false;
@@ -160,12 +161,13 @@ export default function App() {
   };
 
   const handleSelectCase = (caseId: string) => {
+    setCaseReturnView(currentView);
     setSelectedCaseId(caseId);
     setCurrentView('case-config');
   };
 
   const handleBackToDashboard = () => {
-    setCurrentView('lawyer');
+    setCurrentView(caseReturnView);
     setSelectedCaseId(null);
   };
 
@@ -464,7 +466,7 @@ export default function App() {
       ) : null}
 
       {currentView === 'client' ? <ClientDashboard /> : null}
-      {currentView === 'admin' ? <AdminDashboard currentUser={currentUser} /> : null}
+      {currentView === 'admin' ? <AdminDashboard currentUser={currentUser} onSelectCase={handleSelectCase} /> : null}
       {isNewCaseDialogOpen &&
       (currentView === 'lawyer' || currentView === 'active-cases' || currentView === 'case-config') ? (
         <NewCaseDialog
