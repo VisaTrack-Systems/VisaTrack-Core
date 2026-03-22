@@ -5,13 +5,12 @@ import type { AdminCreateUserInput, AdminRoleItem, OrganizationListItem } from '
 type Props = {
   organizations: OrganizationListItem[];
   roles: AdminRoleItem[];
-  isSuperAdmin: boolean;
   userForm: AdminCreateUserInput;
   onFormChange: (form: AdminCreateUserInput) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export function CreateUserForm({ organizations, roles, isSuperAdmin, userForm, onFormChange, onSubmit }: Props) {
+export function CreateUserForm({ organizations, roles, userForm, onFormChange, onSubmit }: Props) {
   const set = (patch: Partial<AdminCreateUserInput>) => onFormChange({ ...userForm, ...patch });
 
   return (
@@ -92,7 +91,7 @@ export function CreateUserForm({ organizations, roles, isSuperAdmin, userForm, o
               <option value="lawyer">Lawyer</option>
             ) : (
               roles
-                .filter((r) => isSuperAdmin || r.slug !== 'super_admin')
+                .filter((r) => r.slug !== 'super_admin')
                 .map((r) => (
                   <option key={r.id} value={r.slug}>
                     {r.name}

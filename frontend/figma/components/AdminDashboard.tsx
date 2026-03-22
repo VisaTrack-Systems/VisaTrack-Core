@@ -98,6 +98,13 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
 
   const isSuperAdmin = currentUser?.active_role === 'super_admin';
 
+  // Redirect super_admin away from sections they can't access
+  useEffect(() => {
+    if (isSuperAdmin && (activeSection === 'case-history' || activeSection === 'settings-general' || activeSection === 'settings-billing')) {
+      setActiveSection('home');
+    }
+  }, [isSuperAdmin, activeSection]);
+
   useEffect(() => {
     if (!userForm.organization_id && organizations.length > 0) {
       setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
@@ -319,7 +326,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} />
+      <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} isSuperAdmin={isSuperAdmin} />
 
       <div className="flex-1 min-w-0">
         {flash ? (
@@ -349,33 +356,37 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
                 unassignedCases={operations?.unassigned_cases.length ?? 0}
               />
 
-              {/* Active Cases — clicking a case or "View all" navigates to Case History */}
-              <div className="grid lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <ActiveCasesPanel
-                    cases={lawyerCases}
-                    isLoading={casesLoading}
-                    onSelectCase={() => setActiveSection('case-history')}
-                    onViewActiveCases={() => setActiveSection('case-history')}
-                  />
+              {/* Active Cases + Lawyer Workload — hidden for super_admin */}
+              {!isSuperAdmin && (
+                <div className="grid lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2">
+                    <ActiveCasesPanel
+                      cases={lawyerCases}
+                      isLoading={casesLoading}
+                      onSelectCase={() => setActiveSection('case-history')}
+                      onViewActiveCases={() => setActiveSection('case-history')}
+                    />
+                  </div>
+                  <LawyerWorkloadPanel workload={operations?.lawyer_workload ?? []} />
                 </div>
-                <LawyerWorkloadPanel workload={operations?.lawyer_workload ?? []} />
-              </div>
+              )}
 
-              {/* Case assignment + Aging cases — side-by-side on large screens */}
-              <div className="grid lg:grid-cols-2 gap-8">
-                <CaseAssignmentQueue
-                  unassignedCases={operations?.unassigned_cases ?? []}
-                  lawyerWorkload={operations?.lawyer_workload ?? []}
-                  assignmentDraft={caseAssignmentDraft}
-                  busyCaseNumber={busyCaseNumber}
-                  onDraftChange={(caseNumber, lawyerId) =>
-                    setCaseAssignmentDraft((prev) => ({ ...prev, [caseNumber]: lawyerId }))
-                  }
-                  onAssign={(caseNumber) => void handleAssignCase(caseNumber)}
-                />
-                <AgingCasesPanel cases={operations?.aging_cases ?? []} />
-              </div>
+              {/* Case assignment + Aging cases — hidden for super_admin */}
+              {!isSuperAdmin && (
+                <div className="grid lg:grid-cols-2 gap-8">
+                  <CaseAssignmentQueue
+                    unassignedCases={operations?.unassigned_cases ?? []}
+                    lawyerWorkload={operations?.lawyer_workload ?? []}
+                    assignmentDraft={caseAssignmentDraft}
+                    busyCaseNumber={busyCaseNumber}
+                    onDraftChange={(caseNumber, lawyerId) =>
+                      setCaseAssignmentDraft((prev) => ({ ...prev, [caseNumber]: lawyerId }))
+                    }
+                    onAssign={(caseNumber) => void handleAssignCase(caseNumber)}
+                  />
+                  <AgingCasesPanel cases={operations?.aging_cases ?? []} />
+                </div>
+              )}
 
               {/* Super admin: org management */}
               {isSuperAdmin ? (
@@ -415,7 +426,6 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
               <CreateUserForm
                 organizations={organizations}
                 roles={roles}
-                isSuperAdmin={isSuperAdmin}
                 userForm={userForm}
                 onFormChange={setUserForm}
                 onSubmit={handleCreateUser}
