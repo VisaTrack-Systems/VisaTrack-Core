@@ -146,6 +146,8 @@ export function MilestonesSection({
                           <div className="flex items-center gap-2">
                             <button
                               className="p-1 hover:bg-white rounded disabled:opacity-50"
+                              title={milestone.client_visible ? 'Hide from Client' : 'Show to Client'}
+                              aria-label={milestone.client_visible ? 'Hide from Client' : 'Show to Client'}
                               disabled={isUpdating}
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -162,6 +164,8 @@ export function MilestonesSection({
                             </button>
                             <button
                               className="p-1 hover:bg-white rounded disabled:opacity-50"
+                              title="Edit Milestone"
+                              aria-label="Edit Milestone"
                               disabled={isUpdating}
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -172,6 +176,8 @@ export function MilestonesSection({
                             </button>
                             <button
                               className="p-1 hover:bg-white rounded disabled:opacity-50"
+                              title="Delete Milestone"
+                              aria-label="Delete Milestone"
                               disabled={isUpdating}
                               onClick={(event) => {
                                 event.stopPropagation();
