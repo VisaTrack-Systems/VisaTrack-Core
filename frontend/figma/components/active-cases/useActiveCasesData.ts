@@ -30,6 +30,7 @@ export function useActiveCasesData() {
             caseType: entry.case_type,
             status: titleize(entry.status),
             priority: entry.priority,
+            lawyerName: entry.primary_lawyer_name ?? 'Unassigned',
             lastActivity: relativeTime(entry.created_at),
             nextMilestone: `Status: ${titleize(entry.status)}`,
             nextDeadline: entry.target_filing_date

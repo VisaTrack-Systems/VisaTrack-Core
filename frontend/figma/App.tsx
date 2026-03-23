@@ -100,6 +100,7 @@ export default function App() {
   const [savingProfileSettings, setSavingProfileSettings] = useState(false);
   const [profileSettingsError, setProfileSettingsError] = useState<string | null>(null);
   const [switchingRole, setSwitchingRole] = useState(false);
+  const [caseReturnView, setCaseReturnView] = useState<AppView>('lawyer');
 
   useEffect(() => {
     let ignore = false;
@@ -160,12 +161,13 @@ export default function App() {
   };
 
   const handleSelectCase = (caseId: string) => {
+    setCaseReturnView(currentView);
     setSelectedCaseId(caseId);
     setCurrentView('case-config');
   };
 
   const handleBackToDashboard = () => {
-    setCurrentView('lawyer');
+    setCurrentView(caseReturnView);
     setSelectedCaseId(null);
   };
 
@@ -344,7 +346,7 @@ export default function App() {
 
   const renderDashboardHeader = () => (
     <header className="bg-black text-white sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-2">
             <FileText className="w-6 h-6" />
@@ -464,7 +466,7 @@ export default function App() {
       ) : null}
 
       {currentView === 'client' ? <ClientDashboard /> : null}
-      {currentView === 'admin' ? <AdminDashboard currentUser={currentUser} /> : null}
+      {currentView === 'admin' ? <AdminDashboard currentUser={currentUser} onSelectCase={handleSelectCase} /> : null}
       {isNewCaseDialogOpen &&
       (currentView === 'lawyer' || currentView === 'active-cases' || currentView === 'case-config') ? (
         <NewCaseDialog
