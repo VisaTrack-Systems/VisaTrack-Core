@@ -125,4 +125,4 @@ class AdminOperationsResponse(BaseModel):
     unassigned_cases: list[AdminOpsCaseItem]
     aging_cases: list[AdminOpsCaseItem]
     lawyer_workload: list[AdminOpsLawyerWorkloadItem]
-    pending_invitations: list[AdminOpsInvitationItem]
+    invitations: list[AdminOpsInvitationItem]

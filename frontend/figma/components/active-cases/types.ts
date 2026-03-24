@@ -4,6 +4,7 @@ export type UiCase = {
   caseType: string;
   status: string;
   priority: string;
+  lawyerName: string;
   lastActivity: string;
   nextMilestone: string;
   nextDeadline: string;

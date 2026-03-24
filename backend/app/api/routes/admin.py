@@ -448,7 +448,7 @@ def get_admin_operations(
         .limit(100)
     ).all()
 
-    pending_invitations: list[AdminOpsInvitationItem] = []
+    invitations: list[AdminOpsInvitationItem] = []
     for row in invitation_rows:
         if row.accepted_at is not None:
             status_value = "accepted"
@@ -459,14 +459,15 @@ def get_admin_operations(
         else:
             status_value = "pending"
 
-        if status_value != "pending":
+        # Skip accepted and revoked; include pending and expired
+        if status_value in ("accepted", "revoked"):
             continue
 
         invited_by_name = None
         if row.first_name and row.last_name:
             invited_by_name = f"{row.first_name} {row.last_name}"
 
-        pending_invitations.append(
+        invitations.append(
             AdminOpsInvitationItem(
                 invitation_id=row.id,
                 user_id=row.user_id,
@@ -484,7 +485,7 @@ def get_admin_operations(
         unassigned_cases=unassigned_cases,
         aging_cases=aging_cases,
         lawyer_workload=lawyer_workload,
-        pending_invitations=pending_invitations,
+        invitations=invitations,
     )
 
 

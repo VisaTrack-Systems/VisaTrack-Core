@@ -298,14 +298,18 @@ def list_lawyer_cases(
     db: Session = Depends(get_db),
 ) -> list[CaseListItem]:
     client_user = aliased(User)
+    lawyer_user = aliased(User)
 
     stmt = (
         select(
             Case,
             client_user.first_name,
             client_user.last_name,
+            lawyer_user.first_name,
+            lawyer_user.last_name,
         )
         .join(client_user, client_user.id == Case.client_id)
+        .outerjoin(lawyer_user, lawyer_user.id == Case.primary_lawyer_id)
         .where(Case.deleted_at.is_(None), Case.organization_id == auth.organization_id)
         .order_by(Case.created_at.desc())
     )
@@ -325,12 +329,12 @@ def list_lawyer_cases(
             priority=case.priority,
             client_name=f"{client_first} {client_last}",
             primary_lawyer_name=(
-                f"{auth.user.first_name} {auth.user.last_name}" if case.primary_lawyer_id else None
+                f"{lawyer_first} {lawyer_last}" if case.primary_lawyer_id else None
             ),
             target_filing_date=case.target_filing_date,
             created_at=case.created_at,
         )
-        for case, client_first, client_last in rows
+        for case, client_first, client_last, lawyer_first, lawyer_last in rows
     ]
 
 
