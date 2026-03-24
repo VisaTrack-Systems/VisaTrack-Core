@@ -1,10 +1,9 @@
 import { AlertCircle, Save } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import type { CasePortalPermissions, CaseWorkspace } from '@/lib/api';
+import type { CasePortalPermissions } from '@/lib/api';
 
 type PermissionsSectionProps = {
-  workspace: CaseWorkspace;
   portalPermissions: CasePortalPermissions;
   defaultPortalPermissions: CasePortalPermissions;
   saving: boolean;
@@ -62,7 +61,6 @@ function VisibilityRow({
 }
 
 export function PermissionsSection({
-  workspace,
   portalPermissions,
   defaultPortalPermissions,
   saving,
@@ -70,15 +68,12 @@ export function PermissionsSection({
   onSave,
 }: PermissionsSectionProps) {
   const [draftPermissions, setDraftPermissions] = useState<CasePortalPermissions>(portalPermissions);
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
 
-  useEffect(() => {
-    setDraftPermissions((current) =>
-      hasPermissionChanges(current, portalPermissions) ? current : portalPermissions
-    );
-  }, [portalPermissions]);
+  const effectivePermissions = hasLocalChanges ? draftPermissions : portalPermissions;
 
   const isDisabled = saving;
-  const hasUnsavedChanges = hasPermissionChanges(draftPermissions, portalPermissions);
+  const hasUnsavedChanges = hasPermissionChanges(effectivePermissions, portalPermissions);
 
   const handleResetToDefault = () => {
     if (saving) {
@@ -86,11 +81,15 @@ export function PermissionsSection({
     }
 
     setDraftPermissions(defaultPortalPermissions);
+    setHasLocalChanges(true);
     onReset();
   };
 
   const handleSave = async () => {
-    await onSave(draftPermissions);
+    const success = await onSave(effectivePermissions);
+    if (success) {
+      setHasLocalChanges(false);
+    }
   };
 
   const toggleVisibility = (key: keyof Pick<CasePortalPermissions, 'show_case_status_progress' | 'show_milestone_details' | 'show_document_requirements'>) => {
@@ -98,10 +97,12 @@ export function PermissionsSection({
       return;
     }
 
+    const currentPermissions = hasLocalChanges ? draftPermissions : portalPermissions;
     setDraftPermissions((previous) => ({
-      ...previous,
-      [key]: !previous[key],
+      ...(hasLocalChanges ? previous : currentPermissions),
+      [key]: !currentPermissions[key],
     }));
+    setHasLocalChanges(true);
   };
 
   return (
@@ -126,13 +127,14 @@ export function PermissionsSection({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Client Portal Access</label>
             <select
-              value={draftPermissions.portal_access}
-              onChange={(event) =>
+              value={effectivePermissions.portal_access}
+              onChange={(event) => {
                 setDraftPermissions((previous) => ({
-                  ...previous,
+                  ...(hasLocalChanges ? previous : portalPermissions),
                   portal_access: event.target.value as CasePortalPermissions['portal_access'],
-                }))
-              }
+                }));
+                setHasLocalChanges(true);
+              }}
               disabled={isDisabled}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
             >
@@ -146,13 +148,14 @@ export function PermissionsSection({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Document Upload Permissions</label>
             <select
-              value={draftPermissions.document_upload}
-              onChange={(event) =>
+              value={effectivePermissions.document_upload}
+              onChange={(event) => {
                 setDraftPermissions((previous) => ({
-                  ...previous,
+                  ...(hasLocalChanges ? previous : portalPermissions),
                   document_upload: event.target.value as CasePortalPermissions['document_upload'],
-                }))
-              }
+                }));
+                setHasLocalChanges(true);
+              }}
               disabled={isDisabled}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
             >
@@ -164,13 +167,14 @@ export function PermissionsSection({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Reminder Visibility</label>
             <select
-              value={draftPermissions.reminders}
-              onChange={(event) =>
+              value={effectivePermissions.reminders}
+              onChange={(event) => {
                 setDraftPermissions((previous) => ({
-                  ...previous,
+                  ...(hasLocalChanges ? previous : portalPermissions),
                   reminders: event.target.value as CasePortalPermissions['reminders'],
-                }))
-              }
+                }));
+                setHasLocalChanges(true);
+              }}
               disabled={isDisabled}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
             >
@@ -185,7 +189,7 @@ export function PermissionsSection({
               <VisibilityRow
                 title="Case Status"
                 description="Show the current case status to the client"
-                enabled={draftPermissions.show_case_status_progress}
+                enabled={effectivePermissions.show_case_status_progress}
                 disabled={isDisabled}
                 onToggle={() => toggleVisibility('show_case_status_progress')}
               />
@@ -193,7 +197,7 @@ export function PermissionsSection({
               <VisibilityRow
                 title="Milestones"
                 description="Show milestone names, details, and due dates"
-                enabled={draftPermissions.show_milestone_details}
+                enabled={effectivePermissions.show_milestone_details}
                 disabled={isDisabled}
                 onToggle={() => toggleVisibility('show_milestone_details')}
               />
@@ -201,7 +205,7 @@ export function PermissionsSection({
               <VisibilityRow
                 title="Document Checklist"
                 description="Show required and optional document items"
-                enabled={draftPermissions.show_document_requirements}
+                enabled={effectivePermissions.show_document_requirements}
                 disabled={isDisabled}
                 onToggle={() => toggleVisibility('show_document_requirements')}
               />

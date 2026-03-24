@@ -896,7 +896,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
 
     return (
       <PermissionsSection
-        workspace={workspace}
         portalPermissions={normalizePortalPermissions(workspace.portal_permissions)}
         defaultPortalPermissions={DEFAULT_PORTAL_PERMISSIONS}
         saving={isSavingPermissions}

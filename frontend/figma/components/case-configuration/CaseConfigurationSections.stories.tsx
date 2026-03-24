@@ -191,7 +191,6 @@ export const Reminders: Story = {
 export const Permissions: Story = {
   render: () => (
     <PermissionsSection
-      workspace={mockCaseWorkspace}
       portalPermissions={mockPortalPermissions}
       defaultPortalPermissions={mockPortalPermissions}
       saving={false}

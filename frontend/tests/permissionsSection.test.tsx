@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PermissionsSection } from '../figma/components/case-configuration/sections/PermissionsSection';
-import { mockCaseWorkspace, mockPortalPermissions } from '../figma/storybook/fixtures';
+import { mockPortalPermissions } from '../figma/storybook/fixtures';
 
 function renderPermissionsSection(options?: {
   portalPermissions?: typeof mockPortalPermissions;
@@ -15,7 +15,6 @@ function renderPermissionsSection(options?: {
 
   const result = render(
     <PermissionsSection
-      workspace={mockCaseWorkspace}
       portalPermissions={options?.portalPermissions ?? mockPortalPermissions}
       defaultPortalPermissions={mockPortalPermissions}
       saving={false}
@@ -67,7 +66,6 @@ describe('PermissionsSection', () => {
 
     rerender(
       <PermissionsSection
-        workspace={mockCaseWorkspace}
         portalPermissions={mockPortalPermissions}
         defaultPortalPermissions={mockPortalPermissions}
         saving={false}
