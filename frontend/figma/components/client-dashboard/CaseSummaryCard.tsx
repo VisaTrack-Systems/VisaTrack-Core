@@ -31,6 +31,13 @@ export function CaseSummaryCard({ caseInfo }: CaseSummaryCardProps) {
           <p className="font-medium text-gray-900">{caseInfo.estimatedCompletion}</p>
         </div>
       </div>
+
+      {caseInfo.description ? (
+        <div className="border-t border-gray-200 pt-6">
+          <p className="text-sm text-gray-600 mb-2">Case Description</p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseInfo.description}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

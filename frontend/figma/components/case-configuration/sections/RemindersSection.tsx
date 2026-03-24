@@ -13,7 +13,6 @@ type OutboundReminder = {
 
 type RemindersSectionProps = {
   workspace: CaseWorkspace;
-  caseNumber: string;
   creating: boolean;
   onCreateReminder: (reminder: OutboundReminder) => Promise<boolean>;
   onNotify: (message: string) => void;
@@ -48,43 +47,11 @@ const templates: TemplateOption[] = [
   },
 ];
 
-function readDraft(storageKey: string): { templateLabel: string; title: string; body: string; sendEmail: boolean } {
-  if (typeof window === 'undefined') {
-    return { templateLabel: '', title: '', body: '', sendEmail: false };
-  }
-
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) {
-      return { templateLabel: '', title: '', body: '', sendEmail: false };
-    }
-
-    const parsed = JSON.parse(raw) as { templateLabel?: string; title?: string; body?: string; sendEmail?: boolean };
-    return {
-      templateLabel: parsed.templateLabel ?? '',
-      title: parsed.title ?? '',
-      body: parsed.body ?? '',
-      sendEmail: Boolean(parsed.sendEmail),
-    };
-  } catch {
-    return { templateLabel: '', title: '', body: '', sendEmail: false };
-  }
-}
-
-export function RemindersSection({ workspace, caseNumber, creating, onCreateReminder, onNotify }: RemindersSectionProps) {
+export function RemindersSection({ workspace, creating, onCreateReminder, onNotify }: RemindersSectionProps) {
   const recentReminders = workspace.reminders.slice(0, 8);
-  const draftStorageKey = `visatrack-reminder-draft-${caseNumber}`;
-  const initialDraft = readDraft(draftStorageKey);
-  const [templateLabel, setTemplateLabel] = useState(initialDraft.templateLabel);
-  const [title, setTitle] = useState(initialDraft.title);
-  const [body, setBody] = useState(initialDraft.body);
-  const [sendEmail, setSendEmail] = useState(initialDraft.sendEmail);
-
-  const saveDraft = () => {
-    const draft = JSON.stringify({ templateLabel, title, body, sendEmail });
-    localStorage.setItem(draftStorageKey, draft);
-    onNotify('Draft saved locally.');
-  };
+  const [templateLabel, setTemplateLabel] = useState('');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
 
   const handleTemplateChange = (nextLabel: string) => {
     setTemplateLabel(nextLabel);
@@ -107,7 +74,7 @@ export function RemindersSection({ workspace, caseNumber, creating, onCreateRemi
     const success = await onCreateReminder({
       title: normalizedTitle,
       body: normalizedBody,
-      sendEmail,
+      sendEmail: false,
     });
     if (!success) {
       return;
@@ -116,8 +83,6 @@ export function RemindersSection({ workspace, caseNumber, creating, onCreateRemi
     setTemplateLabel('');
     setTitle('');
     setBody('');
-    setSendEmail(false);
-    localStorage.removeItem(draftStorageKey);
   };
 
   return (
@@ -179,18 +144,6 @@ export function RemindersSection({ workspace, caseNumber, creating, onCreateRemi
             <Send className="w-4 h-4" />
             {creating ? 'Posting...' : 'Post Reminder'}
           </button>
-          <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" onClick={saveDraft}>
-            Save as Draft
-          </button>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300"
-              checked={sendEmail}
-              onChange={(event) => setSendEmail(event.target.checked)}
-            />
-            Send email notification
-          </label>
         </div>
       </div>
 

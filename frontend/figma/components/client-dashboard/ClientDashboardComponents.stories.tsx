@@ -34,6 +34,13 @@ const reminderMarkRead = fn(async () => {});
 
 export const CaseSummary: Story = {
   render: () => <CaseSummaryCard caseInfo={mockCaseInfo} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByText('We are currently preparing your case package and reviewing the remaining supporting evidence before submission.')
+    ).toBeInTheDocument();
+  },
 };
 
 export const DocumentChecklist: Story = {
