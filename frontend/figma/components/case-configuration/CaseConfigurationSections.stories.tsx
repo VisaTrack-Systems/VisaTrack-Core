@@ -193,10 +193,10 @@ export const Permissions: Story = {
     <PermissionsSection
       workspace={mockCaseWorkspace}
       portalPermissions={mockPortalPermissions}
+      defaultPortalPermissions={mockPortalPermissions}
       saving={false}
-      onChange={() => {}}
       onReset={() => {}}
-      onSave={() => {}}
+      onSave={async () => true}
     />
   ),
 };

@@ -753,13 +753,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
-  const handlePortalPermissionsChange = (nextPermissions: CasePortalPermissions) => {
-    updateWorkspace((current) => ({
-      ...current,
-      portal_permissions: normalizePortalPermissions(nextPermissions),
-    }));
-  };
-
   const handleResetPortalPermissions = () => {
     updateWorkspace((current) => ({
       ...current,
@@ -768,16 +761,18 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     showNotice('info', 'Portal permissions reset to default values.');
   };
 
-  const handleSavePortalPermissions = async () => {
+  const handleSavePortalPermissions = async (
+    nextPermissions: CasePortalPermissions
+  ): Promise<boolean> => {
     if (!workspace) {
-      return;
+      return false;
     }
 
     setIsSavingPermissions(true);
     try {
       const savedPermissions = await updateCasePortalPermissions(
         workspace.case.case_number,
-        normalizePortalPermissions(workspace.portal_permissions)
+        normalizePortalPermissions(nextPermissions)
       );
 
       updateWorkspace((current) => ({
@@ -786,9 +781,11 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       }));
 
       showNotice('success', 'Client portal visibility updated.');
+      return true;
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : 'Unknown error';
       showNotice('error', `Failed to save permissions: ${message}`);
+      return false;
     } finally {
       setIsSavingPermissions(false);
     }
@@ -901,8 +898,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       <PermissionsSection
         workspace={workspace}
         portalPermissions={normalizePortalPermissions(workspace.portal_permissions)}
+        defaultPortalPermissions={DEFAULT_PORTAL_PERMISSIONS}
         saving={isSavingPermissions}
-        onChange={handlePortalPermissionsChange}
         onReset={handleResetPortalPermissions}
         onSave={handleSavePortalPermissions}
       />
