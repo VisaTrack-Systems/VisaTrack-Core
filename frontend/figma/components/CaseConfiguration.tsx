@@ -886,7 +886,6 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
         <RemindersSection
           key={workspace.case.case_number}
           workspace={workspace}
-          caseNumber={workspace.case.case_number}
           creating={isCreatingReminder}
           onCreateReminder={handleCreateReminder}
           onNotify={(message) => showNotice('info', message)}

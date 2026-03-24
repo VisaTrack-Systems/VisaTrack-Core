@@ -156,7 +156,6 @@ export const Reminders: Story = {
   render: () => (
     <RemindersSection
       workspace={mockCaseWorkspace}
-      caseNumber="C-2026-001"
       creating={false}
       onCreateReminder={createReminder}
       onNotify={notifyReminder}
