@@ -92,7 +92,7 @@ export const CaseConfigurationPage: Story = {
     });
 
     await userEvent.click(canvas.getByRole('button', { name: 'Sharing / Permissions' }));
-    await expect(await canvas.findByRole('heading', { name: 'Client Portal Visibility' })).toBeInTheDocument();
+    await expect(await canvas.findByRole('heading', { name: 'Access Control' })).toBeInTheDocument();
   },
 };
 
