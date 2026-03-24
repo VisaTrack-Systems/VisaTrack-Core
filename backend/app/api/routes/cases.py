@@ -1838,7 +1838,7 @@ def get_case_workspace_by_number(
                 "documents": [],
             }
 
-        default_status = custom_document["status"] or ("requested" if custom_document["required"] else "not_requested")
+        default_status = "requested" if custom_document["required"] else "not_requested"
         bound_case_document = bound_case_document_rows.get(upload_bindings.get(custom_document_id, ""))
         bound_status = bound_case_document["status"] if bound_case_document else None
         bound_uploaded_at = bound_case_document["uploaded_at"] if bound_case_document else None
@@ -1850,7 +1850,10 @@ def get_case_workspace_by_number(
                 name=document_name_overrides.get(custom_document_id, custom_document["name"]),
                 required=bool(custom_document["required"]),
                 status=_normalized_document_status(
-                    document_status_overrides.get(custom_document_id, bound_status or default_status)
+                    document_status_overrides.get(
+                        custom_document_id,
+                        custom_document.get("status") or bound_status or default_status,
+                    )
                 ),
                 due_date=custom_document["due_date"],
                 uploaded_at=bound_uploaded_at,
@@ -2821,6 +2824,22 @@ def complete_case_document_upload(
     rejection_notes.pop(slot["logical_document_id"], None)
 
     if slot["kind"] == "custom_request":
+        if slot["previous_case_document_id"]:
+            db.execute(
+                text(
+                    """
+                    UPDATE case_documents
+                    SET deleted_at = NOW(), updated_at = NOW()
+                    WHERE id = :previous_case_document_id
+                      AND case_id = :case_id
+                      AND deleted_at IS NULL
+                    """
+                ),
+                {
+                    "previous_case_document_id": slot["previous_case_document_id"],
+                    "case_id": str(case.id),
+                },
+            )
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
         upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
         status_overrides[slot["logical_document_id"]] = "received"

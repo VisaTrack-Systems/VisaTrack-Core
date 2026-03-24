@@ -487,6 +487,79 @@ def test_get_case_workspace_by_number_returns_workspace(make_auth_context):
     assert result.document_suites[0].documents[0].name == 'Passport'
 
 
+def test_get_case_workspace_prefers_custom_document_status_over_bound_upload_status(make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    custom_suite_id = str(uuid4())
+    custom_document_id = str(uuid4())
+    bound_case_document_id = str(uuid4())
+    case_row = {
+        'id': uuid4(),
+        'organization_id': auth.organization_id,
+        'client_id': uuid4(),
+        'primary_lawyer_id': auth.user_id,
+        'created_by': auth.user_id,
+        'case_number': 'C-2026-001',
+        'case_type': 'Express Entry',
+        'status': 'intake',
+        'priority': 'medium',
+        'start_date': None,
+        'target_filing_date': None,
+        'estimated_completion_from': None,
+        'estimated_completion_to': None,
+        'completion_confidence': None,
+        'description': 'Desc',
+        'internal_notes': 'Notes',
+        'custom_fields': {
+            'custom_document_suites': [
+                {'id': custom_suite_id, 'name': 'Client Uploads', 'reason': 'Custom docs'}
+            ],
+            'custom_documents': [
+                {
+                    'id': custom_document_id,
+                    'name': 'Bank Statement',
+                    'suite_id': custom_suite_id,
+                    'required': True,
+                    'status': 'accepted',
+                }
+            ],
+            'document_upload_bindings': {custom_document_id: bound_case_document_id},
+        },
+        'client_name': 'Client One',
+        'primary_lawyer_name': 'Law Yer',
+    }
+    billing_row = {'total_fees': 0, 'total_paid': 0, 'total_remaining': 0, 'next_payment_due': None}
+
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(rows=[case_row]),
+        FakeResult(rows=[]),
+        FakeResult(
+            rows=[
+                {
+                    'id': bound_case_document_id,
+                    'status': 'received',
+                    'uploaded_at': datetime.now(timezone.utc),
+                    'expiry_date': None,
+                    'file_name': 'bank-statement.pdf',
+                    'client_note': 'Uploaded by client',
+                }
+            ]
+        ),
+        FakeResult(rows=[]),
+        FakeResult(rows=[]),
+        FakeResult(rows=[]),
+        FakeResult(rows=[]),
+        FakeResult(rows=[billing_row]),
+        FakeResult(rows=[]),
+        FakeResult(rows=[]),
+    ]
+
+    result = cases.get_case_workspace_by_number(case_number='C-2026-001', auth=auth, db=db)
+
+    matching_document = next(document for document in result.documents if document.id == custom_document_id)
+    assert matching_document.status == 'accepted'
+
+
 def test_update_case_portal_permissions_persists_custom_fields(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})
@@ -860,6 +933,64 @@ def test_complete_case_document_upload_marks_requested_custom_document_received(
     assert case.custom_fields['document_upload_bindings'][document_id] == str(inserted_id)
     assert case.custom_fields['document_status_overrides'][document_id] == 'received'
     assert case.custom_fields['document_rejection_notes'] == {}
+
+
+def test_complete_case_document_upload_replaces_previous_custom_upload_version(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    document_id = str(uuid4())
+    previous_case_document_id = str(uuid4())
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        custom_fields={
+            'custom_documents': [{'id': document_id, 'name': 'Travel History', 'required': True, 'status': 'rejected'}],
+            'document_upload_bindings': {document_id: previous_case_document_id},
+        },
+    )
+    slot = {
+        'kind': 'custom_request',
+        'logical_document_id': document_id,
+        'template_id': None,
+        'name': 'Travel History',
+        'required': True,
+        'instructions': 'Upload travel history',
+        'previous_case_document_id': previous_case_document_id,
+        'next_version': 2,
+    }
+    storage_key = f'org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-travel-history-v2.pdf'
+    inserted_id = uuid4()
+
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(rows=[{'id': inserted_id, 'uploaded_at': datetime.now(timezone.utc)}]),
+        FakeResult(rows=[]),
+    ]
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+    monkeypatch.setattr(cases, 'head_object', lambda **kwargs: {'ContentLength': 1024, 'ContentType': 'application/pdf'})
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'log_document_access', lambda *args, **kwargs: None)
+
+    cases.complete_case_document_upload(
+        case_number='C-2026-001',
+        document_id=document_id,
+        payload=CaseDocumentUploadCompleteRequest(
+            storage_key=storage_key,
+            file_name='travel-history-v2.pdf',
+            file_type='application/pdf',
+            file_size_bytes=1024,
+        ),
+        request=row(client=row(host='127.0.0.1'), headers={'user-agent': 'pytest'}),
+        auth=auth,
+        db=db,
+    )
+
+    assert case.custom_fields['document_upload_bindings'][document_id] == str(inserted_id)
+    assert case.custom_fields['document_status_overrides'][document_id] == 'received'
+    assert len(db.execute.call_args_list) == 2
+    second_call_params = db.execute.call_args_list[1].args[1]
+    assert second_call_params['previous_case_document_id'] == previous_case_document_id
 
 
 def test_get_case_document_view_url_returns_inline_presigned_link(monkeypatch, make_auth_context):
