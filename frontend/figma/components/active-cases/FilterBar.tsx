@@ -5,6 +5,9 @@ type FilterBarProps = {
   filterStatus: string;
   onSearchTermChange: (value: string) => void;
   onFilterStatusChange: (value: string) => void;
+  filterLawyer?: string;
+  onFilterLawyerChange?: (value: string) => void;
+  lawyerOptions?: string[];
 };
 
 export function FilterBar({
@@ -12,6 +15,9 @@ export function FilterBar({
   filterStatus,
   onSearchTermChange,
   onFilterStatusChange,
+  filterLawyer,
+  onFilterLawyerChange,
+  lawyerOptions,
 }: FilterBarProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
@@ -27,7 +33,7 @@ export function FilterBar({
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <div className="relative">
             <select
               value={filterStatus}
@@ -42,6 +48,22 @@ export function FilterBar({
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+
+          {lawyerOptions && onFilterLawyerChange ? (
+            <div className="relative">
+              <select
+                value={filterLawyer ?? 'all'}
+                onChange={(e) => onFilterLawyerChange(e.target.value)}
+                className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+              >
+                <option value="all">All Lawyers</option>
+                {lawyerOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

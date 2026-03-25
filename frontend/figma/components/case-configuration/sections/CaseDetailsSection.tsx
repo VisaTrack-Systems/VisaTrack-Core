@@ -167,7 +167,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
         <div className="mt-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Client-Facing Description
-            <span className="text-gray-500 font-normal ml-1">(visible to client)</span>
+            <span className="text-gray-500 font-normal ml-1">(Visible to Client)</span>
           </label>
           <textarea
             rows={3}
@@ -180,7 +180,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Internal Notes
-            <span className="text-gray-500 font-normal ml-1">(lawyer only)</span>
+            <span className="text-gray-500 font-normal ml-1">(Lawyer Only)</span>
           </label>
           <textarea
             rows={3}

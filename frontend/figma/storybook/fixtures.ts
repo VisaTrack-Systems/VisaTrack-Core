@@ -445,6 +445,7 @@ export const mockUiCases: UiCase[] = [
     caseType: 'Express Entry',
     status: 'Document Review',
     priority: 'high',
+    lawyerName: 'Alex Lawyer',
     lastActivity: '2 hours ago',
     nextMilestone: 'Lawyer review',
     nextDeadline: 'Mar 15, 2026',
@@ -458,6 +459,7 @@ export const mockUiCases: UiCase[] = [
     caseType: 'Work Permit Extension',
     status: 'Intake',
     priority: 'urgent',
+    lawyerName: 'Alex Lawyer',
     lastActivity: '1 day ago',
     nextMilestone: 'Collect documents',
     nextDeadline: 'Mar 1, 2026',
@@ -571,6 +573,7 @@ export const mockCaseInfo: CaseInfo = {
   assignedLawyer: 'Avery Counsel',
   startDate: 'Feb 10, 2026',
   estimatedCompletion: 'Jun 1, 2026 - Aug 15, 2026',
+  description: 'We are currently preparing your case package and reviewing the remaining supporting evidence before submission.',
 };
 
 export const mockOrganizations: OrganizationListItem[] = [
@@ -631,7 +634,7 @@ export const mockAdminOperations: AdminOperations = {
   unassigned_cases: [],
   aging_cases: [],
   lawyer_workload: [],
-  pending_invitations: [],
+  invitations: [],
 };
 
 export const mockAdminOverview: AdminOverview = {

@@ -208,7 +208,7 @@ export type AdminOperations = {
     full_name: string;
     active_cases: number;
   }>;
-  pending_invitations: Array<{
+  invitations: Array<{
     invitation_id: string;
     user_id: string;
     email: string;

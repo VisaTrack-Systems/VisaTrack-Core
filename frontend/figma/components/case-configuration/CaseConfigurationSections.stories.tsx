@@ -156,7 +156,6 @@ export const Reminders: Story = {
   render: () => (
     <RemindersSection
       workspace={mockCaseWorkspace}
-      caseNumber="C-2026-001"
       creating={false}
       onCreateReminder={createReminder}
       onNotify={notifyReminder}
@@ -191,12 +190,11 @@ export const Reminders: Story = {
 export const Permissions: Story = {
   render: () => (
     <PermissionsSection
-      workspace={mockCaseWorkspace}
       portalPermissions={mockPortalPermissions}
+      defaultPortalPermissions={mockPortalPermissions}
       saving={false}
-      onChange={() => {}}
       onReset={() => {}}
-      onSave={() => {}}
+      onSave={async () => true}
     />
   ),
 };
