@@ -1,4 +1,4 @@
-import { ShieldCheck, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 import type { CurrentUserSettings, UpdateCurrentUserSettingsInput } from '@/lib/api';
@@ -26,10 +26,8 @@ export function ProfileSettingsDialog({
   const [lastName, setLastName] = useState(settings?.last_name ?? '');
   const [email, setEmail] = useState(settings?.email ?? '');
   const [phone, setPhone] = useState(settings?.phone ?? '');
-  const [avatarUrl, setAvatarUrl] = useState(settings?.avatar_url ?? '');
   const [timezone, setTimezone] = useState(settings?.timezone ?? '');
   const [locale, setLocale] = useState(settings?.locale ?? '');
-  const [mfaEnabled, setMfaEnabled] = useState(settings?.mfa_enabled ?? false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -60,10 +58,10 @@ export function ProfileSettingsDialog({
       last_name: normalizedLastName,
       email: normalizedEmail,
       phone: phone.trim() || null,
-      avatar_url: avatarUrl.trim() || null,
+      avatar_url: settings?.avatar_url ?? null,
       timezone: normalizedTimezone,
       locale: normalizedLocale,
-      mfa_enabled: mfaEnabled,
+      mfa_enabled: settings?.mfa_enabled ?? false,
     });
   };
 
@@ -162,17 +160,6 @@ export function ProfileSettingsDialog({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Avatar URL (Optional)</label>
-            <input
-              value={avatarUrl}
-              onChange={(event) => setAvatarUrl(event.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-              disabled={loading || submitting}
-              placeholder="https://..."
-            />
-          </div>
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
@@ -195,32 +182,6 @@ export function ProfileSettingsDialog({
                 placeholder="en-CA"
                 required
               />
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-red-600" />
-                  Multi-factor Authentication
-                </p>
-                <p className="text-xs text-gray-600 mt-1">
-                  Enable MFA to require a second factor during sign in.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMfaEnabled((value) => !value)}
-                disabled={loading || submitting}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  mfaEnabled
-                    ? 'bg-red-600 text-white border-red-600'
-                    : 'bg-white text-gray-700 border-gray-300'
-                }`}
-              >
-                {mfaEnabled ? 'Enabled' : 'Disabled'}
-              </button>
             </div>
           </div>
 

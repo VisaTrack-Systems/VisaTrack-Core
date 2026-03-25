@@ -212,8 +212,6 @@ export const ProfileSettingsOpen: Story = {
     const firstName = canvas.getByDisplayValue('Avery');
     await userEvent.clear(firstName);
     await userEvent.type(firstName, 'Avery Updated');
-    await userEvent.click(canvas.getByRole('button', { name: 'Enabled' }));
-    await expect(await canvas.findByRole('button', { name: 'Disabled' })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole('button', { name: 'Save Changes' }));
 
     await expect(profileSettingsSubmit).toHaveBeenCalledWith(
@@ -223,7 +221,7 @@ export const ProfileSettingsOpen: Story = {
         email: 'lawyer@example.com',
         timezone: 'America/Toronto',
         locale: 'en-CA',
-        mfa_enabled: false,
+        mfa_enabled: true,
       })
     );
   },
