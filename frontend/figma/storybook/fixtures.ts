@@ -658,10 +658,3 @@ export const mockAdminOverview: AdminOverview = {
   })),
 };
 
-export const mockAdminOperations: AdminOperations = {
-  organization_id: organizationId,
-  unassigned_cases: [],
-  aging_cases: [],
-  lawyer_workload: [],
-  pending_invitations: [],
-};

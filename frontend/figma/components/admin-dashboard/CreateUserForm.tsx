@@ -68,18 +68,27 @@ export function CreateUserForm({ organizations, roles, userForm, onFormChange, o
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-          <input
-            required={userForm.status !== 'invited'}
-            minLength={8}
-            type="password"
-            placeholder="Min. 8 characters"
-            value={userForm.password}
-            onChange={(e) => set({ password: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-          />
-        </div>
+        {userForm.status !== 'invited' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+            <input
+              required
+              minLength={8}
+              type="password"
+              placeholder="Min. 8 characters"
+              value={userForm.password}
+              onChange={(e) => set({ password: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+            <p className="text-sm text-gray-500 mt-2">
+              No password needed — the user will set one via the invitation link.
+            </p>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
           <select
