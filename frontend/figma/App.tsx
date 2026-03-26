@@ -26,6 +26,7 @@ import {
 
 import { ActiveCases } from './components/ActiveCases';
 import { AdminDashboard } from './components/AdminDashboard';
+import { InvitationLinkDialog } from './components/InvitationLinkDialog';
 import { CaseConfiguration } from './components/CaseConfiguration';
 import { ClientDashboard } from './components/ClientDashboard';
 import { NewCaseDialog, type NewCaseDialogSubmitPayload } from './components/NewCaseDialog';
@@ -94,6 +95,10 @@ export default function App() {
   const [loadingLawyerClients, setLoadingLawyerClients] = useState(false);
   const [creatingNewCase, setCreatingNewCase] = useState(false);
   const [newCaseError, setNewCaseError] = useState<string | null>(null);
+  const [lawyerInvitationUrl, setLawyerInvitationUrl] = useState<string | null>(null);
+  const [lawyerInvitedUserName, setLawyerInvitedUserName] = useState<string | null>(null);
+  const [lawyerInvitedUserEmail, setLawyerInvitedUserEmail] = useState('');
+  const [lawyerInvitedOrgName, setLawyerInvitedOrgName] = useState<string | undefined>(undefined);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [profileSettings, setProfileSettings] = useState<CurrentUserSettings | null>(null);
   const [loadingProfileSettings, setLoadingProfileSettings] = useState(false);
@@ -224,6 +229,13 @@ export default function App() {
           send_invite: true,
         });
         clientUserId = createdClient.user_id;
+
+        if (createdClient.invitation_url) {
+          setLawyerInvitedUserName(`${firstName} ${lastName}`.trim());
+          setLawyerInvitedUserEmail(email);
+          setLawyerInvitedOrgName(createdClient.organization_name);
+          setLawyerInvitationUrl(createdClient.invitation_url);
+        }
       }
 
       if (!clientUserId) {
@@ -477,6 +489,21 @@ export default function App() {
           errorMessage={newCaseError}
           onClose={handleCloseNewCaseDialog}
           onSubmit={handleSubmitNewCase}
+        />
+      ) : null}
+
+      {lawyerInvitationUrl ? (
+        <InvitationLinkDialog
+          invitationUrl={lawyerInvitationUrl}
+          recipientName={lawyerInvitedUserName}
+          defaultEmail={lawyerInvitedUserEmail}
+          organizationName={lawyerInvitedOrgName}
+          onClose={() => {
+            setLawyerInvitationUrl(null);
+            setLawyerInvitedUserName(null);
+            setLawyerInvitedUserEmail('');
+            setLawyerInvitedOrgName(undefined);
+          }}
         />
       ) : null}
 

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -8,7 +8,8 @@ from sqlalchemy import String, and_, cast, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_permissions, require_roles
-from app.core.security import hash_password
+from app.core.config import settings
+from app.core.security import generate_invitation_token, hash_invitation_token, hash_password
 from app.db.deps import get_db
 from app.models.case import Case
 from app.models.organization import Organization
@@ -22,7 +23,9 @@ from app.schemas.admin import (
     AdminCaseAssignmentResponse,
     AdminCreateOrganizationRequest,
     AdminCreateUserRequest,
+    AdminCreateUserResponse,
     AdminOperationsResponse,
+    SendInvitationEmailRequest,
     AdminOpsCaseItem,
     AdminOpsInvitationItem,
     AdminOpsLawyerWorkloadItem,
@@ -36,6 +39,7 @@ from app.schemas.admin import (
 from app.schemas.organization import OrganizationRead
 from app.schemas.user import UserListItem
 from app.services.audit import log_activity
+from app.services.email import EmailNotConfiguredError, send_invitation_email
 from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -584,6 +588,24 @@ def revoke_invitation(
     db.commit()
 
 
+@router.post("/send-invitation-email", status_code=status.HTTP_204_NO_CONTENT)
+def send_invitation_email_endpoint(
+    payload: SendInvitationEmailRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+) -> None:
+    try:
+        send_invitation_email(
+            to_email=payload.to_email,
+            recipient_name=payload.recipient_name,
+            invitation_url=payload.invitation_url,
+            organization_name=payload.organization_name or "VisaTrack",
+        )
+    except EmailNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to send email: {exc}") from exc
+
+
 @router.get("/roles", response_model=list[AdminRoleItem])
 def list_roles(
     auth: AuthContext = Depends(require_permissions("roles:manage")),
@@ -642,13 +664,19 @@ def list_admin_users(
     ]
 
 
-@router.post("/users", response_model=UserListItem, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=AdminCreateUserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     payload: AdminCreateUserRequest,
     auth: AuthContext = Depends(require_permissions("users:manage")),
     db: Session = Depends(get_db),
-) -> UserListItem:
+) -> AdminCreateUserResponse:
     _require_org_scope(auth, payload.organization_id)
+
+    normalized_status = payload.status.strip().lower()
+    is_invited = normalized_status == "invited"
+
+    if not is_invited and not payload.password:
+        raise HTTPException(status_code=400, detail="Password is required for non-invited users")
 
     organization_exists = db.scalar(
         select(Organization.id).where(
@@ -670,10 +698,13 @@ def create_user(
     if existing_user is not None:
         raise HTTPException(status_code=409, detail="User email already exists in organization")
 
-    try:
-        password_hash = hash_password(payload.password)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if is_invited:
+        password_hash = hash_password(generate_invitation_token())
+    else:
+        try:
+            password_hash = hash_password(payload.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     new_user = User(
         organization_id=payload.organization_id,
@@ -681,7 +712,7 @@ def create_user(
         password_hash=password_hash,
         first_name=payload.first_name.strip(),
         last_name=payload.last_name.strip(),
-        status=payload.status.strip().lower(),
+        status=normalized_status,
     )
     db.add(new_user)
     db.flush()
@@ -693,6 +724,23 @@ def create_user(
         assigned_by=auth.user_id,
     )
 
+    invitation_url: str | None = None
+    if is_invited:
+        now = datetime.now(timezone.utc)
+        plain_token = generate_invitation_token()
+        invitation = UserInvitation(
+            organization_id=payload.organization_id,
+            user_id=new_user.id,
+            email=normalized_email,
+            role_slug=payload.role_slug.strip().lower(),
+            token_hash=hash_invitation_token(plain_token),
+            expires_at=now + timedelta(hours=settings.invitation_expiry_hours),
+            invited_by=auth.user_id,
+        )
+        db.add(invitation)
+        primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
+        invitation_url = f"{primary_origin}/invite?token={plain_token}"
+
     log_activity(
         db,
         organization_id=payload.organization_id,
@@ -700,13 +748,13 @@ def create_user(
         action="created",
         entity_type="user",
         entity_id=new_user.id,
-        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower()},
+        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower(), "invited": is_invited},
     )
 
     db.commit()
     db.refresh(new_user)
 
-    return UserListItem(
+    return AdminCreateUserResponse(
         id=new_user.id,
         email=new_user.email,
         full_name=f"{new_user.first_name} {new_user.last_name}",
@@ -714,6 +762,7 @@ def create_user(
         organization_id=new_user.organization_id,
         created_at=new_user.created_at,
         roles=[payload.role_slug.strip().lower()],
+        invitation_url=invitation_url,
     )
 
 

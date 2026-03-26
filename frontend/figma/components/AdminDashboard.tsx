@@ -17,6 +17,8 @@ import {
   revokeAdminInvitation,
 } from '@/lib/api';
 
+import { InvitationLinkDialog } from './InvitationLinkDialog';
+
 import { ActiveCasesPanel } from './lawyer-dashboard/ActiveCasesPanel';
 import { useLawyerDashboardData } from './lawyer-dashboard/useLawyerDashboardData';
 
@@ -88,6 +90,10 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const [busyOrganizationId, setBusyOrganizationId] = useState<string | null>(null);
   const [busyDeleteUserId, setBusyDeleteUserId] = useState<string | null>(null);
+  const [invitationUrl, setInvitationUrl] = useState<string | null>(null);
+  const [invitedUserName, setInvitedUserName] = useState<string | null>(null);
+  const [invitedUserEmail, setInvitedUserEmail] = useState('');
+  const [invitedOrgName, setInvitedOrgName] = useState<string | undefined>(undefined);
   const [orgForm, setOrgForm] = useState(initialOrgForm);
   const [userForm, setUserForm] = useState(initialUserForm);
   const [userNameFilter, setUserNameFilter] = useState('');
@@ -191,9 +197,20 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   const executeCreateUser = async () => {
     if (!pendingUserCreate) return;
     try {
-      const created = await createAdminUser(pendingUserCreate);
+      const payload =
+        pendingUserCreate.status === 'invited'
+          ? { ...pendingUserCreate, password: undefined }
+          : pendingUserCreate;
+      const created = await createAdminUser(payload);
       setUserForm((prev) => ({ ...initialUserForm, organization_id: prev.organization_id }));
-      flash$(`User created: ${created.full_name}`);
+      if (created.invitation_url) {
+        setInvitedUserName(`${pendingUserCreate.first_name} ${pendingUserCreate.last_name}`.trim());
+        setInvitedUserEmail(pendingUserCreate.email);
+        setInvitedOrgName(organizations.find((o) => o.id === pendingUserCreate.organization_id)?.name);
+        setInvitationUrl(created.invitation_url);
+      } else {
+        flash$(`User created: ${created.full_name}`);
+      }
       refresh();
     } catch (err) {
       flash$(err instanceof Error ? err.message : 'Failed to create user', 'error');
@@ -507,6 +524,21 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
         />
       ) : null}
 
+      {invitationUrl ? (
+        <InvitationLinkDialog
+          invitationUrl={invitationUrl}
+          recipientName={invitedUserName}
+          defaultEmail={invitedUserEmail}
+          organizationName={invitedOrgName}
+          onClose={() => {
+            setInvitationUrl(null);
+            setInvitedUserName(null);
+            setInvitedUserEmail('');
+            setInvitedOrgName(undefined);
+          }}
+        />
+      ) : null}
+
       {pendingUserCreate ? (
         <CreateSummaryDialog
           title="Confirm Create User"
@@ -522,7 +554,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
             { label: 'Email', value: pendingUserCreate.email },
             { label: 'Role', value: pendingUserCreate.role_slug ?? '' },
             { label: 'Status', value: pendingUserCreate.status ?? '' },
-            { label: 'Temporary Password', value: '••••••••' },
+            ...(pendingUserCreate.status !== 'invited' ? [{ label: 'Temporary Password', value: '••••••••' }] : []),
           ]}
           onConfirm={() => void executeCreateUser()}
           onClose={() => setPendingUserCreate(null)}

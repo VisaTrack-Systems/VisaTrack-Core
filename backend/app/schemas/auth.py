@@ -82,3 +82,10 @@ class AcceptInvitationResponse(BaseModel):
     message: str
     email: str
     organization_id: UUID
+
+
+class VerifyInvitationResponse(BaseModel):
+    email: str
+    full_name: str
+    organization_id: UUID
+    expires_at: datetime
