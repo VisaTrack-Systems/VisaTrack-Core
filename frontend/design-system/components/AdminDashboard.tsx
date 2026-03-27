@@ -17,6 +17,7 @@ import {
   deleteAdminUser,
   removeAdminRole,
   revokeAdminInvitation,
+  resendAdminInvitation,
 } from '@/lib/api';
 
 import { InvitationLinkDialog } from './InvitationLinkDialog';
@@ -302,6 +303,22 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
     }
   };
 
+  const handleResendInvitation = async (invitationId: string, email: string) => {
+    setBusyInvitationId(invitationId);
+    try {
+      const result = await resendAdminInvitation(invitationId);
+      setInvitedUserName(null);
+      setInvitedUserEmail(email);
+      setInvitedOrgName(undefined);
+      setInvitationUrl(result.invitation_url);
+      refresh();
+    } catch (err) {
+      flash$(err instanceof Error ? err.message : 'Failed to resend invitation', 'error');
+    } finally {
+      setBusyInvitationId(null);
+    }
+  };
+
   // ── render guards ───────────────────────────────────────────────────────────
 
   if (loading) {
@@ -480,6 +497,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
                   invitations={invitations}
                   busyInvitationId={busyInvitationId}
                   onRevoke={(id, email) => void handleRevokeInvitation(id, email)}
+                  onResend={(id, email) => void handleResendInvitation(id, email)}
                 />
               </div>
             </div>

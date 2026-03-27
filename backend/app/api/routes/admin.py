@@ -26,6 +26,7 @@ from app.schemas.admin import (
     AdminCreateUserRequest,
     AdminCreateUserResponse,
     AdminOperationsResponse,
+    ResendInvitationResponse,
     SendInvitationEmailRequest,
     AdminOpsCaseItem,
     AdminOpsInvitationItem,
@@ -587,6 +588,48 @@ def revoke_invitation(
         new_values={"email": invitation.email, "role_slug": invitation.role_slug},
     )
     db.commit()
+
+
+@router.post("/invitations/{invitation_id}/resend")
+def resend_invitation(
+    invitation_id: UUID,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> ResendInvitationResponse:
+    invitation = db.scalar(select(UserInvitation).where(UserInvitation.id == invitation_id))
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    _require_org_scope(auth, invitation.organization_id)
+
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=400, detail="Accepted invitations cannot be resent")
+    if invitation.revoked_at is not None:
+        raise HTTPException(status_code=400, detail="Revoked invitations cannot be resent")
+
+    now = datetime.now(timezone.utc)
+    if invitation.expires_at > now:
+        raise HTTPException(status_code=400, detail="Invitation has not expired yet")
+
+    plain_token = generate_invitation_token()
+    invitation.token_hash = hash_invitation_token(plain_token)
+    invitation.expires_at = now + timedelta(hours=settings.invitation_expiry_hours)
+    invitation.invited_by = auth.user_id
+    db.add(invitation)
+    log_activity(
+        db,
+        organization_id=invitation.organization_id,
+        user_id=auth.user_id,
+        action="resent",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        new_values={"email": invitation.email, "role_slug": invitation.role_slug},
+    )
+    db.commit()
+
+    primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
+    invitation_url = f"{primary_origin}/invite?token={plain_token}"
+    return ResendInvitationResponse(invitation_url=invitation_url)
 
 
 @router.post("/send-invitation-email", status_code=status.HTTP_204_NO_CONTENT)

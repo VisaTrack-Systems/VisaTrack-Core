@@ -12,6 +12,7 @@ type Props = {
   invitations: Invitation[];
   busyInvitationId: string | null;
   onRevoke: (invitationId: string, email: string) => void;
+  onResend: (invitationId: string, email: string) => void;
 };
 
 function StatusTag({ status }: { status: string }) {
@@ -36,7 +37,7 @@ function StatusTag({ status }: { status: string }) {
   );
 }
 
-export function InvitationsPanel({ invitations, busyInvitationId, onRevoke }: Props) {
+export function InvitationsPanel({ invitations, busyInvitationId, onRevoke, onResend }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const pending = invitations.filter((i) => i.status === 'pending');
@@ -91,6 +92,15 @@ export function InvitationsPanel({ invitations, busyInvitationId, onRevoke }: Pr
                   onClick={() => onRevoke(invite.invitation_id, invite.email)}
                 >
                   Revoke
+                </button>
+              ) : invite.status === 'expired' ? (
+                <button
+                  type="button"
+                  className="shrink-0 border border-gray-300 text-gray-700 px-3 py-1 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-50"
+                  disabled={busyInvitationId === invite.invitation_id}
+                  onClick={() => onResend(invite.invitation_id, invite.email)}
+                >
+                  {busyInvitationId === invite.invitation_id ? 'Sending…' : 'Resend'}
                 </button>
               ) : (
                 <span className="shrink-0 w-16" />

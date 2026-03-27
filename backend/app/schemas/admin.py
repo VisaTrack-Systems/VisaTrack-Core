@@ -139,6 +139,10 @@ class SendInvitationEmailRequest(BaseModel):
     organization_name: Optional[str] = Field(default=None, max_length=255)
 
 
+class ResendInvitationResponse(BaseModel):
+    invitation_url: str
+
+
 class AdminOperationsResponse(BaseModel):
     organization_id: UUID
     unassigned_cases: list[AdminOpsCaseItem]

@@ -934,6 +934,13 @@ export async function revokeAdminInvitation(invitationId: string): Promise<void>
   });
 }
 
+export async function resendAdminInvitation(invitationId: string): Promise<{ invitation_url: string }> {
+  return requestJson<{ invitation_url: string }>(
+    `/api/v1/admin/invitations/${encodeURIComponent(invitationId)}/resend`,
+    { method: 'POST' },
+  );
+}
+
 export async function getCaseSummaryByNumber(caseNumber: string): Promise<CaseSummary> {
   return requestJson<CaseSummary>(`/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}`);
 }
