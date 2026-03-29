@@ -304,10 +304,11 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   };
 
   const handleResendInvitation = async (invitationId: string, email: string) => {
+    const matchingUser = users.find((u) => u.email === email);
     setBusyInvitationId(invitationId);
     try {
       const result = await resendAdminInvitation(invitationId);
-      setInvitedUserName(null);
+      setInvitedUserName(matchingUser?.full_name ?? null);
       setInvitedUserEmail(email);
       setInvitedOrgName(undefined);
       setInvitationUrl(result.invitation_url);

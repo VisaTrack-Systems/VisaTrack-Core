@@ -941,6 +941,24 @@ export async function resendAdminInvitation(invitationId: string): Promise<{ inv
   );
 }
 
+export type InvitationStyles = {
+  button_color: string;
+  button_label: string;
+  subject: string;
+  bold_org_name: boolean;
+};
+
+export async function getInvitationTemplate(): Promise<{ body: string; is_custom: boolean; styles: InvitationStyles }> {
+  return requestJson<{ body: string; is_custom: boolean; styles: InvitationStyles }>('/api/v1/admin/email-templates/invitation');
+}
+
+export async function saveInvitationTemplate(body: string, styles: InvitationStyles): Promise<void> {
+  return requestVoid('/api/v1/admin/email-templates/invitation', {
+    method: 'PUT',
+    body: JSON.stringify({ body, styles }),
+  });
+}
+
 export async function getCaseSummaryByNumber(caseNumber: string): Promise<CaseSummary> {
   return requestJson<CaseSummary>(`/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}`);
 }
