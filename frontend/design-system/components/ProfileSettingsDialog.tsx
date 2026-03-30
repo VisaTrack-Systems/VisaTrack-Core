@@ -1,6 +1,9 @@
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream:frontend/figma/components/ProfileSettingsDialog.tsx
 import { X } from 'lucide-react';
 =======
+=======
+>>>>>>> Stashed changes
 /** ProfileSettingsDialog: Modal dialog for user profile and account settings management. Allows profile updates, password changes, and preference configuration. */
 
 import { ShieldCheck, X } from 'lucide-react';
