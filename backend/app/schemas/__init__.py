@@ -1,3 +1,4 @@
+"""Pydantic Data Schemas Package: Imports and exposes all API request/response validation schemas."""
 from app.schemas.case import (
     CaseListItem,
     CaseSummary,

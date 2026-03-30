@@ -1,3 +1,8 @@
+/**
+ * API Client: TypeScript type definitions and API client functions.
+ * Provides strongly-typed interfaces for all backend API endpoints and data structures.
+ */
+
 export type DashboardOverview = {
   stats: {
     organizations: number;
@@ -94,6 +99,7 @@ export type LawyerClientCreateResponse = {
   email: string;
   full_name: string;
   status: string;
+  organization_name: string;
   invitation_url: string | null;
 };
 
@@ -174,9 +180,26 @@ export type AdminCreateUserInput = {
   email: string;
   first_name: string;
   last_name: string;
-  password: string;
+  password?: string;
   status?: string;
   role_slug?: string;
+};
+
+export type AdminCreateUserResult = UserListItem & {
+  invitation_url: string | null;
+};
+
+export type VerifyInvitationResult = {
+  email: string;
+  full_name: string;
+  organization_id: string;
+  expires_at: string;
+};
+
+export type AcceptInvitationResult = {
+  message: string;
+  email: string;
+  organization_id: string;
 };
 
 export type AdminOperations = {
@@ -836,10 +859,23 @@ export async function deleteAdminOrganization(organizationId: string): Promise<v
   });
 }
 
-export async function createAdminUser(input: AdminCreateUserInput): Promise<UserListItem> {
-  return requestJson<UserListItem>('/api/v1/admin/users', {
+export async function createAdminUser(input: AdminCreateUserInput): Promise<AdminCreateUserResult> {
+  return requestJson<AdminCreateUserResult>('/api/v1/admin/users', {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export async function verifyInvitation(token: string): Promise<VerifyInvitationResult> {
+  return requestJson<VerifyInvitationResult>(
+    `/api/v1/auth/verify-invitation?token=${encodeURIComponent(token)}`
+  );
+}
+
+export async function acceptInvitation(token: string, password: string): Promise<AcceptInvitationResult> {
+  return requestJson<AcceptInvitationResult>('/api/v1/auth/accept-invitation', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
   });
 }
 
@@ -872,6 +908,23 @@ export async function assignAdminCaseLawyer(
   return requestJson<AdminCaseAssignmentResult>(`/api/v1/admin/cases/${encodeURIComponent(caseNumber)}/assign`, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export async function sendInvitationEmail(
+  toEmail: string,
+  recipientName: string,
+  invitationUrl: string,
+  organizationName?: string,
+): Promise<void> {
+  return requestVoid('/api/v1/admin/send-invitation-email', {
+    method: 'POST',
+    body: JSON.stringify({
+      to_email: toEmail,
+      recipient_name: recipientName,
+      invitation_url: invitationUrl,
+      organization_name: organizationName,
+    }),
   });
 }
 

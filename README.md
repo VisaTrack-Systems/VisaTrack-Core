@@ -1,106 +1,138 @@
-# Project Overview: VisaTrack
+# VisaTrack: Immigration Case Management System
 
-Course: SEG4910
-Version: 1.0 (Initial) | Date: January 20, 2026
+**Course:** SEG4910 | **Version:** 1.0 | **Date:** March 30, 2026
 
-## 1. Project Outline
+---
 
-VisaTrack is a web-based client and case management system designed for immigration and visa-processing consulting firms. The platform centralizes client information, case documents, application status, and communication into a single secure system, replacing fragmented workflows that currently rely on email, spreadsheets, and manual follow-ups.
+## 🎯 START HERE
 
-The system enables clients to track their visa application progress, upload required documents, receive reminders,
-and book follow-up appointments, while consultants gain access to an administrative dashboard for managing cases,
-storing files, and monitoring progress. The long-term goal of VisaTrack is to evolve into an extensible platform that
-adapts to changing immigration requirements and supports intelligent automation such as assisted form filling and
-document data extraction.
+**👉 New to this project? Read [CODEBASE_TOUR.md](CODEBASE_TOUR.md)**
 
-## Project Structure
+This guide provides a structured walkthrough of the codebase (30 min read) with:
+- ✅ Architecture explanation with diagrams
+- ✅ Guided reading order for key files
+- ✅ Feature and design deep dives
+- ✅ Code quality assessment
 
-- `frontend/` - Next.js web application
-- `backend/` - FastAPI backend and database logic
-- `docs/` - Architecture and design documentation
-- `scripts/` - Development helper scripts
+**For immediate context:** Continue reading below (5 min).
 
-## 2. Team Members and Roles
+---
 
-Name | Role | Primary Responsibilities
---- | --- | ---
-Umer Qamar | Full-Stack Developer | Adapting All Software Engineering roles
-Mayoor | Full-Stack Developer | Adapting All Software Engineering roles
-Patrick Bonini | Full-Stack Developer | Adapting All Software Engineering roles
-Pavel Karmaker | Full-Stack Developer | Adapting All Software Engineering roles
-Ronit Mehta | Full-Stack Developer | Adapting All Software Engineering roles
+## What is VisaTrack?
 
-## 3. Objectives
+VisaTrack centralizes visa case management for immigration consulting firms. It replaces fragmented email/spreadsheet workflows with a secure, real-time system where:
 
-### 3.1 Benefit to Customer
+**For Consultants:**
+- Unified dashboard for case management
+- Document storage and version control
+- Client and case organization
+- Automated reminders and appointments
+- Real-time activity tracking
 
-Who is the end-user? How does this software make their life better or solve a specific pain point?
+**For Clients:**
+- Track visa application progress
+- Upload required documents
+- Receive reminders and updates
+- Book follow-up appointments
+- Full transparency into their case
 
-End users:
+**End Result:** Faster case resolution, fewer errors, better client experience.
 
-- Immigration consultants and visa-processing firms
-- Clients applying for visas or immigration services
+---
 
-VisaTrack reduces administrative overhead for consultants by centralizing client data, documents, and application tracking. For clients, it improves transparency and communication by providing real-time status updates, clear document requirements, and structured follow-ups. This minimizes delays, reduces errors, and improves overall client experience.
+## 🏗️ Technology Stack
 
-### 3.2 Key Accomplishments
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | Next.js + TypeScript + Tailwind CSS | Responsive web interface for consultants & clients |
+| **Backend** | FastAPI + Python | RESTful API with role-based access control |
+| **Database** | PostgreSQL | Multi-tenant relational data (users, cases, documents) |
+| **Storage** | AWS S3 + KMS | Encrypted document storage with presigned URLs |
+| **Auth** | JWT Tokens | Stateless authentication with scrypt password hashing |
 
-List the primary features or milestones that must be completed.
+**Key Features:**
+- ✅ Role-based access control (super_admin, org_admin, lawyer, client)
+- ✅ Multi-tenant architecture (isolated organizations)
+- ✅ Audit logging (all user actions tracked)
+- ✅ Modern security practices (encryption, secure tokens, input validation)
 
-The primary goals of the project include:
+## 👥 Team
 
-- Secure user authentication for consultants and clients
-- Client profile and case management
-- Document upload and storage per case
-- Application status tracking and progress indicators
-- Consultant administrative dashboard
-- Automated reminders and notifications
-- Appointment scheduling functionality
-- (Stretch goal) Intelligent document parsing and assisted form filling
+| Name | Primary Role | Responsibilities |
+|------|--------------|------------------|
+| **Umer Qamar** | Backend & Database Lead | FastAPI architecture, PostgreSQL schema, ORM models, API design, infrastructure support |
+| **Patrick Bonini** | Tech Lead - Lawyer Component & DevOps | Lawyer portal development, component library architecture, design system leadership, Docker/CI-CD infrastructure, full-stack co-leadership |
+| **Mayoor** | Full-Stack Developer | Full-stack support across frontend, backend, and database, admin component implementation |
+| **Ronit Mehta** | Full-Stack Developer | Full-stack support across frontend, backend, and database, client portal implementation |
+| **Pavel Karmaker** | Project Administration | Meeting coordination, documentation management, action item tracking, project communication |
 
-### 3.3 Criteria for Success
+*All team members adapted multiple software engineering roles as needed for the full-stack development.*
 
-What defines a "finished" and "successful" project? (e.g., "The app handles 100 concurrent users" or "The algorithm achieves 90% accuracy").
+## 📋 Features & Goals
 
-The project will be considered successful if:
+**Core Features:**
+- Secure user authentication (JWT-based, role-based access control)
+- Client profile and case management dashboards
+- Encrypted document upload and storage (AWS S3 + KMS)
+- Real-time application status tracking
+- Automated reminders and appointment scheduling
+- Comprehensive audit logging for compliance
 
-- Core workflows (client onboarding, document upload, case tracking) function end-to-end
-- The system supports multiple concurrent users without data corruption
-- All sensitive data is stored securely and access-controlled
-- The MVP is deployable and usable by a small consulting firm
-- Codebase is maintainable, documented, and extensible for future work
+**Success Criteria:**
+- End-to-end workflows function reliably
+- Multi-user support without data corruption
+- Sensitive data secured with encryption and access control
+- Deployable MVP for small consulting firms
+- Well-documented, extensible codebase
 
-## 4. Expected / Anticipated Architecture
+---
 
-Describe the high-level technical stack (e.g., MERN stack, AWS, Microservices). You should include a placeholder for a diagram here.
+**Full feature breakdown and implementation details:** See [CODEBASE_TOUR.md](CODEBASE_TOUR.md#-the-features) or [SECURITY.md](SECURITY.md)
 
-VisaTrack will follow a modular, web-based architecture with clear separation of concerns.
+## 🏛️ Architecture Overview
 
-Frontend:
+**Four-Layer Design:**
 
-- React (with modern routing and component architecture)
-- Tailwind CSS for styling
+1. **Frontend** (Next.js + TypeScript) — User interface for consultants and clients
+2. **API** (FastAPI) — RESTful endpoints with role-based access control
+3. **Services** (Python) — Business logic (RBAC, audit logging, encryption, storage)
+4. **Database** (PostgreSQL + S3) — Secure data persistence and document storage
 
-Backend:
+**Diagram:**
 
-- Node.js with Express (RESTful API)
-- Authentication and authorization middleware
+![VisaTrack Architecture](./docs/assets/architecture_overview.png)
 
-Database:
+For detailed architecture breakdown, see [CODEBASE_TOUR.md](CODEBASE_TOUR.md#-the-architecture)
 
-- PostgreSQL (relational data for users, cases, documents)
+---
 
-Hosting / Infrastructure:
+## 📚 Project Structure
 
-- Cloud hosting (to be finalized)
-- GitHub Actions for CI/CD
+```
+VisaTrack-Core/
+├── frontend/                  # Next.js web application
+│   ├── design-system/         # React components and pages
+│   ├── lib/                   # API client and utilities
+│   └── tests/                 # Vitest unit tests
+├── backend/                   # FastAPI application
+│   ├── app/
+│   │   ├── api/              # Route handlers
+│   │   ├── core/             # Auth, config, security
+│   │   ├── db/               # Database layer
+│   │   ├── models/           # ORM models
+│   │   ├── schemas/          # Validation schemas
+│   │   └── services/         # Business logic
+│   ├── alembic/              # Database migrations
+│   └── tests/                # Pytest test suite
+├── Database/                  # SQL schema definitions
+├── docs/                      # Architecture and design docs
+└── scripts/                   # Development helpers
+```
 
-Architecture Diagram:
-
-![VisaTrack High-Level Architecture](./docs/assets/architecture_overview.png)
-
-*The diagram above illustrates the interaction between the Next.js frontend,
-FastAPI backend, and our data persistence layers (PostgreSQL & S3).*
+**Starting Points:**
+- **Backend:** See [backend/README.md](backend/README.md) for entry points
+- **Frontend:** See [frontend/README.md](frontend/README.md) for entry points
+- **Full Tour:** See [CODEBASE_TOUR.md](CODEBASE_TOUR.md) for guided 30-min walkthrough
 
 ## 5. Anticipated Risks
 

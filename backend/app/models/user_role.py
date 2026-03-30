@@ -1,3 +1,7 @@
+"""User Role Assignment Model: SQLAlchemy ORM model linking users to roles.
+Manages RBAC role assignments per organization.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

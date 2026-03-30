@@ -1,3 +1,5 @@
+-- Trust Account Entries Table: Legal trust account ledger. Records trust fund deposits and withdrawals for client funds.
+
 CREATE TABLE trust_account_entries (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     UUID NOT NULL REFERENCES organizations(id),

@@ -1,3 +1,7 @@
+"""Test Configuration and Fixtures: Provides pytest fixtures for common test objects
+(users, auth contexts, database sessions) and mock data builders for testing.
+"""
+
 from __future__ import annotations
 
 import sys

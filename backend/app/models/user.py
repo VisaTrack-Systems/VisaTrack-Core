@@ -1,3 +1,7 @@
+"""User Model: SQLAlchemy ORM model for user accounts.
+Stores authentication, profile, and organizational relationship data.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

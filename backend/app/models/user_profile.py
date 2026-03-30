@@ -1,3 +1,7 @@
+"""User Profile Model: SQLAlchemy ORM model extending user information
+with role-specific profile data and preferences.
+"""
+
 from __future__ import annotations
 
 from datetime import date, datetime

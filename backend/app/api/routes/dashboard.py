@@ -1,3 +1,4 @@
+"""Dashboard Routes: API endpoints for dashboard data, analytics, summary statistics, and overview information."""
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session

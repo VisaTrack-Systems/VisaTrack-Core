@@ -1,3 +1,4 @@
+"""Client Schemas: Pydantic models for client profile and account-related API data validation."""
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID

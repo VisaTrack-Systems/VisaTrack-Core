@@ -1,3 +1,7 @@
+"""Database Base Configuration: SQLAlchemy declarative base and table registry
+for all ORM models.
+"""
+
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()

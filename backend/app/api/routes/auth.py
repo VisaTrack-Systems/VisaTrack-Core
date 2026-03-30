@@ -1,3 +1,4 @@
+"""Authentication Routes: API endpoints for login, token refresh, logout, and user session management."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -32,6 +33,7 @@ from app.schemas.auth import (
     SwitchActiveRoleRequest,
     SwitchActiveRoleResponse,
     UpdateCurrentUserSettingsRequest,
+    VerifyInvitationResponse,
 )
 from app.services.audit import log_activity
 from app.services.rbac import canonical_role_slug, select_default_active_role
@@ -312,6 +314,41 @@ def change_password(
     auth.user.updated_at = datetime.now(timezone.utc)
     db.add(auth.user)
     db.commit()
+
+
+@router.get("/verify-invitation", response_model=VerifyInvitationResponse)
+def verify_invitation(
+    token: str,
+    db: Session = Depends(get_db),
+) -> VerifyInvitationResponse:
+    now = datetime.now(timezone.utc)
+    token_hash = hash_invitation_token(token)
+
+    invitation = db.scalar(
+        select(UserInvitation).where(
+            UserInvitation.token_hash == token_hash,
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.revoked_at.is_(None),
+        )
+    )
+    if invitation is None:
+        raise HTTPException(status_code=400, detail="Invitation is invalid")
+
+    if invitation.expires_at < now:
+        raise HTTPException(status_code=400, detail="Invitation has expired")
+
+    user = db.scalar(
+        select(User).where(User.id == invitation.user_id, User.deleted_at.is_(None))
+    )
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invited user no longer exists")
+
+    return VerifyInvitationResponse(
+        email=user.email,
+        full_name=f"{user.first_name} {user.last_name}",
+        organization_id=user.organization_id,
+        expires_at=invitation.expires_at,
+    )
 
 
 @router.post("/accept-invitation", response_model=AcceptInvitationResponse)

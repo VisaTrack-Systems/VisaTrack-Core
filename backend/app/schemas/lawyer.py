@@ -1,3 +1,4 @@
+"""Lawyer Schemas: Pydantic models for lawyer/legal professional profile and workload related API validation."""
 from datetime import date
 from typing import Optional
 from uuid import UUID
@@ -58,4 +59,5 @@ class LawyerClientCreateResponse(BaseModel):
     email: str
     full_name: str
     status: str
+    organization_name: str
     invitation_url: Optional[str] = None

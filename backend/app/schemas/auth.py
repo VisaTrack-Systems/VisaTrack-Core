@@ -1,3 +1,4 @@
+"""Authentication Schemas: Pydantic models for login, token, and authentication-related API requests and responses."""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -82,3 +83,10 @@ class AcceptInvitationResponse(BaseModel):
     message: str
     email: str
     organization_id: UUID
+
+
+class VerifyInvitationResponse(BaseModel):
+    email: str
+    full_name: str
+    organization_id: UUID
+    expires_at: datetime

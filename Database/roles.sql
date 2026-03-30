@@ -1,3 +1,5 @@
+-- Roles Table: RBAC role definitions. Defines system and custom roles with permission configurations.
+
 CREATE TABLE roles (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,

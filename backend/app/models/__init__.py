@@ -1,3 +1,5 @@
+"""SQLAlchemy ORM Models Package: Imports and exposes all database models."""
+
 from app.models.case_client import CaseClient
 from app.models.case import Case
 from app.models.milestone import Milestone

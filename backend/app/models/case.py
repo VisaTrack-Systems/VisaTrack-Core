@@ -1,3 +1,7 @@
+"""Case Model: SQLAlchemy ORM model for the cases entity.
+Represents visa case records with all associated metadata and relationships.
+"""
+
 from __future__ import annotations
 
 from datetime import date, datetime

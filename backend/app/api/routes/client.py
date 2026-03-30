@@ -1,3 +1,4 @@
+"""Client Routes: API endpoints for client management, profiles, and client-specific operations."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
