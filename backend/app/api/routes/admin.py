@@ -26,6 +26,10 @@ from app.schemas.admin import (
     AdminCreateUserRequest,
     AdminCreateUserResponse,
     AdminOperationsResponse,
+    InvitationStyles,
+    InvitationTemplateRequest,
+    InvitationTemplateResponse,
+    ResendInvitationResponse,
     SendInvitationEmailRequest,
     AdminOpsCaseItem,
     AdminOpsInvitationItem,
@@ -39,11 +43,14 @@ from app.schemas.admin import (
 )
 from app.schemas.organization import OrganizationRead
 from app.schemas.user import UserListItem
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.services.audit import log_activity
-from app.services.email import EmailNotConfiguredError, send_invitation_email
+from app.services.email import DEFAULT_INVITATION_TEMPLATE, EmailNotConfiguredError, send_invitation_email
 from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
 
 LEGACY_CASE_STATUS_MAP = {
     "document_collection": "awaiting_client",
@@ -589,22 +596,150 @@ def revoke_invitation(
     db.commit()
 
 
+@router.post("/invitations/{invitation_id}/resend")
+def resend_invitation(
+    invitation_id: UUID,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> ResendInvitationResponse:
+    invitation = db.scalar(select(UserInvitation).where(UserInvitation.id == invitation_id))
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    _require_org_scope(auth, invitation.organization_id)
+
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=400, detail="Accepted invitations cannot be resent")
+    if invitation.revoked_at is not None:
+        raise HTTPException(status_code=400, detail="Revoked invitations cannot be resent")
+
+    now = datetime.now(timezone.utc)
+    if invitation.expires_at > now:
+        raise HTTPException(status_code=400, detail="Invitation has not expired yet")
+
+    plain_token = generate_invitation_token()
+    invitation.token_hash = hash_invitation_token(plain_token)
+    invitation.expires_at = now + timedelta(hours=settings.invitation_expiry_hours)
+    invitation.invited_by = auth.user_id
+    db.add(invitation)
+    log_activity(
+        db,
+        organization_id=invitation.organization_id,
+        user_id=auth.user_id,
+        action="resent",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        new_values={"email": invitation.email, "role_slug": invitation.role_slug},
+    )
+    db.commit()
+
+    primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
+    invitation_url = f"{primary_origin}/invite?token={plain_token}"
+    return ResendInvitationResponse(invitation_url=invitation_url)
+
+
 @router.post("/send-invitation-email", status_code=status.HTTP_204_NO_CONTENT)
 def send_invitation_email_endpoint(
     payload: SendInvitationEmailRequest,
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
 ) -> None:
+    # Look up the org's custom invitation template and style options.
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    body_template: str | None = None
+    styles_data: dict = {}
+    if org is not None:
+        email_templates = (org.settings or {}).get("email_templates", {})
+        body_template = email_templates.get("invitation") or None
+        styles_data = email_templates.get("invitation_styles", {})
+
+    org_name = payload.organization_name or (org.name if org is not None else "VisaTrack")
+
     try:
         send_invitation_email(
             to_email=payload.to_email,
             recipient_name=payload.recipient_name,
             invitation_url=payload.invitation_url,
-            organization_name=payload.organization_name or "VisaTrack",
+            organization_name=org_name,
+            body_template=body_template,
+            button_color=styles_data.get("button_color", "#dc2626"),
+            button_label=styles_data.get("button_label", "Activate my account"),
+            subject_template=styles_data.get("subject") or None,
+            bold_org_name=styles_data.get("bold_org_name", True),
         )
     except EmailNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to send email: {exc}") from exc
+
+
+@router.get("/email-templates/invitation")
+def get_invitation_template(
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> InvitationTemplateResponse:
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    email_templates = (org.settings or {}).get("email_templates", {})
+    custom_body: str | None = email_templates.get("invitation") or None
+    invitation_type = email_templates.get("invitation_type", "plain")
+    # Discard old HTML templates — the HTML editor no longer exists.
+    if invitation_type == "html":
+        custom_body = None
+    styles_data = email_templates.get("invitation_styles", {})
+    styles = InvitationStyles(
+        button_color=styles_data.get("button_color", "#dc2626"),
+        button_label=styles_data.get("button_label", "Activate my account"),
+        subject=styles_data.get("subject", "You have been invited to join {organization_name}"),
+        bold_org_name=styles_data.get("bold_org_name", True),
+    )
+    return InvitationTemplateResponse(
+        body=custom_body if custom_body else DEFAULT_INVITATION_TEMPLATE,
+        is_custom=custom_body is not None,
+        styles=styles,
+    )
+
+
+@router.put("/email-templates/invitation", status_code=status.HTTP_204_NO_CONTENT)
+def save_invitation_template(
+    payload: InvitationTemplateRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    # Build a fresh dict so SQLAlchemy detects the mutation on the JSONB column.
+    new_settings = dict(org.settings or {})
+    new_settings["email_templates"] = dict(new_settings.get("email_templates", {}))
+
+    raw_body = payload.body.strip()
+    if raw_body:
+        new_settings["email_templates"]["invitation"] = raw_body
+        new_settings["email_templates"]["invitation_type"] = "plain"
+        new_settings["email_templates"]["invitation_styles"] = payload.styles.model_dump()
+    else:
+        # Empty body means "reset to default" — remove body, type, and styles.
+        new_settings["email_templates"].pop("invitation", None)
+        new_settings["email_templates"].pop("invitation_type", None)
+        new_settings["email_templates"].pop("invitation_styles", None)
+
+    org.settings = new_settings
+    flag_modified(org, "settings")
+    db.add(org)
+    log_activity(
+        db,
+        organization_id=org.id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="email_template",
+        entity_id=org.id,
+        new_values={"template": "invitation", "is_custom": bool(raw_body)},
+    )
+    db.commit()
 
 
 @router.get("/roles", response_model=list[AdminRoleItem])

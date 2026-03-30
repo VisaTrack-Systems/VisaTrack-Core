@@ -139,6 +139,33 @@ class SendInvitationEmailRequest(BaseModel):
     organization_name: Optional[str] = Field(default=None, max_length=255)
 
 
+class ResendInvitationResponse(BaseModel):
+    invitation_url: str
+
+
+class InvitationStyles(BaseModel):
+    button_color: str = Field(default="#dc2626", max_length=7)
+    button_label: str = Field(default="Activate my account", max_length=100)
+    subject: str = Field(
+        default="You have been invited to join {organization_name}",
+        max_length=255,
+    )
+    bold_org_name: bool = True
+
+
+class InvitationTemplateResponse(BaseModel):
+    body: str
+    is_custom: bool
+    styles: InvitationStyles
+
+
+class InvitationTemplateRequest(BaseModel):
+    # The full template body. Use {recipient_name}, {organization_name},
+    # {invitation_url} as placeholders. Send an empty string to reset to default.
+    body: str = Field(max_length=5000)
+    styles: InvitationStyles = Field(default_factory=InvitationStyles)
+
+
 class AdminOperationsResponse(BaseModel):
     organization_id: UUID
     unassigned_cases: list[AdminOpsCaseItem]
