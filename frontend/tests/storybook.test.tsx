@@ -10,7 +10,7 @@ type ComposedStory = {
   play?: (context?: { canvasElement: HTMLElement }) => Promise<void>;
 };
 
-const storyModules = import.meta.glob<StoryModule>('../figma/**/*.stories.tsx', {
+const storyModules = import.meta.glob<StoryModule>('../design-system/**/*.stories.tsx', {
   eager: true,
 });
 
