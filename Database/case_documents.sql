@@ -1,3 +1,5 @@
+-- Case Documents Table: Document storage and tracking. Maintains case documents with metadata, storage paths, and version information.
+
 CREATE TABLE case_documents (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id             UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,

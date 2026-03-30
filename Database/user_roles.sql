@@ -1,3 +1,5 @@
+-- User Roles Junction Table: User-to-role assignment relationship. Implements many-to-many mapping of users to roles within organizations.
+
 CREATE TABLE user_roles (
     user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
     role_id         UUID REFERENCES roles(id) ON DELETE CASCADE,

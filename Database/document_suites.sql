@@ -1,3 +1,5 @@
+-- Document Suites Table: Categorized document groupings. Organizes documents into logical suites, folders, or categories per case.
+
 CREATE TABLE document_suites (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,  -- NULL for system defaults

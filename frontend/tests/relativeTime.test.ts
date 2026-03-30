@@ -1,8 +1,10 @@
+/** relativeTime: Unit tests for relativeTime component/module. Validates component behavior and interactions. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { relativeTime as activeCasesRelativeTime } from '../figma/components/active-cases/utils';
-import { relativeTime as clientDashboardRelativeTime } from '../figma/components/client-dashboard/utils';
-import { relativeTime as lawyerDashboardRelativeTime } from '../figma/components/lawyer-dashboard/utils';
+import { relativeTime as activeCasesRelativeTime } from '../design-system/components/active-cases/utils';
+import { relativeTime as clientDashboardRelativeTime } from '../design-system/components/client-dashboard/utils';
+import { relativeTime as lawyerDashboardRelativeTime } from '../design-system/components/lawyer-dashboard/utils';
 
 const NOW = new Date('2026-03-13T12:00:00.000Z');
 

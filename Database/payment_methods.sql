@@ -1,3 +1,5 @@
+-- Payment Methods Table: Stored payment method information. Securely stores customer payment methods for billing purposes.
+
 CREATE TABLE payment_methods (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,3 +1,4 @@
+"""Role-Based Access Control Service: Implements permission checking, role management, and authorization logic for the system."""
 from __future__ import annotations
 
 from datetime import datetime, timezone

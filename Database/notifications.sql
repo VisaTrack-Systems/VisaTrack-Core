@@ -1,3 +1,5 @@
+-- Notifications Table: User notification records. Stores notification messages and delivery status for system alerts.
+
 CREATE TABLE notifications (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -1,3 +1,7 @@
+"""Test Support Utilities: Mock database result classes and fake objects for unit testing
+without real database connections. Implements SQLAlchemy-compatible result interfaces.
+"""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

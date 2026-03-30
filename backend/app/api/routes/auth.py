@@ -1,3 +1,4 @@
+"""Authentication Routes: API endpoints for login, token refresh, logout, and user session management."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

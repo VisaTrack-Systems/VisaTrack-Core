@@ -1,3 +1,4 @@
+"""File Storage Service: Handles document storage, retrieval, and file management operations."""
 from __future__ import annotations
 
 from dataclasses import dataclass

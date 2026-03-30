@@ -1,3 +1,4 @@
+"""Case Management Routes: API endpoints for case CRUD operations, status updates, document handling, and case analytics."""
 import re
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile

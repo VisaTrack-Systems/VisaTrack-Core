@@ -1,3 +1,5 @@
+-- Document Access Log Table: Document access audit trail. Logs all document access events for compliance and security tracking.
+
 CREATE TABLE document_access_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id     UUID REFERENCES case_documents(id) ON DELETE CASCADE,

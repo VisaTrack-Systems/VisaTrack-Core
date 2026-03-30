@@ -1,3 +1,7 @@
+"""Configuration Manager: Loads environment variables and application settings.
+Handles APP_NAME, APP_VERSION, database URIs, and environment-specific configurations.
+"""
+
 import os
 from pathlib import Path
 

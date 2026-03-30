@@ -1,3 +1,5 @@
+-- Cases Table: Immigration case entity schema. Core case record with case identification, type, status, and client relationships.
+
 CREATE TABLE cases (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

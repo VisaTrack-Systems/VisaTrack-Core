@@ -1,3 +1,4 @@
+"""User Schemas: Pydantic models for user-related API requests and responses. Includes user creation, updates, and profile management."""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID

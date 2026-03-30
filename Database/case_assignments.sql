@@ -1,3 +1,5 @@
+-- Case Assignments Table: Primary case assignment tracking. Records lawyer-to-case assignments and assignment metadata.
+
 CREATE TABLE case_assignments (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id         UUID REFERENCES cases(id) ON DELETE CASCADE,

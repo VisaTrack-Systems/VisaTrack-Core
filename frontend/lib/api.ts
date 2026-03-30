@@ -1,3 +1,8 @@
+/**
+ * API Client: TypeScript type definitions and API client functions.
+ * Provides strongly-typed interfaces for all backend API endpoints and data structures.
+ */
+
 export type DashboardOverview = {
   stats: {
     organizations: number;

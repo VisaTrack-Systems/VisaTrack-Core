@@ -1,3 +1,5 @@
+-- Case Collaborators Table: Co-worker and collaborator assignments. Tracks additional lawyers and staff assigned to cases.
+
 CREATE TABLE case_collaborators (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id         UUID REFERENCES cases(id) ON DELETE CASCADE,

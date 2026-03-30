@@ -1,3 +1,5 @@
+-- Milestones Table: Case milestone tracking. Records case milestones, target dates, completion status, and progress tracking.
+
 CREATE TABLE milestones (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id             UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,

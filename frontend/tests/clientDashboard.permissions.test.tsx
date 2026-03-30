@@ -1,8 +1,10 @@
+/** clientDashboard.permissions: Unit tests for clientDashboard.permissions component/module. Validates component behavior and interactions. */
+
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ClientDashboard } from '../figma/components/ClientDashboard';
-import { mockCaseWorkspace, mockClientCases, mockPortalPermissions } from '../figma/storybook/fixtures';
+import { ClientDashboard } from '../design-system/components/ClientDashboard';
+import { mockCaseWorkspace, mockClientCases, mockPortalPermissions } from '../design-system/storybook/fixtures';
 
 vi.mock('@/lib/api', () => ({
   getClientCases: vi.fn(),

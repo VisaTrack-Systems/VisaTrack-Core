@@ -12,6 +12,58 @@ The backend is responsible for:
 
 ---
 
+## Reading the Code (Where to Start)
+
+**New to the codebase?** Read these files in order (~20 minutes):
+
+1. **[app/main.py](app/main.py)** (~20 lines) - Application entry point and middleware
+2. **[app/api/router.py](app/api/router.py)** (~15 lines) - All endpoints aggregated here
+3. **[app/core/security.py](app/core/security.py)** (~130 lines) - JWT tokens and password hashing
+4. **[app/api/routes/auth.py](app/api/routes/auth.py)** (~350 lines, skim) - Login/token endpoints
+5. **[app/services/rbac.py](app/services/rbac.py)** (~175 lines) - Role-based access control
+6. **[tests/conftest.py](tests/conftest.py)** (~60 lines) - Test fixtures and patterns
+
+Then explore by feature:
+- **Case Management**: `app/api/routes/cases.py` + `app/models/case.py`
+- **Document Storage**: `app/services/storage.py`
+- **Audit Trail**: `app/services/audit.py`
+- **Permissions**: `app/api/deps/auth.py`
+
+📖 **Full guide with diagrams**: See [../CODEBASE_TOUR.md](../CODEBASE_TOUR.md)
+
+---
+
+## Project Structure at a Glance
+
+```
+app/
+├── main.py              → FastAPI app initialization
+├── api/
+│   ├── router.py       → Central endpoint aggregation point
+│   ├── routes/         → Domain-specific endpoints (auth, cases, users, admin, etc.)
+│   │   ├── auth.py     → Login, token refresh, signup
+│   │   ├── cases.py    → Case CRUD, documents, milestones
+│   │   ├── users.py    → User management
+│   │   ├── admin.py    → System administration
+│   │   └── ...
+│   └── deps/           → Dependency injection (auth, database)
+├── core/
+│   ├── config.py       → Environment variables and settings
+│   └── security.py     → JWT, password hashing, cryptography
+├── db/
+│   ├── session.py      → Database engine and session factory
+│   ├── base.py         → SQLAlchemy ORM declarative base
+│   └── deps.py         → Database dependency injection
+├── models/             → ORM models (users, cases, orgs, etc.)
+├── schemas/            → Pydantic validation schemas
+├── services/           → Business logic (RBAC, audit, storage)
+└── tests/              → Pytest test suite
+
+alembic/                → Database migration scripts
+```
+
+---
+
 ## Tech Stack
 
 - Python

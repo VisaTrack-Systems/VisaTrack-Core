@@ -1,3 +1,4 @@
+"""Admin Schemas: Pydantic models for administrator-specific operations. Handles org management and user administration requests."""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID

@@ -1,3 +1,5 @@
+-- Permissions Table: Access control permissions schema. Defines granular permissions assigned to roles.
+
 CREATE TABLE permissions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code            VARCHAR(100) UNIQUE NOT NULL,  -- e.g., "cases:edit"

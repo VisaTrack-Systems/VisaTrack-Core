@@ -1,3 +1,5 @@
+/** vitest.setup: vitest.setup implementation. */
+
 import '@testing-library/jest-dom/vitest';
 import { setProjectAnnotations } from '@storybook/react';
 import { vi } from 'vitest';

@@ -1,3 +1,4 @@
+"""Organization Routes: API endpoints for organization management, settings, and tenant administration."""
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session

@@ -1,3 +1,5 @@
+-- User Profiles Table: Extended user profile information. Stores profession type, preferences, and role-specific profile data.
+
 CREATE TABLE user_profiles (
     user_id         UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     user_type       VARCHAR(50) NOT NULL,  -- lawyer, client, staff, admin

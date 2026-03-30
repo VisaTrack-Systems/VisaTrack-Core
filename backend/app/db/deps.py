@@ -1,3 +1,7 @@
+"""Database Dependencies: FastAPI dependency injection for database sessions.
+Provides get_db() for route handlers.
+"""
+
 from collections.abc import Generator
 
 from app.db.session import SessionLocal

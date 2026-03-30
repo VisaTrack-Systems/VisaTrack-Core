@@ -1,3 +1,5 @@
+-- Invoices Table: Billing and invoice records. Stores invoice data with amounts, dates, and payment tracking.
+
 CREATE TABLE invoices (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     UUID NOT NULL REFERENCES organizations(id),

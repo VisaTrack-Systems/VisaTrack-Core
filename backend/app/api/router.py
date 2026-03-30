@@ -1,3 +1,4 @@
+"""API Router: Main FastAPI router that aggregates all sub-routers for cases, users, auth, and other domain endpoints."""
 from fastapi import APIRouter
 
 from app.api.routes import admin, auth, cases, client, dashboard, health, lawyer, organizations, users

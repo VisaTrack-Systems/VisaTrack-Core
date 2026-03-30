@@ -1,3 +1,4 @@
+"""Administration Routes: API endpoints for system administration, user invites, and org-level management."""
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional

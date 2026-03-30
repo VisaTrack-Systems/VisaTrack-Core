@@ -1,3 +1,5 @@
+-- Milestone Templates Table: Reusable milestone templates. Provides standardized milestone templates for common case types.
+
 CREATE TABLE milestone_templates (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id),

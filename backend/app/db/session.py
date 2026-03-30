@@ -1,3 +1,7 @@
+"""Database Session Management: Creates and manages SQLAlchemy session factory,
+database engine, and connection pooling.
+"""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
