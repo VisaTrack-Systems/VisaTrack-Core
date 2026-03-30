@@ -1,3 +1,7 @@
+"""Organization Model: SQLAlchemy ORM model for organizations.
+Represents tenant data and multi-tenancy structure.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

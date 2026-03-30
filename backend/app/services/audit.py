@@ -1,3 +1,4 @@
+"""Audit Logging Service: Logs user activities and system events for compliance and audit trail purposes."""
 from __future__ import annotations
 
 from typing import Any, Optional

@@ -1,3 +1,5 @@
+-- User Invitations Table: Pending user invitations schema. Tracks invitation tokens, expiration dates, and acceptance status.
+
 CREATE TABLE user_invitations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

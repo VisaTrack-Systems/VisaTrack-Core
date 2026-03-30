@@ -1,3 +1,5 @@
+-- Invoice Items Table: Line items for invoices. Details individual charges and service items within invoices.
+
 CREATE TABLE invoice_items (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id      UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,

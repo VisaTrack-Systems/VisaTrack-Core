@@ -1,3 +1,7 @@
+"""Security Module: JWT token generation/validation, password hashing with scrypt,
+token verification, and cryptographic utilities for authentication.
+"""
+
 from __future__ import annotations
 
 import base64

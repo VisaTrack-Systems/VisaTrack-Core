@@ -1,3 +1,5 @@
+-- Document Templates Table: Reusable document templates. Stores predefined document templates for document generation and standardization.
+
 CREATE TABLE document_templates (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     suite_id            UUID REFERENCES document_suites(id) ON DELETE CASCADE,

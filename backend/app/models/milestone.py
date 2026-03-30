@@ -1,3 +1,7 @@
+"""Milestone Model: SQLAlchemy ORM model for case milestones.
+Tracks key dates and phases in visa case progression.
+"""
+
 from __future__ import annotations
 
 from datetime import date, datetime

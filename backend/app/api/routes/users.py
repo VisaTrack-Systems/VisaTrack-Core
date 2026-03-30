@@ -1,3 +1,4 @@
+"""User Management Routes: API endpoints for user CRUD, profile management, and user administration."""
 from typing import Optional
 from uuid import UUID
 

@@ -1,3 +1,5 @@
+-- Users Table: User account and authentication schema. Stores user credentials, contact info, and account verification status.
+
 CREATE TABLE users (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,

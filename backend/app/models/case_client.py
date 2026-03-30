@@ -1,3 +1,7 @@
+"""Case-Client Relationship Model: SQLAlchemy ORM model linking cases to client users.
+Many-to-many relationship junction table.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

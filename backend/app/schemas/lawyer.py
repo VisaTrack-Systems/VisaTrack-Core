@@ -1,3 +1,4 @@
+"""Lawyer Schemas: Pydantic models for lawyer/legal professional profile and workload related API validation."""
 from datetime import date
 from typing import Optional
 from uuid import UUID

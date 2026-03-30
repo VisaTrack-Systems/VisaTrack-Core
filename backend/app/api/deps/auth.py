@@ -1,3 +1,4 @@
+"""Authentication Dependencies: FastAPI dependency functions for JWT validation, user extraction, and role-based access enforcement."""
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,8 @@
+/**
+ * Global Styles: Root-level CSS configuration for VisaTrack application.
+ * Imports Tailwind CSS, defines CSS variables for theming, and sets base styling.
+ */
+
 @import "tailwindcss";
 
 :root {

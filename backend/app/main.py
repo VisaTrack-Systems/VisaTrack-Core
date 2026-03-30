@@ -1,3 +1,7 @@
+"""FastAPI Application: Main application factory and middleware configuration.
+Sets up CORS, routing, and core FastAPI settings.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

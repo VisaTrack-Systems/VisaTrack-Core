@@ -1,3 +1,4 @@
+"""Organization Schemas: Pydantic models for organization management and tenant configuration API requests."""
 from datetime import datetime
 from uuid import UUID
 

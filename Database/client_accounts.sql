@@ -1,3 +1,5 @@
+-- Client Accounts Table: Client financial account information. Maintains client account balances and account-level settings.
+
 CREATE TABLE client_accounts (
     id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id                 UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

@@ -1,3 +1,4 @@
+"""Health Check Routes: API endpoint for service health and readiness checks."""
 from fastapi import APIRouter
 
 router = APIRouter(tags=["health"])

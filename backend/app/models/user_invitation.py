@@ -1,3 +1,7 @@
+"""User Invitation Model: SQLAlchemy ORM model for pending user invitations.
+Tracks invite tokens, expiration, and acceptance status.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

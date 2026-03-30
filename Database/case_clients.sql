@@ -1,3 +1,5 @@
+-- Case-Clients Junction Table: Many-to-many case to client relationship. Links multiple clients to cases for joint applications or supporting parties.
+
 CREATE TABLE case_clients (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     case_id             UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,

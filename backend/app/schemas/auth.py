@@ -1,3 +1,4 @@
+"""Authentication Schemas: Pydantic models for login, token, and authentication-related API requests and responses."""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID

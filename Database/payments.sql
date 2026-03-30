@@ -1,3 +1,5 @@
+-- Payments Table: Payment transaction records. Tracks payments received against invoices and cases.
+
 CREATE TABLE payments (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id          UUID NOT NULL REFERENCES invoices(id),

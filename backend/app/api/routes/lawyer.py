@@ -1,3 +1,4 @@
+"""Lawyer Routes: API endpoints for lawyer profile, workload, and lawyer-specific operations."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

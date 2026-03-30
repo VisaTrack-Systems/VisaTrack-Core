@@ -1,3 +1,5 @@
+-- Activity Log Table: System-wide activity audit trail. Logs all user activities, case changes, and system events for compliance.
+
 CREATE TABLE activity_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id),

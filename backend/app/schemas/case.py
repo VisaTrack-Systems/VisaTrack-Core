@@ -1,3 +1,4 @@
+"""Case Schemas: Pydantic models for case-related API requests and responses. Handles CRUD validation for case data."""
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID

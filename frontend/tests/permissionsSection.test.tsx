@@ -1,9 +1,11 @@
+/** permissionsSection.test: Configuration section for permissions.test settings and options. */
+
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { PermissionsSection } from '../figma/components/case-configuration/sections/PermissionsSection';
-import { mockPortalPermissions } from '../figma/storybook/fixtures';
+import { PermissionsSection } from '../design-system/components/case-configuration/sections/PermissionsSection';
+import { mockPortalPermissions } from '../design-system/storybook/fixtures';
 
 function renderPermissionsSection(options?: {
   portalPermissions?: typeof mockPortalPermissions;

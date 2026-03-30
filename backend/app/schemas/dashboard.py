@@ -1,3 +1,4 @@
+"""Dashboard Schemas: Pydantic models for dashboard overview, analytics, and summary data API responses."""
 from datetime import date
 from typing import Optional
 from uuid import UUID

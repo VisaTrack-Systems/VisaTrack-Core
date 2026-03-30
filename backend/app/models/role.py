@@ -1,3 +1,7 @@
+"""Role Model: SQLAlchemy ORM model for access control roles.
+Defines permissions and role definitions for RBAC system.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime

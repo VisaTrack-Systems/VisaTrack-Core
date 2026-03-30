@@ -1,3 +1,5 @@
+/** storybook: Unit tests for storybook component/module. Validates component behavior and interactions. */
+
 import { act, cleanup, render, type RenderResult } from '@testing-library/react';
 import { composeStories } from '@storybook/react';
 import { afterEach, describe, expect, it } from 'vitest';
