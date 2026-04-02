@@ -343,10 +343,20 @@ def verify_invitation(
     if user is None:
         raise HTTPException(status_code=400, detail="Invited user no longer exists")
 
+    organization = db.scalar(
+        select(Organization).where(
+            Organization.id == user.organization_id,
+            Organization.deleted_at.is_(None),
+        )
+    )
+    if organization is None:
+        raise HTTPException(status_code=400, detail="Organization no longer exists")
+
     return VerifyInvitationResponse(
         email=user.email,
         full_name=f"{user.first_name} {user.last_name}",
         organization_id=user.organization_id,
+        organization_slug=organization.slug,
         expires_at=invitation.expires_at,
     )
 
