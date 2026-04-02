@@ -193,6 +193,7 @@ export type VerifyInvitationResult = {
   email: string;
   full_name: string;
   organization_id: string;
+  organization_slug: string;
   expires_at: string;
 };
 

@@ -187,3 +187,32 @@ def test_accept_invitation_activates_user_and_creates_profile(monkeypatch, make_
     assert result.email == user.email
     assert user.status == 'active'
     db.commit.assert_called_once()
+
+
+def test_verify_invitation_returns_organization_slug(monkeypatch, make_user):
+    organization_id = uuid4()
+    invitation = row(
+        organization_id=organization_id,
+        user_id=uuid4(),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        accepted_at=None,
+        revoked_at=None,
+    )
+    user = make_user(
+        id=invitation.user_id,
+        organization_id=organization_id,
+        email='invitee@example.com',
+        first_name='Invitee',
+        last_name='User',
+    )
+    organization = row(id=organization_id, slug='acme-law')
+    db = MagicMock()
+    db.scalar.side_effect = [invitation, user, organization]
+    monkeypatch.setattr(auth, 'hash_invitation_token', lambda token: 'token-hash')
+
+    result = auth.verify_invitation(token='a' * 16, db=db)
+
+    assert result.email == 'invitee@example.com'
+    assert result.full_name == 'Invitee User'
+    assert str(result.organization_id) == str(organization_id)
+    assert result.organization_slug == 'acme-law'

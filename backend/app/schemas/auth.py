@@ -89,4 +89,5 @@ class VerifyInvitationResponse(BaseModel):
     email: str
     full_name: str
     organization_id: UUID
+    organization_slug: str
     expires_at: datetime
