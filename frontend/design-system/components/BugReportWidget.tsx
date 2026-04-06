@@ -54,6 +54,23 @@ export function BugReportWidget() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
+    };
+  }, [isOpen]);
+
   const resetForm = () => {
     setTitle("");
     setDetails("");
@@ -289,6 +306,11 @@ export function BugReportWidget() {
           className={`fixed inset-0 z-[99] flex items-center justify-center bg-black/60 p-4 ${
             isUiHiddenForCapture ? "hidden" : ""
           }`}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeModal();
+            }
+          }}
         >
           <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
