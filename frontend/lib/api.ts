@@ -567,6 +567,24 @@ export type UpdateCurrentUserSettingsInput = {
   locale: string;
 };
 
+export type SubmitBugReportInput = {
+  title: string;
+  details: string;
+  channel: 'email' | 'github';
+  context: {
+    path: string;
+    origin: string;
+    reported_at_utc: string;
+    user_agent: string;
+    screenshot_captured_at: string | null;
+  };
+  screenshot?: {
+    filename: string;
+    content_type: string;
+    base64_content: string;
+  } | null;
+};
+
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const authTokenStorageKey = 'visatrack.access_token';
 
@@ -617,8 +635,45 @@ export function clearAccessToken(): void {
 
 async function parseErrorDetail(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { detail?: string };
-    return payload.detail ? ` - ${payload.detail}` : '';
+    const payload = (await response.json()) as {
+      detail?:
+        | string
+        | Array<{ loc?: Array<string | number>; msg?: string; type?: string }>
+        | Record<string, unknown>;
+    };
+
+    if (!payload.detail) {
+      return '';
+    }
+
+    if (typeof payload.detail === 'string') {
+      return ` - ${payload.detail}`;
+    }
+
+    if (Array.isArray(payload.detail)) {
+      const messages = payload.detail
+        .map((issue) => {
+          const location = Array.isArray(issue.loc)
+            ? issue.loc
+                .filter((part) => part !== 'body')
+                .map((part) => String(part))
+                .join('.')
+            : '';
+          const message = issue.msg?.trim() || 'Invalid value';
+          return location ? `${location}: ${message}` : message;
+        })
+        .filter(Boolean);
+
+      if (messages.length > 0) {
+        return ` - ${messages.join('; ')}`;
+      }
+    }
+
+    if (typeof payload.detail === 'object') {
+      return ` - ${JSON.stringify(payload.detail)}`;
+    }
+
+    return '';
   } catch {
     return '';
   }
@@ -759,6 +814,17 @@ export async function updateCurrentUserSettings(
 
 export async function getDashboardOverview(): Promise<DashboardOverview> {
   return requestJson<DashboardOverview>('/api/v1/dashboard/overview');
+}
+
+export async function submitBugReport(input: SubmitBugReportInput): Promise<void> {
+  return requestVoid(
+    '/api/v1/feedback/bug-report',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    { includeAuth: false }
+  );
 }
 
 export async function getCases(limit = 10): Promise<CaseListItem[]> {
