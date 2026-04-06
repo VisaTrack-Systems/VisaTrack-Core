@@ -34,6 +34,7 @@ class Settings:
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.ca")
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
+    bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
 
     @property
     def frontend_origins(self) -> list[str]:

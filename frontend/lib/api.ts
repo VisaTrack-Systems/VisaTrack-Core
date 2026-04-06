@@ -567,6 +567,24 @@ export type UpdateCurrentUserSettingsInput = {
   locale: string;
 };
 
+export type SubmitBugReportInput = {
+  title: string;
+  details: string;
+  channel: 'email' | 'github';
+  context: {
+    path: string;
+    origin: string;
+    reported_at_utc: string;
+    user_agent: string;
+    screenshot_captured_at: string | null;
+  };
+  screenshot?: {
+    filename: string;
+    content_type: string;
+    base64_content: string;
+  } | null;
+};
+
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const authTokenStorageKey = 'visatrack.access_token';
 
@@ -759,6 +777,17 @@ export async function updateCurrentUserSettings(
 
 export async function getDashboardOverview(): Promise<DashboardOverview> {
   return requestJson<DashboardOverview>('/api/v1/dashboard/overview');
+}
+
+export async function submitBugReport(input: SubmitBugReportInput): Promise<void> {
+  return requestVoid(
+    '/api/v1/feedback/bug-report',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    { includeAuth: false }
+  );
 }
 
 export async function getCases(limit = 10): Promise<CaseListItem[]> {

@@ -170,3 +170,118 @@ def send_invitation_email(
     })
 
     logger.info("Invitation email sent to %s via Resend", to_email)
+
+
+def send_bug_report_email(
+    *,
+    to_email: str,
+    report_title: str,
+    report_details: str,
+    path: str,
+    origin: str | None,
+    reported_at_utc: str,
+    user_agent: str | None,
+    screenshot_captured_at: str | None,
+    screenshot_filename: str | None,
+    screenshot_content_type: str | None,
+    screenshot_base64_content: str | None,
+    delivery_channel: str,
+    sender_ip: str | None,
+    referrer: str | None,
+    browser_language: str | None,
+) -> None:
+    """Send a bug report email via Resend."""
+    if not settings.resend_api_key:
+        raise EmailNotConfiguredError(
+            "Resend is not configured. Set RESEND_API_KEY in your environment."
+        )
+
+    resend.api_key = settings.resend_api_key
+
+    from_address = f"{settings.resend_from_name} <{settings.resend_from_email}>"
+    subject = f"[Bug Report] {report_title.strip()}"
+
+    plain_text = (
+        "Bug report submitted from VisaTrack\n\n"
+        f"Title: {report_title}\n"
+        f"Details:\n{report_details}\n\n"
+        "Context\n"
+        f"- Path: {path}\n"
+        f"- Origin: {origin or 'unknown'}\n"
+        f"- Reported at (UTC): {reported_at_utc}\n"
+        f"- Channel selected: {delivery_channel}\n"
+        f"- Screenshot captured at (UTC): {screenshot_captured_at or 'not provided'}\n"
+        f"- Screenshot attached: {'yes' if screenshot_base64_content else 'no'}\n"
+        f"- User-Agent: {user_agent or 'unknown'}\n"
+        f"- Referrer: {referrer or 'unknown'}\n"
+        f"- Browser language: {browser_language or 'unknown'}\n"
+        f"- Sender IP: {sender_ip or 'unknown'}\n"
+    )
+
+    escaped_title = html_lib.escape(report_title)
+    escaped_details = html_lib.escape(report_details).replace("\n", "<br>")
+    escaped_path = html_lib.escape(path)
+    escaped_origin = html_lib.escape(origin or "unknown")
+    escaped_reported_at = html_lib.escape(reported_at_utc)
+    escaped_channel = html_lib.escape(delivery_channel)
+    escaped_screenshot = html_lib.escape(screenshot_captured_at or "not provided")
+    escaped_screenshot_attached = "yes" if screenshot_base64_content else "no"
+    escaped_user_agent = html_lib.escape(user_agent or "unknown")
+    escaped_referrer = html_lib.escape(referrer or "unknown")
+    escaped_browser_language = html_lib.escape(browser_language or "unknown")
+    escaped_sender_ip = html_lib.escape(sender_ip or "unknown")
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0;padding:24px;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:700px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+    <div style="background:#111827;color:#ffffff;padding:16px 20px;font-size:18px;font-weight:600;">
+      VisaTrack Bug Report
+    </div>
+    <div style="padding:20px;">
+      <h2 style="margin:0 0 12px;color:#111827;font-size:20px;">{escaped_title}</h2>
+      <p style="margin:0 0 16px;color:#374151;line-height:1.65;">{escaped_details}</p>
+
+      <h3 style="margin:20px 0 8px;color:#111827;font-size:16px;">Context</h3>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr><td style="padding:6px 0;color:#6b7280;">Path</td><td style="padding:6px 0;color:#111827;">{escaped_path}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Origin</td><td style="padding:6px 0;color:#111827;">{escaped_origin}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Reported at (UTC)</td><td style="padding:6px 0;color:#111827;">{escaped_reported_at}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Channel selected</td><td style="padding:6px 0;color:#111827;">{escaped_channel}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Screenshot captured</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Screenshot attached</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot_attached}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">User-Agent</td><td style="padding:6px 0;color:#111827;">{escaped_user_agent}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Referrer</td><td style="padding:6px 0;color:#111827;">{escaped_referrer}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Browser language</td><td style="padding:6px 0;color:#111827;">{escaped_browser_language}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Sender IP</td><td style="padding:6px 0;color:#111827;">{escaped_sender_ip}</td></tr>
+      </table>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    send_params: dict = {
+        "from": from_address,
+        "to": [to_email],
+        "subject": subject,
+        "text": plain_text,
+        "html": html,
+        "click_tracking": False,
+    }
+
+    if screenshot_base64_content and screenshot_filename:
+        send_params["attachments"] = [
+            {
+                "filename": screenshot_filename,
+                "content": screenshot_base64_content,
+                "content_type": screenshot_content_type or "image/png",
+            }
+        ]
+
+    resend.Emails.send(send_params)
+
+    logger.info("Bug report email sent to %s via Resend", to_email)

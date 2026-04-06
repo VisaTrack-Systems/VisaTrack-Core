@@ -4,10 +4,16 @@ import { AlertCircle, Bug, Mail, Send, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { submitBugReport } from "@/lib/api";
+
 type DeliveryChannel = "email" | "github";
 type ScreenshotState = "idle" | "capturing" | "copied" | "downloaded" | "failed";
+type ScreenshotAttachmentPayload = {
+  filename: string;
+  content_type: string;
+  base64_content: string;
+};
 
-const DEFAULT_BUG_REPORT_EMAIL = "support@visatrack.ca";
 const DEFAULT_GITHUB_ISSUES_URL = "https://github.com/VisaTrack-Systems/VisaTrack-Core/issues/new";
 
 function buildPathWithQuery(pathname: string, searchParams: URLSearchParams): string {
@@ -27,9 +33,12 @@ export function BugReportWidget() {
   const [screenshotState, setScreenshotState] = useState<ScreenshotState>("idle");
   const [screenshotMessage, setScreenshotMessage] = useState<string | null>(null);
   const [screenshotCapturedAt, setScreenshotCapturedAt] = useState<string | null>(null);
+  const [screenshotAttachment, setScreenshotAttachment] = useState<ScreenshotAttachmentPayload | null>(
+    null
+  );
   const [isUiHiddenForCapture, setIsUiHiddenForCapture] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const reportEmail = (process.env.NEXT_PUBLIC_BUG_REPORT_EMAIL || DEFAULT_BUG_REPORT_EMAIL).trim();
   const githubIssuesUrl = (
     process.env.NEXT_PUBLIC_GITHUB_ISSUES_URL || DEFAULT_GITHUB_ISSUES_URL
   ).trim();
@@ -78,7 +87,9 @@ export function BugReportWidget() {
     setScreenshotState("idle");
     setScreenshotMessage(null);
     setScreenshotCapturedAt(null);
+    setScreenshotAttachment(null);
     setIsUiHiddenForCapture(false);
+    setIsSubmitting(false);
   };
 
   const closeModal = () => {
@@ -184,6 +195,27 @@ export function BugReportWidget() {
     URL.revokeObjectURL(blobUrl);
   };
 
+  const blobToBase64 = async (blob: Blob): Promise<string> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Failed to convert screenshot to base64."));
+          return;
+        }
+        resolve(reader.result);
+      };
+      reader.onerror = () => reject(new Error("Failed to read screenshot blob."));
+      reader.readAsDataURL(blob);
+    });
+
+    const parts = dataUrl.split(",", 2);
+    if (parts.length < 2 || !parts[1]) {
+      throw new Error("Invalid screenshot encoding.");
+    }
+    return parts[1];
+  };
+
   const captureScreenshot = async () => {
     if (!isScreenshotCaptureSupported()) {
       setScreenshotState("failed");
@@ -196,6 +228,14 @@ export function BugReportWidget() {
 
     try {
       const screenshotBlob = await captureScreenshotBlob();
+      const screenshotBase64 = await blobToBase64(screenshotBlob);
+      const screenshotFilename = `visatrack-bug-${Date.now()}.png`;
+      setScreenshotAttachment({
+        filename: screenshotFilename,
+        content_type: screenshotBlob.type || "image/png",
+        base64_content: screenshotBase64,
+      });
+
       const copied = await tryCopyImageToClipboard(screenshotBlob);
       const nowUtc = new Date().toISOString();
       setScreenshotCapturedAt(nowUtc);
@@ -203,16 +243,15 @@ export function BugReportWidget() {
       if (copied) {
         setScreenshotState("copied");
         setScreenshotMessage(
-          "Screenshot copied. Paste it into the GitHub issue (Ctrl/Cmd+V) before submitting."
+          "Screenshot copied and will be attached to internal email reports."
         );
         return;
       }
 
-      const filename = `visatrack-bug-${Date.now()}.png`;
-      downloadImageBlob(screenshotBlob, filename);
+      downloadImageBlob(screenshotBlob, screenshotFilename);
       setScreenshotState("downloaded");
       setScreenshotMessage(
-        `Clipboard image copy is unavailable. Downloaded ${filename}; attach it manually.`
+        `Clipboard image copy is unavailable. Downloaded ${screenshotFilename}. It will still be attached to internal email reports.`
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
@@ -253,13 +292,7 @@ export function BugReportWidget() {
     return url.toString();
   };
 
-  const createMailtoUrl = (summary: string, description: string): string => {
-    const subject = encodeURIComponent(`[VisaTrack Bug] ${summary}`);
-    const body = encodeURIComponent(buildReportBody(summary, description));
-    return `mailto:${reportEmail}?subject=${subject}&body=${body}`;
-  };
-
-  const submitReport = () => {
+  const submitReport = async () => {
     const normalizedTitle = title.trim();
     const normalizedDetails = details.trim();
 
@@ -282,9 +315,32 @@ export function BugReportWidget() {
       return;
     }
 
-    const mailtoUrl = createMailtoUrl(normalizedTitle, normalizedDetails);
-    window.location.href = mailtoUrl;
-    closeModal();
+    const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
+    const reportedAtUtc = new Date().toISOString();
+
+    setIsSubmitting(true);
+    try {
+      await submitBugReport({
+        title: normalizedTitle,
+        details: normalizedDetails,
+        channel,
+        context: {
+          path: pathWithQuery,
+          origin,
+          reported_at_utc: reportedAtUtc,
+          user_agent: userAgent,
+          screenshot_captured_at: screenshotCapturedAt,
+        },
+        screenshot: screenshotAttachment,
+      });
+      closeModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send bug report email.";
+      setValidationError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -354,7 +410,7 @@ export function BugReportWidget() {
                     }`}
                   >
                     <p className="font-semibold">Email</p>
-                    <p className="text-xs opacity-80 break-all">{reportEmail}</p>
+                    <p className="text-xs opacity-80 break-all">Sent by VisaTrack support system</p>
                   </button>
                 </div>
               </div>
@@ -431,11 +487,16 @@ export function BugReportWidget() {
               </button>
               <button
                 type="button"
-                onClick={submitReport}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => void submitReport()}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {channel === "email" ? <Mail className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-                Open {channel === "email" ? "email draft" : "GitHub issue"}
+                {isSubmitting
+                  ? "Sending..."
+                  : channel === "email"
+                    ? "Send bug report"
+                    : "Open GitHub issue"}
               </button>
             </div>
           </div>
