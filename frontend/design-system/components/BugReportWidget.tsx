@@ -359,7 +359,7 @@ export function BugReportWidget() {
 
       {isOpen ? (
         <div
-          className={`fixed inset-0 z-[99] flex items-center justify-center bg-black/60 p-4 ${
+          className={`fixed inset-0 z-[99] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center ${
             isUiHiddenForCapture ? "hidden" : ""
           }`}
           onClick={(event) => {
@@ -368,7 +368,10 @@ export function BugReportWidget() {
             }
           }}
         >
-          <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            className="my-2 flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            style={{ maxHeight: "calc(100vh - 2rem)" }}
+          >
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Report a bug</h2>
@@ -384,7 +387,7 @@ export function BugReportWidget() {
               </button>
             </div>
 
-            <div className="space-y-4 px-5 py-4">
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Where should this go?</label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
