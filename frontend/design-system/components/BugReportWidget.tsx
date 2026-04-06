@@ -296,13 +296,13 @@ export function BugReportWidget() {
     const normalizedTitle = title.trim();
     const normalizedDetails = details.trim();
 
-    if (!normalizedTitle) {
-      setValidationError("Please add a short bug title.");
+    if (!normalizedTitle || normalizedTitle.length < 3) {
+      setValidationError("Title must be at least 3 characters.");
       return;
     }
 
-    if (!normalizedDetails) {
-      setValidationError("Please describe what happened.");
+    if (!normalizedDetails || normalizedDetails.length < 5) {
+      setValidationError("Details must be at least 5 characters.");
       return;
     }
 
@@ -426,6 +426,7 @@ export function BugReportWidget() {
                   id="bug-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
+                  minLength={3}
                   placeholder="Short summary of the bug"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
                 />
@@ -439,6 +440,7 @@ export function BugReportWidget() {
                   id="bug-details"
                   value={details}
                   onChange={(event) => setDetails(event.target.value)}
+                  minLength={5}
                   rows={6}
                   placeholder="What did you expect, what happened, and steps to reproduce?"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
