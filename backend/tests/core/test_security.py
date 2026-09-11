@@ -24,7 +24,8 @@ def test_verify_password_rejects_unknown_hash_format():
     assert security.verify_password('secret', 'secret') is False
 
 
-def test_access_token_can_be_decoded():
+def test_access_token_can_be_decoded(monkeypatch):
+    monkeypatch.setattr(security.settings, 'auth_secret_key', 'x' * 32)
     token = security.create_access_token('user-1', 'org-1', ['lawyer'])
     payload = security.decode_access_token(token)
 
