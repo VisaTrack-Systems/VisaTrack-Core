@@ -54,12 +54,11 @@ TABLES_IN_CREATION_ORDER = tuple(
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    connection = op.get_bind()
     for file_name in SCHEMA_FILES:
         schema_path = SCHEMA_DIRECTORY / file_name
         if not schema_path.is_file():
             raise RuntimeError(f"Missing baseline schema file: {schema_path}")
-        connection.exec_driver_sql(schema_path.read_text(encoding="utf-8"))
+        op.execute(schema_path.read_text(encoding="utf-8"))
 
 
 def downgrade() -> None:
