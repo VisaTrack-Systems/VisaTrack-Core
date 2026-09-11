@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 from app.services.audit import log_activity, log_document_access
+from app.services import audit
 
 
 def test_log_activity_executes_insert():
@@ -26,6 +27,7 @@ def test_log_activity_executes_insert():
     assert params['organization_id'] == str(organization_id)
     assert params['user_id'] == str(user_id)
     assert params['action'] == 'created'
+    assert 'audit_outbox' in str(db.execute.call_args.args[0])
 
 
 def test_log_document_access_executes_insert():
@@ -46,3 +48,19 @@ def test_log_document_access_executes_insert():
     assert params['document_id'] == str(document_id)
     assert params['action'] == 'download'
     assert params['ip_address'] == '127.0.0.1'
+
+
+def test_audit_redaction_removes_nested_credentials():
+    value = {
+        'email': 'person@example.com',
+        'token': 'plain-token',
+        'nested': {'password': 'plain-password'},
+        'items': [{'refresh_token': 'plain-refresh'}],
+    }
+
+    assert audit._redact(value) == {
+        'email': 'person@example.com',
+        'token': '[REDACTED]',
+        'nested': {'password': '[REDACTED]'},
+        'items': [{'refresh_token': '[REDACTED]'}],
+    }

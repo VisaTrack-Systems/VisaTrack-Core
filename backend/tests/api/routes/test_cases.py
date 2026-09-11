@@ -863,7 +863,7 @@ def test_initiate_case_document_upload_returns_presigned_upload(monkeypatch, mak
 
     assert result.upload_url == 'https://upload'
     assert result.upload_method == 'POST'
-    assert result.storage_key.startswith(f'org/{auth.organization_id}/case/{case.id}/documents/')
+    assert result.storage_key.startswith(f'quarantine/org/{auth.organization_id}/case/{case.id}/documents/')
 
 
 def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_context):
@@ -880,7 +880,7 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
         'previous_case_document_id': None,
         'next_version': 1,
     }
-    storage_key = f'org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-passport.pdf'
+    storage_key = f'quarantine/org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-passport.pdf'
     db = MagicMock()
     db.execute.return_value = FakeResult(rows=[{'id': uuid4(), 'uploaded_at': datetime.now(timezone.utc)}])
     monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
@@ -903,8 +903,8 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
         db=db,
     )
 
-    assert result.status == 'received'
-    assert result.can_download is True
+    assert result.status == 'scanning'
+    assert result.can_download is False
 
 
 def test_complete_case_document_upload_removes_oversized_object(
@@ -930,7 +930,7 @@ def test_complete_case_document_upload_removes_oversized_object(
         'next_version': 1,
     }
     storage_key = (
-        f'org/{case.organization_id}/case/{case.id}/documents/'
+        f'quarantine/org/{case.organization_id}/case/{case.id}/documents/'
         f'{document_id}/uuid-passport.pdf'
     )
     deleted = []
@@ -991,7 +991,7 @@ def test_complete_case_document_upload_marks_requested_custom_document_received(
         'previous_case_document_id': None,
         'next_version': 1,
     }
-    storage_key = f'org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-travel-history.pdf'
+    storage_key = f'quarantine/org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-travel-history.pdf'
     inserted_id = uuid4()
     db = MagicMock()
     db.execute.return_value = FakeResult(rows=[{'id': inserted_id, 'uploaded_at': datetime.now(timezone.utc)}])
@@ -1015,9 +1015,9 @@ def test_complete_case_document_upload_marks_requested_custom_document_received(
         db=db,
     )
 
-    assert result.status == 'received'
+    assert result.status == 'scanning'
     assert case.custom_fields['document_upload_bindings'][document_id] == str(inserted_id)
-    assert case.custom_fields['document_status_overrides'][document_id] == 'received'
+    assert case.custom_fields['document_status_overrides'][document_id] == 'scanning'
     assert case.custom_fields['document_rejection_notes'] == {}
 
 
@@ -1044,7 +1044,7 @@ def test_complete_case_document_upload_replaces_previous_custom_upload_version(m
         'previous_case_document_id': previous_case_document_id,
         'next_version': 2,
     }
-    storage_key = f'org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-travel-history-v2.pdf'
+    storage_key = f'quarantine/org/{case.organization_id}/case/{case.id}/documents/{document_id}/uuid-travel-history-v2.pdf'
     inserted_id = uuid4()
 
     db = MagicMock()
@@ -1073,7 +1073,7 @@ def test_complete_case_document_upload_replaces_previous_custom_upload_version(m
     )
 
     assert case.custom_fields['document_upload_bindings'][document_id] == str(inserted_id)
-    assert case.custom_fields['document_status_overrides'][document_id] == 'received'
+    assert case.custom_fields['document_status_overrides'][document_id] == 'scanning'
     assert len(db.execute.call_args_list) == 2
     second_call_params = db.execute.call_args_list[1].args[1]
     assert second_call_params['previous_case_document_id'] == previous_case_document_id
@@ -1106,6 +1106,34 @@ def test_get_case_document_view_url_returns_inline_presigned_link(monkeypatch, m
     )
 
     assert result.view_url == 'https://view-inline'
+
+
+def test_get_case_document_view_url_blocks_quarantined_file(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})
+    slot = {
+        'logical_document_id': str(uuid4()),
+        'name': 'Passport',
+        'bound_case_document': {
+            'id': uuid4(),
+            'file_path': 'quarantine/org/x/doc.pdf',
+            'file_name': 'passport.pdf',
+            'scan_status': 'pending',
+        },
+    }
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+
+    with pytest.raises(HTTPException) as exc:
+        cases.get_case_document_view_url(
+            case_number='C-2026-001',
+            document_id=slot['logical_document_id'],
+            request=row(client=row(host='127.0.0.1'), headers={}),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 409
     assert result.file_name == 'passport.pdf'
 
 

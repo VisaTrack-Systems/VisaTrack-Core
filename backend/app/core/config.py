@@ -49,6 +49,15 @@ class Settings:
     s3_endpoint_url: str = os.getenv("S3_ENDPOINT_URL", "")
     s3_presign_expires_seconds: int = int(os.getenv("S3_PRESIGN_EXPIRES_SECONDS", "900"))
     s3_max_upload_bytes: int = int(os.getenv("S3_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+    s3_quarantine_prefix: str = os.getenv("S3_QUARANTINE_PREFIX", "quarantine").strip("/")
+    s3_clean_prefix: str = os.getenv("S3_CLEAN_PREFIX", "clean").strip("/")
+    document_scanner_command: str = os.getenv("DOCUMENT_SCANNER_COMMAND", "clamscan")
+    document_scan_timeout_seconds: int = int(
+        os.getenv("DOCUMENT_SCAN_TIMEOUT_SECONDS", "120")
+    )
+    document_retention_days: int = int(os.getenv("DOCUMENT_RETENTION_DAYS", "2555"))
+    audit_archive_bucket: str = os.getenv("AUDIT_ARCHIVE_BUCKET", "")
+    audit_retention_days: int = int(os.getenv("AUDIT_RETENTION_DAYS", "2555"))
     resend_api_key: str = os.getenv("RESEND_API_KEY", "")
     resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.ca")
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
@@ -81,6 +90,12 @@ class Settings:
 
         if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
             raise RuntimeError("AUTH_COOKIE_SAMESITE must be lax, strict, or none")
+
+        if not self.s3_bucket_name or not self.aws_kms_key_id or not self.audit_archive_bucket:
+            raise RuntimeError(
+                "S3_BUCKET_NAME, AWS_KMS_KEY_ID, and AUDIT_ARCHIVE_BUCKET are required "
+                "outside local environments"
+            )
 
     @property
     def frontend_origins(self) -> list[str]:
