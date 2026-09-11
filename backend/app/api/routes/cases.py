@@ -3,7 +3,7 @@ import re
 from collections.abc import Iterator
 from tempfile import SpooledTemporaryFile
 from zipfile import ZIP_DEFLATED, ZipFile
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID, uuid4
@@ -56,6 +56,7 @@ from app.schemas.case import (
     MilestoneSummary,
 )
 from app.services.audit import log_activity, log_document_access
+from app.services.jobs import enqueue_job
 from app.services.storage import (
     StorageConfigurationError,
     StorageOperationError,
@@ -436,7 +437,10 @@ def _sanitize_file_name(file_name: str) -> str:
 
 def _build_document_storage_key(*, organization_id: UUID, case_id: UUID, document_id: str, file_name: str) -> str:
     safe_name = _sanitize_file_name(file_name)
-    return f"org/{organization_id}/case/{case_id}/documents/{document_id}/{uuid4()}-{safe_name}"
+    return (
+        f"{settings.s3_quarantine_prefix}/org/{organization_id}/case/{case_id}/"
+        f"documents/{document_id}/{uuid4()}-{safe_name}"
+    )
 
 
 def _client_portal_capabilities(case: Case) -> dict[str, bool | str]:
@@ -538,6 +542,7 @@ def _resolve_document_slot(*, case: Case, document_id: str, db: Session) -> dict
                 file_name,
                 file_path,
                 status,
+                scan_status,
                 uploaded_at,
                 version,
                 template_id
@@ -578,7 +583,7 @@ def _resolve_document_slot(*, case: Case, document_id: str, db: Session) -> dict
             bound_case_document = db.execute(
                 text(
                     """
-                    SELECT id, name, file_name, file_path, status, uploaded_at, version
+                    SELECT id, name, file_name, file_path, status, scan_status, uploaded_at, version
                     FROM case_documents
                     WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
                     LIMIT 1
@@ -2433,7 +2438,10 @@ def rename_case_document(
             LIMIT 1
             """
         ),
-        {"document_id": str(document_uuid), "case_id": str(case.id)},
+        {
+            "document_id": str(document_uuid),
+            "case_id": str(case.id),
+        },
     ).first()
 
     if not custom_doc_updated and template_exists is None and case_document_exists is None:
@@ -2495,12 +2503,19 @@ def delete_case_document(
         text(
             """
             UPDATE case_documents
-            SET deleted_at = NOW(), updated_at = NOW()
+            SET deleted_at = NOW(),
+                retention_delete_after = :retention_delete_after,
+                updated_at = NOW()
             WHERE id = :document_id AND case_id = :case_id AND deleted_at IS NULL
             RETURNING id
             """
         ),
-        {"document_id": str(document_uuid), "case_id": str(case.id)},
+        {
+            "document_id": str(document_uuid),
+            "case_id": str(case.id),
+            "retention_delete_after": datetime.now(timezone.utc)
+            + timedelta(days=settings.document_retention_days),
+        },
     ).first()
 
     template_exists = db.execute(
@@ -2563,6 +2578,16 @@ def delete_case_document(
     )
 
     db.add(case)
+    if removed_case_document is not None:
+        enqueue_job(
+            db,
+            organization_id=case.organization_id,
+            job_type="purge_document",
+            idempotency_key=f"purge-document:{document_uuid}",
+            payload={"document_id": str(document_uuid)},
+            scheduled_at=datetime.now(timezone.utc)
+            + timedelta(days=settings.document_retention_days),
+        )
     db.commit()
 
 
@@ -2774,7 +2799,8 @@ def complete_case_document_upload(
 
     slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
     expected_prefix = (
-        f"org/{case.organization_id}/case/{case.id}/documents/{slot['logical_document_id']}/"
+        f"{settings.s3_quarantine_prefix}/org/{case.organization_id}/case/{case.id}/"
+        f"documents/{slot['logical_document_id']}/"
     )
     if not payload.storage_key.startswith(expected_prefix):
         raise HTTPException(status_code=400, detail="Storage key does not match document upload scope")
@@ -2833,6 +2859,7 @@ def complete_case_document_upload(
                 version,
                 previous_version_id,
                 status,
+                scan_status,
                 issue_date,
                 expiry_date,
                 uploaded_by
@@ -2848,7 +2875,8 @@ def complete_case_document_upload(
                 :file_hash,
                 :version,
                 CAST(:previous_version_id AS uuid),
-                'received',
+                'scanning',
+                'pending',
                 :issue_date,
                 :expiry_date,
                 :uploaded_by
@@ -2890,7 +2918,9 @@ def complete_case_document_upload(
                 text(
                     """
                     UPDATE case_documents
-                    SET deleted_at = NOW(), updated_at = NOW()
+                    SET deleted_at = NOW(),
+                        retention_delete_after = :retention_delete_after,
+                        updated_at = NOW()
                     WHERE id = :previous_case_document_id
                       AND case_id = :case_id
                       AND deleted_at IS NULL
@@ -2899,11 +2929,22 @@ def complete_case_document_upload(
                 {
                     "previous_case_document_id": slot["previous_case_document_id"],
                     "case_id": str(case.id),
+                    "retention_delete_after": datetime.now(timezone.utc)
+                    + timedelta(days=settings.document_retention_days),
                 },
+            )
+            enqueue_job(
+                db,
+                organization_id=case.organization_id,
+                job_type="purge_document",
+                idempotency_key=f"purge-document:{slot['previous_case_document_id']}",
+                payload={"document_id": slot["previous_case_document_id"]},
+                scheduled_at=datetime.now(timezone.utc)
+                + timedelta(days=settings.document_retention_days),
             )
         upload_bindings = _normalized_document_upload_bindings(custom_fields.get("document_upload_bindings"))
         upload_bindings[slot["logical_document_id"]] = str(insert_result["id"])
-        status_overrides[slot["logical_document_id"]] = "received"
+        status_overrides[slot["logical_document_id"]] = "scanning"
         case.custom_fields = {
             **custom_fields,
             "document_upload_bindings": upload_bindings,
@@ -2945,6 +2986,13 @@ def complete_case_document_upload(
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
+    enqueue_job(
+        db,
+        organization_id=case.organization_id,
+        job_type="scan_document",
+        idempotency_key=f"scan-document:{insert_result['id']}",
+        payload={"document_id": str(insert_result["id"])},
+    )
 
     db.commit()
 
@@ -2952,7 +3000,7 @@ def complete_case_document_upload(
         id=slot["logical_document_id"],
         name=slot["name"],
         required=bool(slot["required"]),
-        status="received",
+        status="scanning",
         due_date=payload.expiry_date,
         uploaded_at=insert_result["uploaded_at"],
         instructions=slot["instructions"],
@@ -2960,7 +3008,7 @@ def complete_case_document_upload(
         rejection_note=None,
         file_name=actual_file_name,
         latest_case_document_id=str(insert_result["id"]),
-        can_download=True,
+        can_download=False,
     )
 
 
@@ -2988,12 +3036,16 @@ def delete_client_uploaded_document(
     case_document = slot["bound_case_document"]
     if case_document is None:
         raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+    if str(case_document.get("scan_status") or "clean") != "clean":
+        raise HTTPException(status_code=409, detail="Document security scan is not complete")
 
     delete_result = db.execute(
         text(
             """
             UPDATE case_documents
-            SET deleted_at = NOW(), updated_at = NOW()
+            SET deleted_at = NOW(),
+                retention_delete_after = :retention_delete_after,
+                updated_at = NOW()
             WHERE
                 id = :case_document_id
                 AND case_id = :case_id
@@ -3006,6 +3058,8 @@ def delete_client_uploaded_document(
             "case_document_id": str(case_document["id"]),
             "case_id": str(case.id),
             "user_id": str(auth.user_id),
+            "retention_delete_after": datetime.now(timezone.utc)
+            + timedelta(days=settings.document_retention_days),
         },
     ).first()
 
@@ -3051,6 +3105,15 @@ def delete_client_uploaded_document(
         ip_address=None,
         user_agent=None,
     )
+    enqueue_job(
+        db,
+        organization_id=case.organization_id,
+        job_type="purge_document",
+        idempotency_key=f"purge-document:{case_document['id']}",
+        payload={"document_id": str(case_document["id"])},
+        scheduled_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.document_retention_days),
+    )
 
     db.commit()
 
@@ -3078,6 +3141,8 @@ def get_case_document_view_url(
     case_document = slot["bound_case_document"]
     if case_document is None:
         raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+    if str(case_document.get("scan_status") or "clean") != "clean":
+        raise HTTPException(status_code=409, detail="Document security scan is not complete")
 
     try:
         view_url = create_presigned_download(
@@ -3181,12 +3246,14 @@ def download_all_case_documents(
                 name,
                 file_name,
                 file_path,
+                scan_status,
                 uploaded_at
             FROM case_documents
             WHERE
                 case_id = :case_id
                 AND deleted_at IS NULL
                 AND template_id IS NOT NULL
+                AND scan_status = 'clean'
             ORDER BY template_id, uploaded_at DESC NULLS LAST, created_at DESC
             """
         ),
@@ -3203,12 +3270,14 @@ def download_all_case_documents(
                     name,
                     file_name,
                     file_path,
+                    scan_status,
                     uploaded_at
                 FROM case_documents
                 WHERE
                     case_id = :case_id
                     AND deleted_at IS NULL
                     AND id = ANY(CAST(:document_ids AS uuid[]))
+                    AND scan_status = 'clean'
                 ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
                 """
             ),
@@ -3223,12 +3292,14 @@ def download_all_case_documents(
                 name,
                 file_name,
                 file_path,
+                scan_status,
                 uploaded_at
             FROM case_documents
             WHERE
                 case_id = :case_id
                 AND deleted_at IS NULL
                 AND template_id IS NULL
+                AND scan_status = 'clean'
                 AND (
                     cardinality(CAST(:bound_document_ids AS uuid[])) = 0
                     OR id <> ALL(CAST(:bound_document_ids AS uuid[]))

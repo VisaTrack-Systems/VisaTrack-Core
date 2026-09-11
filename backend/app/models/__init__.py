@@ -1,5 +1,6 @@
 """SQLAlchemy ORM Models Package: Imports and exposes all database models."""
 
+from app.models.background_job import BackgroundJob
 from app.models.case_client import CaseClient
 from app.models.case import Case
 from app.models.milestone import Milestone
@@ -13,6 +14,7 @@ from app.models.user_role import UserRole
 from app.models.user_session import SessionRefreshToken, UserSession
 
 __all__ = [
+    "BackgroundJob",
     "Organization",
     "User",
     "Case",

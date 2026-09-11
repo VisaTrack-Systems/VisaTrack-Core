@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
-from typing import Any, Optional
+from typing import Any, BinaryIO, Optional
 from urllib.parse import quote
 
 import boto3
@@ -175,6 +176,66 @@ def delete_object(*, object_key: str) -> None:
         client.delete_object(Bucket=settings.s3_bucket_name, Key=object_key)
     except (BotoCoreError, ClientError) as exc:
         raise StorageOperationError("Failed to delete invalid uploaded file") from exc
+
+
+def copy_object(*, source_key: str, destination_key: str) -> None:
+    client = _s3_client()
+    extra: dict[str, str] = {}
+    if settings.aws_kms_key_id:
+        extra = {
+            "ServerSideEncryption": "aws:kms",
+            "SSEKMSKeyId": settings.aws_kms_key_id,
+        }
+    try:
+        client.copy_object(
+            Bucket=settings.s3_bucket_name,
+            CopySource={"Bucket": settings.s3_bucket_name, "Key": source_key},
+            Key=destination_key,
+            **extra,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to promote scanned document") from exc
+
+
+def download_object(*, object_key: str, destination: BinaryIO) -> None:
+    client = _s3_client()
+    try:
+        client.download_fileobj(settings.s3_bucket_name, object_key, destination)
+        destination.seek(0)
+    except (NoCredentialsError, PartialCredentialsError) as exc:
+        raise StorageConfigurationError(
+            "AWS credentials are not configured for document scanning"
+        ) from exc
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to retrieve quarantined document") from exc
+
+
+def put_immutable_audit_event(
+    *,
+    object_key: str,
+    payload: bytes,
+    retain_until: datetime,
+) -> None:
+    if not settings.audit_archive_bucket:
+        raise StorageConfigurationError("AUDIT_ARCHIVE_BUCKET is not configured")
+    client = _s3_client()
+    try:
+        client.put_object(
+            Bucket=settings.audit_archive_bucket,
+            Key=object_key,
+            Body=payload,
+            ContentType="application/json",
+            ServerSideEncryption="aws:kms",
+            SSEKMSKeyId=settings.aws_kms_key_id,
+            ObjectLockMode="COMPLIANCE",
+            ObjectLockRetainUntilDate=retain_until,
+        )
+    except (NoCredentialsError, PartialCredentialsError) as exc:
+        raise StorageConfigurationError(
+            "AWS credentials are not configured for audit export"
+        ) from exc
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to export immutable audit event") from exc
 
 
 def get_object_bytes(*, object_key: str) -> bytes:
