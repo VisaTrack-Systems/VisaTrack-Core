@@ -2,20 +2,21 @@
 
 import { act, cleanup, render, type RenderResult } from '@testing-library/react';
 import { composeStories } from '@storybook/react';
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 type StoryModule = Record<string, unknown>;
 type ComposedStory = {
-  (): JSX.Element;
+  (): ReactElement;
   play?: (context?: { canvasElement: HTMLElement }) => Promise<void>;
 };
 
-const storyModules = import.meta.glob<StoryModule>('../design-system/**/*.stories.tsx', {
+const storyModules = import.meta.glob('../design-system/**/*.stories.tsx', {
   eager: true,
-});
+}) as Record<string, StoryModule>;
 
 const stories = Object.entries(storyModules).flatMap(([path, moduleExports]) => {
-  const composed = composeStories(moduleExports);
+  const composed = composeStories(moduleExports as never);
   return Object.entries(composed).map(([storyName, story]) => ({
     storyId: `${path}#${storyName}`,
     Story: story as ComposedStory,
