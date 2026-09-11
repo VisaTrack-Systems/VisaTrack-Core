@@ -145,10 +145,12 @@ function InviteForm() {
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+            <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">New password</label>
             <input
+              id="new-password"
               required
               type="password"
+              autoComplete="new-password"
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -158,10 +160,12 @@ function InviteForm() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
             <input
+              id="confirm-password"
               required
               type="password"
+              autoComplete="new-password"
               minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

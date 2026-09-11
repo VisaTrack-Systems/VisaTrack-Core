@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { getAccessToken, submitBugReport } from "@/lib/api";
+import { DialogPanel } from "./DialogPanel";
 
 type DeliveryChannel = "email" | "github";
 type ScreenshotState = "idle" | "capturing" | "copied" | "downloaded" | "failed";
@@ -370,13 +371,14 @@ export function BugReportWidget() {
             }
           }}
         >
-          <div
-            className="my-2 flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-            style={{ maxHeight: "calc(100vh - 2rem)" }}
+          <DialogPanel
+            labelledBy="bug-report-title"
+            onClose={closeModal}
+            className="my-2 flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
           >
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Report a bug</h2>
+                <h2 id="bug-report-title" className="text-lg font-semibold text-gray-900">Report a bug</h2>
                 <p className="text-xs text-gray-500">Send bug details from anywhere in the app.</p>
               </div>
               <button
@@ -513,7 +515,7 @@ export function BugReportWidget() {
                     : "Open GitHub issue"}
               </button>
             </div>
-          </div>
+          </DialogPanel>
         </div>
       ) : null}
     </>

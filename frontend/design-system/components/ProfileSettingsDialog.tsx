@@ -1,9 +1,10 @@
 /** ProfileSettingsDialog: Modal dialog for user profile and account settings management. Allows profile updates, password changes, and preference configuration. */
 
-import { ShieldCheck, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 import type { CurrentUserSettings, UpdateCurrentUserSettingsInput } from '@/lib/api';
+import { DialogPanel } from './DialogPanel';
 
 type ProfileSettingsDialogProps = {
   isOpen: boolean;
@@ -73,10 +74,14 @@ export function ProfileSettingsDialog({
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      <DialogPanel
+        labelledBy="profile-settings-title"
+        onClose={onClose}
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+      >
         <div className="px-6 py-4 bg-black text-white flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Profile Settings</h2>
+            <h2 id="profile-settings-title" className="text-xl font-semibold">Profile Settings</h2>
             <p className="text-xs text-gray-300 mt-1">Manage your account details and security preferences.</p>
           </div>
           <button
@@ -208,7 +213,7 @@ export function ProfileSettingsDialog({
             </div>
           </div>
         </form>
-      </div>
+      </DialogPanel>
     </div>
   );
 }

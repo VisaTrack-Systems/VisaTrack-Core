@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 
 import type { UserListItem } from '@/lib/api';
+import { DialogPanel } from './DialogPanel';
 
 export type NewCaseDialogSubmitPayload = {
   case_type: string;
@@ -111,10 +112,14 @@ export function NewCaseDialog({
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      <DialogPanel
+        labelledBy="new-case-dialog-title"
+        onClose={onClose}
+        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+      >
         <div className="px-6 py-4 bg-black text-white flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Create New Case</h2>
+            <h2 id="new-case-dialog-title" className="text-xl font-semibold">Create New Case</h2>
             <p className="text-xs text-gray-300 mt-1">Set up a case and link it to an existing or new client.</p>
           </div>
           <button
@@ -285,7 +290,7 @@ export function NewCaseDialog({
             </button>
           </div>
         </form>
-      </div>
+      </DialogPanel>
     </div>
   );
 }
