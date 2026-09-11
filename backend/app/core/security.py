@@ -95,8 +95,9 @@ def verify_password(password: str, stored_hash: str) -> bool:
         except Exception:
             return False
 
-    # Development compatibility for legacy/plain seeded passwords.
-    return hmac.compare_digest(candidate, stored_hash)
+    # Unknown/legacy formats must fail closed. Legacy credentials should be
+    # migrated explicitly instead of being treated as plaintext passwords.
+    return False
 
 
 def create_access_token(
@@ -121,7 +122,15 @@ def create_access_token(
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
-    return jwt.decode(token, settings.auth_secret_key, algorithms=[settings.auth_algorithm])
+    payload = jwt.decode(
+        token,
+        settings.auth_secret_key,
+        algorithms=[settings.auth_algorithm],
+        options={"require": ["sub", "org", "iat", "exp", "type"]},
+    )
+    if payload.get("type") != "access":
+        raise jwt.InvalidTokenError("Invalid token type")
+    return payload
 
 
 def generate_invitation_token() -> str:

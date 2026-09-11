@@ -102,6 +102,16 @@ def _require_org_scope(auth: AuthContext, organization_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="Cross-organization access is not allowed")
 
 
+def _require_delegable_role(auth: AuthContext, role_slug: str) -> str:
+    normalized_role = canonical_role_slug(role_slug)
+    if normalized_role == "super_admin" and not _is_super_admin(auth):
+        raise HTTPException(
+            status_code=403,
+            detail="Only an active super admin can manage the super admin role",
+        )
+    return normalized_role
+
+
 def _list_user_roles(
     db: Session,
     *,
@@ -807,6 +817,7 @@ def create_user(
     db: Session = Depends(get_db),
 ) -> AdminCreateUserResponse:
     _require_org_scope(auth, payload.organization_id)
+    normalized_role = _require_delegable_role(auth, payload.role_slug)
 
     normalized_status = payload.status.strip().lower()
     is_invited = normalized_status == "invited"
@@ -856,7 +867,7 @@ def create_user(
     assign_role_to_user(
         db,
         user_id=new_user.id,
-        role_slug=payload.role_slug.strip().lower(),
+        role_slug=normalized_role,
         assigned_by=auth.user_id,
     )
 
@@ -868,7 +879,7 @@ def create_user(
             organization_id=payload.organization_id,
             user_id=new_user.id,
             email=normalized_email,
-            role_slug=payload.role_slug.strip().lower(),
+            role_slug=normalized_role,
             token_hash=hash_invitation_token(plain_token),
             expires_at=now + timedelta(hours=settings.invitation_expiry_hours),
             invited_by=auth.user_id,
@@ -884,7 +895,7 @@ def create_user(
         action="created",
         entity_type="user",
         entity_id=new_user.id,
-        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower(), "invited": is_invited},
+        new_values={"email": new_user.email, "role": normalized_role, "invited": is_invited},
     )
 
     db.commit()
@@ -897,7 +908,7 @@ def create_user(
         status=new_user.status,
         organization_id=new_user.organization_id,
         created_at=new_user.created_at,
-        roles=[payload.role_slug.strip().lower()],
+        roles=[normalized_role],
         invitation_url=invitation_url,
     )
 
@@ -948,11 +959,12 @@ def assign_user_role(
         raise HTTPException(status_code=404, detail="User not found")
 
     _require_org_scope(auth, user.organization_id)
+    normalized_role = _require_delegable_role(auth, payload.role_slug)
 
     assign_role_to_user(
         db,
         user_id=user.id,
-        role_slug=payload.role_slug.strip().lower(),
+        role_slug=normalized_role,
         assigned_by=auth.user_id,
     )
 
@@ -963,7 +975,7 @@ def assign_user_role(
         action="assigned",
         entity_type="role",
         entity_id=user.id,
-        new_values={"role_slug": payload.role_slug.strip().lower()},
+        new_values={"role_slug": normalized_role},
     )
 
     db.commit()
@@ -982,7 +994,7 @@ def remove_user_role(
 
     _require_org_scope(auth, user.organization_id)
 
-    normalized_role = role_slug.strip().lower()
+    normalized_role = _require_delegable_role(auth, role_slug)
     if user.id == auth.user_id and normalized_role in {"org_admin", "super_admin"}:
         raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
 
