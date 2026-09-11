@@ -1106,6 +1106,7 @@ def test_get_case_document_view_url_returns_inline_presigned_link(monkeypatch, m
     )
 
     assert result.view_url == 'https://view-inline'
+    assert result.file_name == 'passport.pdf'
 
 
 def test_get_case_document_view_url_blocks_quarantined_file(monkeypatch, make_auth_context):
@@ -1134,7 +1135,6 @@ def test_get_case_document_view_url_blocks_quarantined_file(monkeypatch, make_au
         )
 
     assert exc.value.status_code == 409
-    assert result.file_name == 'passport.pdf'
 
 
 def test_get_case_document_download_url_returns_presigned_link(monkeypatch, make_auth_context):
