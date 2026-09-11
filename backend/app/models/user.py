@@ -34,6 +34,8 @@ class User(Base):
     phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     mfa_secret: Mapped[Optional[str]] = mapped_column(String(255))
+    mfa_enrolled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -47,6 +49,10 @@ class User(Base):
     organization = relationship("Organization", back_populates="users")
     profile = relationship("UserProfile", back_populates="user", uselist=False)
     user_roles = relationship("UserRole", back_populates="user", foreign_keys="UserRole.user_id")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    mfa_recovery_codes = relationship(
+        "MfaRecoveryCode", back_populates="user", cascade="all, delete-orphan"
+    )
     client_cases = relationship("Case", foreign_keys="Case.client_id", back_populates="client")
     lawyer_cases = relationship(
         "Case", foreign_keys="Case.primary_lawyer_id", back_populates="primary_lawyer"

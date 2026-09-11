@@ -11,6 +11,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID, uuid4
 
 import jwt
 
@@ -104,7 +105,10 @@ def create_access_token(
     user_id: str,
     organization_id: str,
     roles: list[str],
-    active_role: str | None = None,
+    active_role: str,
+    *,
+    session_id: UUID | str,
+    token_version: int,
 ) -> str:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.auth_access_token_minutes)
@@ -112,12 +116,14 @@ def create_access_token(
         "sub": user_id,
         "org": organization_id,
         "roles": roles,
+        "active_role": active_role,
+        "sid": str(session_id),
+        "jti": str(uuid4()),
+        "tv": token_version,
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
         "type": "access",
     }
-    if active_role:
-        payload["active_role"] = active_role
     return jwt.encode(payload, settings.auth_secret_key, algorithm=settings.auth_algorithm)
 
 
@@ -126,7 +132,19 @@ def decode_access_token(token: str) -> dict[str, Any]:
         token,
         settings.auth_secret_key,
         algorithms=[settings.auth_algorithm],
-        options={"require": ["sub", "org", "iat", "exp", "type"]},
+        options={
+            "require": [
+                "sub",
+                "org",
+                "active_role",
+                "sid",
+                "jti",
+                "tv",
+                "iat",
+                "exp",
+                "type",
+            ]
+        },
     )
     if payload.get("type") != "access":
         raise jwt.InvalidTokenError("Invalid token type")

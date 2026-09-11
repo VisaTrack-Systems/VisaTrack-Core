@@ -89,7 +89,7 @@ def test_create_lawyer_client_creates_invited_client(monkeypatch, make_auth_cont
     )
 
     assert result.status == 'invited'
-    assert 'invite?token=invite-token' in result.invitation_url
+    assert 'invite#token=invite-token' in result.invitation_url
     db.commit.assert_called_once()
 
 
@@ -220,4 +220,4 @@ def test_invite_client_to_case_returns_invitation(monkeypatch, make_auth_context
 
     assert result.case_number == 'C-2026-001'
     assert result.client_email == 'client@example.com'
-    assert result.invitation_url.endswith('invite?token=invite-token')
+    assert result.invitation_url.endswith('invite#token=invite-token')

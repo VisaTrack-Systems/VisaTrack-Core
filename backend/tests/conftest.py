@@ -38,6 +38,9 @@ def make_user():
             'email_verified': True,
             'phone_verified': False,
             'mfa_enabled': False,
+            'mfa_secret': None,
+            'mfa_enrolled_at': None,
+            'token_version': 0,
             'timezone': 'America/Toronto',
             'locale': 'en-CA',
             'deleted_at': None,
@@ -60,6 +63,7 @@ def make_auth_context(make_user):
             roles=roles or ['lawyer'],
             active_role=(roles or ['lawyer'])[0],
             permissions=permissions or set(),
+            session_id=uuid4(),
         )
 
     return _make_auth_context

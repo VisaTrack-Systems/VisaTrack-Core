@@ -18,6 +18,7 @@ from app.models.role import Role
 from app.models.user import User
 from app.models.user_role import UserRole
 from app.services.rbac import canonical_role_slug, select_default_active_role
+from app.services.sessions import get_active_session
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -29,6 +30,7 @@ class AuthContext:
     roles: list[str]
     active_role: str
     permissions: set[str]
+    session_id: UUID
 
     @property
     def user_id(self) -> UUID:
@@ -55,13 +57,22 @@ def get_auth_context(
 
     user_id = payload.get("sub")
     org_id = payload.get("org")
+    session_id_raw = payload.get("sid")
+    token_version_raw = payload.get("tv")
     token_active_role = canonical_role_slug(str(payload.get("active_role") or ""))
 
-    if not user_id or not org_id:
+    if not user_id or not org_id or not session_id_raw or token_version_raw is None:
         raise _http_401("Malformed token")
 
+    try:
+        parsed_user_id = UUID(str(user_id))
+        parsed_session_id = UUID(str(session_id_raw))
+        token_version = int(token_version_raw)
+    except (TypeError, ValueError) as exc:
+        raise _http_401("Malformed token") from exc
+
     user = db.scalar(
-        select(User).where(User.id == user_id, User.deleted_at.is_(None))
+        select(User).where(User.id == parsed_user_id, User.deleted_at.is_(None))
     )
     if user is None:
         raise _http_401("User not found")
@@ -74,6 +85,20 @@ def get_auth_context(
 
     if user.locked_until and user.locked_until > datetime.now(timezone.utc):
         raise _http_401("User account is locked")
+
+    if int(user.token_version or 0) != token_version:
+        raise _http_401("Session has been revoked")
+
+    if (
+        get_active_session(
+            db,
+            session_id=parsed_session_id,
+            user_id=parsed_user_id,
+            token_version=token_version,
+        )
+        is None
+    ):
+        raise _http_401("Session has been revoked")
 
     now = datetime.now(timezone.utc)
     db_role_rows = db.execute(
@@ -110,6 +135,7 @@ def get_auth_context(
         roles=normalized_roles,
         active_role=active_role,
         permissions=permissions,
+        session_id=parsed_session_id,
     )
 
 

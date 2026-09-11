@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 
 import type { CurrentUserSettings, UpdateCurrentUserSettingsInput } from '@/lib/api';
 import { DialogPanel } from './DialogPanel';
+import { MfaSettings } from './MfaSettings';
 
 type ProfileSettingsDialogProps = {
   isOpen: boolean;
@@ -64,7 +65,6 @@ export function ProfileSettingsDialog({
       avatar_url: settings?.avatar_url ?? null,
       timezone: normalizedTimezone,
       locale: normalizedLocale,
-      mfa_enabled: settings?.mfa_enabled ?? false,
     });
   };
 
@@ -213,6 +213,11 @@ export function ProfileSettingsDialog({
             </div>
           </div>
         </form>
+        {settings ? (
+          <div className="px-6 pb-6">
+            <MfaSettings initiallyEnabled={settings.mfa_enabled} />
+          </div>
+        ) : null}
       </DialogPanel>
     </div>
   );

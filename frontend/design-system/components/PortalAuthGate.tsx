@@ -24,6 +24,8 @@ export function PortalAuthGate({
   const [organizationSlug, setOrganizationSlug] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,9 +49,14 @@ export function PortalAuthGate({
         organization_slug: organizationSlug.trim(),
         email: email.trim(),
         password,
+        mfa_code: mfaCode.trim() || undefined,
       });
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Failed to sign in');
+      const message = loginError instanceof Error ? loginError.message : 'Failed to sign in';
+      if (message.includes('MFA code required')) {
+        setMfaRequired(true);
+      }
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -135,6 +142,23 @@ export function PortalAuthGate({
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
           />
         </div>
+
+        {mfaRequired ? (
+          <div>
+            <label htmlFor="sign-in-mfa" className="block text-sm font-medium text-gray-700 mb-1">
+              Authenticator or recovery code
+            </label>
+            <input
+              id="sign-in-mfa"
+              required
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={mfaCode}
+              onChange={(event) => setMfaCode(event.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            />
+          </div>
+        ) : null}
 
         <button
           type="submit"
