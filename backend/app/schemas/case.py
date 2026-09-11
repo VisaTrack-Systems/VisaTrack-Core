@@ -1,6 +1,6 @@
 """Case Schemas: Pydantic models for case-related API requests and responses. Handles CRUD validation for case data."""
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -196,7 +196,8 @@ class CaseDocumentUploadInitiateRequest(BaseModel):
 class CaseDocumentUploadInitiateResponse(BaseModel):
     document_id: str
     upload_url: str
-    upload_headers: dict[str, str]
+    upload_method: Literal["POST"] = "POST"
+    upload_fields: dict[str, str]
     storage_key: str
     expires_in_seconds: int
     max_upload_bytes: int

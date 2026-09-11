@@ -1,9 +1,11 @@
 """File Storage Service: Handles document storage, retrieval, and file management operations."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Optional
+from typing import Any, Optional
+from urllib.parse import quote
 
 import boto3
 from botocore.client import BaseClient, Config
@@ -23,7 +25,7 @@ class StorageOperationError(RuntimeError):
 @dataclass(frozen=True)
 class PresignedUpload:
     url: str
-    headers: dict[str, str]
+    fields: dict[str, str]
     expires_in_seconds: int
 
 
@@ -40,26 +42,41 @@ def _s3_client() -> BaseClient:
     )
 
 
-def create_presigned_upload(*, object_key: str, content_type: str) -> PresignedUpload:
+def create_presigned_upload(
+    *,
+    object_key: str,
+    content_type: str,
+    max_bytes: int,
+) -> PresignedUpload:
     client = _s3_client()
-    params: dict[str, str] = {
-        "Bucket": settings.s3_bucket_name,
-        "Key": object_key,
-        "ContentType": content_type,
+    fields: dict[str, str] = {
+        "key": object_key,
+        "Content-Type": content_type,
     }
-    headers = {"Content-Type": content_type}
+    conditions: list[Any] = [
+        {"key": object_key},
+        {"Content-Type": content_type},
+        ["content-length-range", 1, max_bytes],
+    ]
     if settings.aws_kms_key_id:
-        params["ServerSideEncryption"] = "aws:kms"
-        params["SSEKMSKeyId"] = settings.aws_kms_key_id
-        headers["x-amz-server-side-encryption"] = "aws:kms"
-        headers["x-amz-server-side-encryption-aws-kms-key-id"] = settings.aws_kms_key_id
+        fields["x-amz-server-side-encryption"] = "aws:kms"
+        fields["x-amz-server-side-encryption-aws-kms-key-id"] = settings.aws_kms_key_id
+        conditions.extend(
+            [
+                {"x-amz-server-side-encryption": "aws:kms"},
+                {
+                    "x-amz-server-side-encryption-aws-kms-key-id": settings.aws_kms_key_id
+                },
+            ]
+        )
 
     try:
-        url = client.generate_presigned_url(
-            ClientMethod="put_object",
-            Params=params,
+        presigned = client.generate_presigned_post(
+            Bucket=settings.s3_bucket_name,
+            Key=object_key,
+            Fields=fields,
+            Conditions=conditions,
             ExpiresIn=settings.s3_presign_expires_seconds,
-            HttpMethod="PUT",
         )
     except (NoCredentialsError, PartialCredentialsError) as exc:
         raise StorageConfigurationError(
@@ -69,9 +86,20 @@ def create_presigned_upload(*, object_key: str, content_type: str) -> PresignedU
         raise StorageOperationError("Failed to create upload URL") from exc
 
     return PresignedUpload(
-        url=url,
-        headers=headers,
+        url=presigned["url"],
+        fields=presigned["fields"],
         expires_in_seconds=settings.s3_presign_expires_seconds,
+    )
+
+
+def _content_disposition(disposition: str, download_name: str) -> str:
+    normalized = download_name.replace("\\", "/").rsplit("/", 1)[-1]
+    normalized = re.sub(r"[\x00-\x1f\x7f\";]+", "_", normalized).strip()
+    ascii_name = re.sub(r"[^A-Za-z0-9._ -]+", "_", normalized)[:255] or "document"
+    encoded_name = quote(normalized[:255] or "document", safe="")
+    return (
+        f'{disposition}; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{encoded_name}"
     )
 
 
@@ -83,7 +111,10 @@ def create_presigned_download(*, object_key: str, download_name: Optional[str] =
         "Key": object_key,
     }
     if download_name:
-        params["ResponseContentDisposition"] = f'inline; filename="{download_name}"'
+        params["ResponseContentDisposition"] = _content_disposition(
+            "inline",
+            download_name,
+        )
 
     try:
         return client.generate_presigned_url(
@@ -108,7 +139,10 @@ def create_presigned_force_download(*, object_key: str, download_name: Optional[
         "Key": object_key,
     }
     disposition_name = download_name or "document"
-    params["ResponseContentDisposition"] = f'attachment; filename="{disposition_name}"'
+    params["ResponseContentDisposition"] = _content_disposition(
+        "attachment",
+        disposition_name,
+    )
 
     try:
         return client.generate_presigned_url(
@@ -133,6 +167,14 @@ def head_object(*, object_key: str) -> dict:
         raise StorageOperationError("Uploaded file not found in storage") from exc
     except (BotoCoreError, ClientError) as exc:
         raise StorageOperationError("Failed to validate uploaded file") from exc
+
+
+def delete_object(*, object_key: str) -> None:
+    client = _s3_client()
+    try:
+        client.delete_object(Bucket=settings.s3_bucket_name, Key=object_key)
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to delete invalid uploaded file") from exc
 
 
 def get_object_bytes(*, object_key: str) -> bytes:

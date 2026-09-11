@@ -353,15 +353,15 @@ export function useClientDashboardData(): ClientDashboardData {
         file_size_bytes: file.size,
       });
 
-      const uploadHeaders = new Headers(uploadSession.upload_headers);
-      if (!uploadHeaders.has('Content-Type')) {
-        uploadHeaders.set('Content-Type', file.type || 'application/octet-stream');
-      }
+      const uploadForm = new FormData();
+      Object.entries(uploadSession.upload_fields).forEach(([key, value]) => {
+        uploadForm.append(key, value);
+      });
+      uploadForm.append('file', file);
 
       const uploadResponse = await fetch(uploadSession.upload_url, {
-        method: 'PUT',
-        headers: uploadHeaders,
-        body: file,
+        method: uploadSession.upload_method,
+        body: uploadForm,
       });
 
       if (!uploadResponse.ok) {

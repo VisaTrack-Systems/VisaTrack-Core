@@ -60,6 +60,7 @@ from app.services.storage import (
     create_presigned_download,
     create_presigned_force_download,
     create_presigned_upload,
+    delete_object,
     get_object_bytes,
     head_object,
 )
@@ -77,6 +78,12 @@ DEFAULT_PORTAL_PERMISSIONS = {
 
 ALLOWED_PORTAL_ACCESS = {"full_access", "limited_access", "read_only", "disabled"}
 ALLOWED_DOCUMENT_UPLOAD = {"enabled", "disabled"}
+ALLOWED_DOCUMENT_CONTENT_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/jpeg",
+    "image/png",
+}
 ALLOWED_REMINDERS = {"enabled", "disabled"}
 ALLOWED_DOCUMENT_STATUSES = {
     "requested",
@@ -2686,8 +2693,8 @@ def initiate_case_document_upload(
             status_code=400,
             detail=f"File exceeds upload limit of {settings.s3_max_upload_bytes} bytes",
         )
-    if not file_type:
-        file_type = "application/octet-stream"
+    if file_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported document type")
 
     slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
     storage_key = _build_document_storage_key(
@@ -2698,7 +2705,11 @@ def initiate_case_document_upload(
     )
 
     try:
-        upload = create_presigned_upload(object_key=storage_key, content_type=file_type)
+        upload = create_presigned_upload(
+            object_key=storage_key,
+            content_type=file_type,
+            max_bytes=settings.s3_max_upload_bytes,
+        )
     except StorageConfigurationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except StorageOperationError as exc:
@@ -2707,7 +2718,7 @@ def initiate_case_document_upload(
     return CaseDocumentUploadInitiateResponse(
         document_id=slot["logical_document_id"],
         upload_url=upload.url,
-        upload_headers=upload.headers,
+        upload_fields=upload.fields,
         storage_key=storage_key,
         expires_in_seconds=upload.expires_in_seconds,
         max_upload_bytes=settings.s3_max_upload_bytes,
@@ -2748,7 +2759,29 @@ def complete_case_document_upload(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     actual_file_size = int(head_response.get("ContentLength") or payload.file_size_bytes)
-    actual_file_type = str(head_response.get("ContentType") or payload.file_type or "application/octet-stream")
+    actual_file_type = str(
+        head_response.get("ContentType")
+        or payload.file_type
+        or "application/octet-stream"
+    ).strip().lower()
+    if actual_file_size <= 0 or actual_file_size > settings.s3_max_upload_bytes:
+        try:
+            delete_object(object_key=payload.storage_key)
+        except StorageOperationError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Invalid upload could not be removed",
+            ) from exc
+        raise HTTPException(status_code=400, detail="Uploaded file exceeds the allowed size")
+    if actual_file_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        try:
+            delete_object(object_key=payload.storage_key)
+        except StorageOperationError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Invalid upload could not be removed",
+            ) from exc
+        raise HTTPException(status_code=400, detail="Unsupported uploaded document type")
     actual_file_name = payload.file_name.strip()
     normalized_client_note = (payload.client_note or "").strip() or None
     if normalized_client_note and len(normalized_client_note) > 2000:
