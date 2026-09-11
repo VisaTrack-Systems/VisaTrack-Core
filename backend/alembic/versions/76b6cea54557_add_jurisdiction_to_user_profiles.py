@@ -8,8 +8,6 @@ Create Date: 2026-03-14 22:33:03.677232
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -20,14 +18,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Check if column already exists to handle cases where migration was partially applied
-    bind = op.get_bind()
-    inspector = inspect(bind)
-    columns = [col['name'] for col in inspector.get_columns('user_profiles')]
-    
-    if 'jurisdiction' not in columns:
-        op.add_column('user_profiles', sa.Column('jurisdiction', sa.String(100), nullable=True))
+    op.execute(
+        "ALTER TABLE user_profiles "
+        "ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(100)"
+    )
 
 
 def downgrade() -> None:
-    op.drop_column('user_profiles', 'jurisdiction')
+    op.execute(
+        "ALTER TABLE user_profiles DROP COLUMN IF EXISTS jurisdiction"
+    )

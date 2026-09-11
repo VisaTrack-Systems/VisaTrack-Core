@@ -50,7 +50,15 @@ This directory contains the complete IRCC immigration system data model expresse
 
 ## Getting Started
 
-Initialize the PostgreSQL database by running [setup_database.sql](setup_database.sql), then apply migrations in chronological order from the [migrations/](migrations/) directory. Review the schema files to understand the data model relationships, particularly [cases.sql](cases.sql), [users.sql](users.sql), and [permissions.sql](permissions.sql) for the core entities.
+Alembic is the authoritative migration runner. From `backend/`, run
+`alembic upgrade head`; its baseline consumes the ordered schema files in this
+directory before applying later revisions. Do not separately apply files under
+`Database/migrations/` to an Alembic-managed database. Those files are retained
+as historical migration records and are reconciled by Alembic revisions.
+
+`setup_database.sql` remains available only for inspecting or manually
+bootstrapping the historical baseline. Application deployments and automated
+environments must use Alembic.
 
 ## Related Documentation
 

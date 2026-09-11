@@ -61,4 +61,4 @@ CREATE INDEX idx_cases_client ON cases(client_id);
 CREATE INDEX idx_cases_lawyer ON cases(primary_lawyer_id);
 CREATE INDEX idx_cases_status ON cases(status);
 CREATE INDEX idx_cases_type ON cases(case_type);
-CREATE INDEX idx_cases_priority ON cases(priority) WHERE status NOT IN ('approved', 'refused', 'withdrawn', 'closed');
+CREATE INDEX idx_cases_priority ON cases(priority) WHERE status <> 'closed';

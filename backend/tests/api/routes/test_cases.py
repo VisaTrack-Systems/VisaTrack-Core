@@ -67,6 +67,20 @@ def test_client_portal_capabilities_respect_permissions(make_auth_context):
     assert capabilities['can_upload_documents'] is False
 
 
+def test_generate_case_number_takes_transaction_lock():
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(rows=[]),
+        FakeResult(scalar_value=7),
+    ]
+
+    result = cases._generate_case_number(db, uuid4())
+
+    assert result.endswith('-008')
+    lock_statement = str(db.execute.call_args_list[0].args[0])
+    assert 'pg_advisory_xact_lock' in lock_statement
+
+
 def test_create_case_returns_created_case(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     client_user = row(

@@ -191,7 +191,7 @@ def get_admin_overview(
         .select_from(Case)
         .where(
             Case.deleted_at.is_(None),
-            cast(Case.status, String).notin_(["approved", "refused", "withdrawn", "closed"]),
+            cast(Case.status, String) != "closed",
             *org_filter,
         )
     ) or 0
@@ -200,7 +200,7 @@ def get_admin_overview(
         .select_from(Case)
         .where(
             Case.deleted_at.is_(None),
-            cast(Case.status, String).in_(["approved", "refused", "withdrawn", "closed"]),
+            cast(Case.status, String) == "closed",
             *org_filter,
         )
     ) or 0

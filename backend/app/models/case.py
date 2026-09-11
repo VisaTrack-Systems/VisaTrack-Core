@@ -25,6 +25,9 @@ class Case(Base):
         PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     case_number: Mapped[str] = mapped_column(String(100), nullable=False)
+    ircc_file_number: Mapped[Optional[str]] = mapped_column(String(100))
+    uci_number: Mapped[Optional[str]] = mapped_column(String(50))
+    application_number: Mapped[Optional[str]] = mapped_column(String(50))
     client_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     primary_lawyer_id: Mapped[Optional[UUID]] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id")
@@ -41,6 +44,9 @@ class Case(Base):
     internal_notes: Mapped[Optional[str]] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(String(20), nullable=False, server_default="medium")
     complexity: Mapped[str] = mapped_column(String(20), nullable=False, server_default="standard")
+    start_date: Mapped[Optional[date]] = mapped_column(Date)
+    actual_filing_date: Mapped[Optional[date]] = mapped_column(Date)
+    actual_completion_date: Mapped[Optional[date]] = mapped_column(Date)
     fee_agreement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
     source: Mapped[Optional[str]] = mapped_column(String(50))
     tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
