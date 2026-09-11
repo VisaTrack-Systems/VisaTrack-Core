@@ -20,7 +20,8 @@ def test_hash_password_rejects_empty_input():
         raise AssertionError('Expected ValueError for empty password')
 
 
-def test_access_token_can_be_decoded():
+def test_access_token_can_be_decoded(monkeypatch):
+    monkeypatch.setattr(security.settings, 'auth_secret_key', 'x' * 32)
     token = security.create_access_token('user-1', 'org-1', ['lawyer'])
     payload = security.decode_access_token(token)
 
