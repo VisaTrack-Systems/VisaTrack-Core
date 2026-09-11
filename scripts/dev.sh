@@ -131,7 +131,7 @@ BACKEND_PYTHON="$(resolve_backend_python)"
 
 echo "Syncing backend dependencies..."
 "$BACKEND_PYTHON" -m pip install --upgrade pip --quiet
-"$BACKEND_PYTHON" -m pip install --quiet -r requirements.txt
+"$BACKEND_PYTHON" -m pip install --quiet --require-hashes -r requirements.lock
 if [ -f requirements-dev.txt ]; then
   "$BACKEND_PYTHON" -m pip install --quiet -r requirements-dev.txt
 fi
