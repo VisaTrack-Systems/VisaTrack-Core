@@ -56,9 +56,34 @@ jobs:
         working-directory: frontend
         run: npm run test:stories
 
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser accessibility tests
+        working-directory: frontend
+        run: npm run test:e2e
+
   backend:
     name: Backend Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env:
+          POSTGRES_DB: visatrack_test
+          POSTGRES_USER: visatrack
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U visatrack -d visatrack_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql://visatrack:test-only-password@localhost:5432/visatrack_test
 
     steps:
       - name: Checkout repo
@@ -90,6 +115,13 @@ jobs:
         run: |
           source venv/bin/activate
           python -m compileall app
+
+      - name: Bootstrap empty PostgreSQL database
+        working-directory: backend
+        run: |
+          source venv/bin/activate
+          alembic upgrade head
+          alembic current --check-heads
 
       - name: Run backend tests
         working-directory: backend

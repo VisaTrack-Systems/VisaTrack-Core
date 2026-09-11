@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.middleware.request_context import RequestContextMiddleware
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+app.add_middleware(RequestContextMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { Upload, X } from 'lucide-react';
 
 import type { DashboardDocument } from './types';
+import { DialogPanel } from '../DialogPanel';
 
 type DocumentUploadDialogProps = {
   isOpen: boolean;
@@ -45,11 +46,16 @@ export function DocumentUploadDialog({
 
   return (
     <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      <DialogPanel
+        labelledBy="document-upload-title"
+        describedBy="document-upload-description"
+        onClose={onClose}
+        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+      >
         <div className="px-6 py-4 bg-black text-white flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Upload Document</h2>
-            <p className="text-xs text-gray-300 mt-1">Attach a file for {document.name}.</p>
+            <h2 id="document-upload-title" className="text-xl font-semibold">Upload Document</h2>
+            <p id="document-upload-description" className="text-xs text-gray-300 mt-1">Attach a file for {document.name}.</p>
           </div>
           <button
             type="button"
@@ -64,13 +70,13 @@ export function DocumentUploadDialog({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {validationError ? (
-            <div className="rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-800 text-sm px-3 py-2">
+            <div role="alert" className="rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-800 text-sm px-3 py-2">
               {validationError}
             </div>
           ) : null}
 
           {errorMessage ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
               {errorMessage}
             </div>
           ) : null}
@@ -86,8 +92,9 @@ export function DocumentUploadDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select File</label>
+            <label htmlFor="document-upload-file" className="block text-sm font-medium text-gray-700 mb-2">Select File</label>
             <input
+              id="document-upload-file"
               type="file"
               accept=".pdf,.docx,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
@@ -102,10 +109,11 @@ export function DocumentUploadDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="document-upload-note" className="block text-sm font-medium text-gray-700 mb-2">
               Note for your lawyer (optional)
             </label>
             <textarea
+              id="document-upload-note"
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={3}
@@ -136,7 +144,7 @@ export function DocumentUploadDialog({
             </button>
           </div>
         </form>
-      </div>
+      </DialogPanel>
     </div>
   );
 }

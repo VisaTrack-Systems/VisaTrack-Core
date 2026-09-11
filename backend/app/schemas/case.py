@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CaseListItem(BaseModel):
@@ -185,6 +185,11 @@ class CaseDocumentStatusUpdateResponse(BaseModel):
     document_id: str
     status: str
     rejection_note: Optional[str] = None
+
+
+class CaseDocumentLegalHoldRequest(BaseModel):
+    enabled: bool
+    reason: str = Field(min_length=3, max_length=500)
 
 
 class CaseDocumentUploadInitiateRequest(BaseModel):
