@@ -40,7 +40,6 @@ const privatePageHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   reactCompiler: true,
   turbopack: {
     root: path.resolve(__dirname),
