@@ -5,6 +5,13 @@ on:
   push:
     branches: ["develop"]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
     name: Frontend Build
@@ -28,6 +35,14 @@ jobs:
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint
+
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Audit production dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build frontend
         working-directory: frontend
@@ -60,8 +75,15 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock
           pip install -r requirements-dev.txt
+          pip install pip-audit==2.10.1
+
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: |
+          source venv/bin/activate
+          pip-audit -r requirements.lock
 
       - name: Compile backend
         working-directory: backend
