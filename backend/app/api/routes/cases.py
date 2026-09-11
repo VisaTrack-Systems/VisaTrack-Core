@@ -892,7 +892,6 @@ def get_case_by_number(
         estimated_completion_from=case.estimated_completion_from,
         estimated_completion_to=case.estimated_completion_to,
         description=case.description,
-        internal_notes=case.internal_notes,
         milestones=[
             MilestoneSummary(
                 id=milestone_row.id,

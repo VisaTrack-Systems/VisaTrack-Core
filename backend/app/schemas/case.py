@@ -52,7 +52,6 @@ class CaseSummary(BaseModel):
     estimated_completion_from: Optional[date]
     estimated_completion_to: Optional[date]
     description: Optional[str]
-    internal_notes: Optional[str]
     milestones: list[MilestoneSummary]
 
 

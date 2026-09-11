@@ -275,7 +275,6 @@ export type CaseSummary = {
   estimated_completion_from: string | null;
   estimated_completion_to: string | null;
   description: string | null;
-  internal_notes: string | null;
   milestones: MilestoneSummary[];
 };
 
@@ -817,14 +816,10 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
 }
 
 export async function submitBugReport(input: SubmitBugReportInput): Promise<void> {
-  return requestVoid(
-    '/api/v1/feedback/bug-report',
-    {
-      method: 'POST',
-      body: JSON.stringify(input),
-    },
-    { includeAuth: false }
-  );
+  return requestVoid('/api/v1/feedback/bug-report', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function getCases(limit = 10): Promise<CaseListItem[]> {

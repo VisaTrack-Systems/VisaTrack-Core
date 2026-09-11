@@ -12,7 +12,7 @@ from app.services.email import EmailNotConfiguredError
 from tests.support import row
 
 
-def test_submit_bug_report_sends_email_with_screenshot_attachment(monkeypatch):
+def test_submit_bug_report_sends_email_with_screenshot_attachment(monkeypatch, make_auth_context):
     payload = BugReportSubmitRequest(
         title="Cannot submit payment",
         details="Clicking pay now does nothing and no toast appears.",
@@ -42,7 +42,11 @@ def test_submit_bug_report_sends_email_with_screenshot_attachment(monkeypatch):
     monkeypatch.setattr(feedback, "send_bug_report_email", fake_send)
     monkeypatch.setattr(feedback.settings, "bug_report_to_email", "visatrack.support@gmail.com")
 
-    feedback.submit_bug_report(payload=payload, request=request)
+    feedback.submit_bug_report(
+        payload=payload,
+        request=request,
+        _auth=make_auth_context(),
+    )
 
     kwargs = fake_send.call_args.kwargs
     assert kwargs["to_email"] == "visatrack.support@gmail.com"
@@ -54,7 +58,7 @@ def test_submit_bug_report_sends_email_with_screenshot_attachment(monkeypatch):
     assert kwargs["sender_ip"] == "127.0.0.1"
 
 
-def test_submit_bug_report_returns_503_when_email_not_configured(monkeypatch):
+def test_submit_bug_report_returns_503_when_email_not_configured(monkeypatch, make_auth_context):
     payload = BugReportSubmitRequest(
         title="Cannot open dashboard",
         details="Screen stays blank after login.",
@@ -76,13 +80,17 @@ def test_submit_bug_report_returns_503_when_email_not_configured(monkeypatch):
     monkeypatch.setattr(feedback, "send_bug_report_email", _raise_not_configured)
 
     with pytest.raises(HTTPException) as exc:
-        feedback.submit_bug_report(payload=payload, request=request)
+        feedback.submit_bug_report(
+            payload=payload,
+            request=request,
+            _auth=make_auth_context(),
+        )
 
     assert exc.value.status_code == 503
-    assert "Resend is not configured" in str(exc.value.detail)
+    assert exc.value.detail == "Bug reporting is unavailable"
 
 
-def test_submit_bug_report_returns_502_on_delivery_failure(monkeypatch):
+def test_submit_bug_report_returns_502_on_delivery_failure(monkeypatch, make_auth_context):
     payload = BugReportSubmitRequest(
         title="Cannot open dashboard",
         details="Screen stays blank after login.",
@@ -104,7 +112,11 @@ def test_submit_bug_report_returns_502_on_delivery_failure(monkeypatch):
     monkeypatch.setattr(feedback, "send_bug_report_email", _raise_delivery_error)
 
     with pytest.raises(HTTPException) as exc:
-        feedback.submit_bug_report(payload=payload, request=request)
+        feedback.submit_bug_report(
+            payload=payload,
+            request=request,
+            _auth=make_auth_context(),
+        )
 
     assert exc.value.status_code == 502
-    assert "Failed to send bug report email" in str(exc.value.detail)
+    assert exc.value.detail == "Failed to send bug report"

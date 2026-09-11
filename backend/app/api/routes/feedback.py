@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from app.api.deps.auth import AuthContext, get_auth_context
 from app.core.config import settings
 from app.schemas.feedback import BugReportSubmitRequest
 from app.services.email import EmailNotConfiguredError, send_bug_report_email
@@ -12,7 +13,11 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 @router.post("/bug-report", status_code=status.HTTP_204_NO_CONTENT)
-def submit_bug_report(payload: BugReportSubmitRequest, request: Request) -> None:
+def submit_bug_report(
+    payload: BugReportSubmitRequest,
+    request: Request,
+    _auth: AuthContext = Depends(get_auth_context),
+) -> None:
     client_host = request.client.host if request.client and request.client.host else None
     try:
         send_bug_report_email(
@@ -37,6 +42,6 @@ def submit_bug_report(payload: BugReportSubmitRequest, request: Request) -> None
             browser_language=request.headers.get("accept-language"),
         )
     except EmailNotConfiguredError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Bug reporting is unavailable") from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to send bug report email: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Failed to send bug report") from exc
