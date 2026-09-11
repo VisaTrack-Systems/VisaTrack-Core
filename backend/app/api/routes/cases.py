@@ -27,6 +27,7 @@ from app.schemas.case import (
     CaseDocumentRenameRequest,
     CaseDocumentRenameResponse,
     CaseDocumentDownloadResponse,
+    CaseDocumentLegalHoldRequest,
     CaseDocumentUploadCompleteRequest,
     CaseDocumentUploadInitiateRequest,
     CaseDocumentUploadInitiateResponse,
@@ -2588,6 +2589,70 @@ def delete_case_document(
             scheduled_at=datetime.now(timezone.utc)
             + timedelta(days=settings.document_retention_days),
         )
+    db.commit()
+
+
+@router.put(
+    "/by-number/{case_number}/documents/{document_id}/legal-hold",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def set_document_legal_hold(
+    case_number: str,
+    document_id: UUID,
+    payload: CaseDocumentLegalHoldRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
+    updated = db.execute(
+        text(
+            """
+            UPDATE case_documents
+            SET legal_hold = :enabled, updated_at = NOW()
+            WHERE id = :document_id AND case_id = :case_id
+            RETURNING id
+            """
+        ),
+        {
+            "enabled": payload.enabled,
+            "document_id": str(document_id),
+            "case_id": str(case.id),
+        },
+    ).first()
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not payload.enabled:
+        db.execute(
+            text(
+                """
+                UPDATE background_jobs
+                SET status = 'pending',
+                    scheduled_at = GREATEST(NOW(), COALESCE(scheduled_at, NOW())),
+                    attempts = 0,
+                    last_error = NULL,
+                    completed_at = NULL
+                WHERE organization_id = :organization_id
+                  AND idempotency_key = :idempotency_key
+                  AND status = 'failed'
+                """
+            ),
+            {
+                "organization_id": str(case.organization_id),
+                "idempotency_key": f"purge-document:{document_id}",
+            },
+        )
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="legal_hold_enabled" if payload.enabled else "legal_hold_released",
+        entity_type="document",
+        entity_id=document_id,
+        case_id=case.id,
+        client_id=case.client_id,
+        new_values={"reason": payload.reason},
+    )
     db.commit()
 
 

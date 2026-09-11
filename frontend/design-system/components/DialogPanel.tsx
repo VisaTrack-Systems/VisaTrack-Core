@@ -11,6 +11,7 @@ type DialogPanelProps = {
   children: ReactNode;
   className: string;
   labelledBy: string;
+  describedBy?: string;
   onClose: () => void;
 };
 
@@ -27,6 +28,7 @@ export function DialogPanel({
   children,
   className,
   labelledBy,
+  describedBy,
   onClose,
 }: DialogPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -78,6 +80,7 @@ export function DialogPanel({
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       className={className}
       tabIndex={-1}
       onKeyDown={handleKeyDown}

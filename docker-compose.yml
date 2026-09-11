@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_DB: visatrack
+      POSTGRES_USER: visatrack
+      POSTGRES_PASSWORD: local-development-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visatrack -d visatrack"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: visatrack
+      MINIO_ROOT_PASSWORD: local-development-only
+    ports:
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000 visatrack local-development-only;
+        do sleep 1; done;
+        mc mb --ignore-existing local/visatrack-documents
+
+  backend:
+    build: ./backend
+    command:
+      - /bin/sh
+      - -c
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment: &backend-environment
+      APP_ENV: development
+      DATABASE_URL: postgresql://visatrack:local-development-only@postgres:5432/visatrack
+      FRONTEND_ORIGIN: http://localhost:3000
+      AUTH_SECRET_KEY: local-only-auth-secret-change-before-production
+      MFA_ENCRYPTION_KEY: local-only-mfa-secret-change-before-production
+      AUTH_COOKIE_SECURE: "false"
+      S3_BUCKET_NAME: visatrack-documents
+      S3_ENDPOINT_URL: http://minio:9000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: visatrack
+      AWS_SECRET_ACCESS_KEY: local-development-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.workers.main"]
+    environment: *backend-environment
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres-data:
+  minio-data:
