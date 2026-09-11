@@ -89,6 +89,7 @@ export function DocumentUploadDialog({
             <label className="block text-sm font-medium text-gray-700 mb-2">Select File</label>
             <input
               type="file"
+              accept=".pdf,.docx,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
               className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-red-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-red-700"
               disabled={submitting}

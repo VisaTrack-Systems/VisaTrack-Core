@@ -475,7 +475,8 @@ export type CaseDocumentUploadInitiateInput = {
 export type CaseDocumentUploadInitiateResponse = {
   document_id: string;
   upload_url: string;
-  upload_headers: Record<string, string>;
+  upload_method: 'POST';
+  upload_fields: Record<string, string>;
   storage_key: string;
   expires_in_seconds: number;
   max_upload_bytes: number;
