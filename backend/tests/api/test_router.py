@@ -4,7 +4,7 @@ from app.main import app
 
 
 def test_api_router_includes_expected_paths():
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()['paths'])
 
     assert '/health' in paths
     assert '/api/v1/auth/login' in paths
