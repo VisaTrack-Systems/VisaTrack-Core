@@ -36,6 +36,23 @@ class Settings:
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
 
+    def validate_security(self) -> None:
+        """Reject unsafe authentication settings outside local development."""
+        if self.app_env.strip().lower() in {"development", "local", "test"}:
+            return
+
+        if (
+            self.auth_secret_key == "dev-only-change-me"
+            or len(self.auth_secret_key.encode("utf-8")) < 32
+        ):
+            raise RuntimeError(
+                "AUTH_SECRET_KEY must be configured with at least 32 bytes "
+                "outside development, local, and test environments"
+            )
+
+        if self.auth_algorithm != "HS256":
+            raise RuntimeError("AUTH_ALGORITHM must be HS256")
+
     @property
     def frontend_origins(self) -> list[str]:
         raw = self.frontend_origin.strip()
@@ -54,3 +71,4 @@ class Settings:
 
 
 settings = Settings()
+settings.validate_security()

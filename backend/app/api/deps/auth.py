@@ -55,7 +55,6 @@ def get_auth_context(
 
     user_id = payload.get("sub")
     org_id = payload.get("org")
-    token_roles = payload.get("roles", [])
     token_active_role = canonical_role_slug(str(payload.get("active_role") or ""))
 
     if not user_id or not org_id:
@@ -69,6 +68,9 @@ def get_auth_context(
 
     if str(user.organization_id) != str(org_id):
         raise _http_401("Tenant mismatch")
+
+    if (user.status or "").strip().lower() != "active":
+        raise _http_401("User account is not active")
 
     if user.locked_until and user.locked_until > datetime.now(timezone.utc):
         raise _http_401("User account is locked")
@@ -86,7 +88,6 @@ def get_auth_context(
 
     normalized_roles = sorted(
         {canonical_role_slug(str(row.slug)) for row in db_role_rows}
-        | {canonical_role_slug(str(role)) for role in token_roles}
     )
     active_role = token_active_role if token_active_role in normalized_roles else select_default_active_role(normalized_roles)
     if active_role is None:
@@ -103,11 +104,6 @@ def get_auth_context(
 
     permissions = set(role_permissions.get(active_role, set()))
 
-    # Backward compatible: if token roles include a super admin role but DB perms are missing,
-    # treat it as full access (DB should still be source of truth).
-    if active_role == "super_admin" and "super_admin" in normalized_roles:
-        permissions.add("*")
-
     return AuthContext(
         user=user,
         organization_id=user.organization_id,
@@ -118,10 +114,10 @@ def get_auth_context(
 
 
 def require_roles(*required_roles: str):
-    required = {role.lower() for role in required_roles}
+    required = {canonical_role_slug(role) for role in required_roles}
 
     def _dependency(auth: AuthContext = Depends(get_auth_context)) -> AuthContext:
-        if required and not required.intersection(set(auth.roles)):
+        if required and auth.active_role not in required:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role privileges")
         return auth
 
@@ -138,7 +134,7 @@ def require_permissions(*required_permissions: str):
         if "*" in auth.permissions:
             return auth
 
-        if not required.intersection(auth.permissions):
+        if not required.issubset(auth.permissions):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permission privileges")
 
         return auth

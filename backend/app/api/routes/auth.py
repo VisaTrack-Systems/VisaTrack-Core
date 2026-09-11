@@ -256,6 +256,11 @@ def update_me_settings(
         user.avatar_url = normalized_avatar_url or None
 
     if payload.mfa_enabled is not None:
+        if payload.mfa_enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="MFA enrollment is not available yet",
+            )
         user.mfa_enabled = payload.mfa_enabled
         if not payload.mfa_enabled:
             user.mfa_secret = None

@@ -198,6 +198,26 @@ def test_assign_user_role_assigns_and_commits(monkeypatch, make_auth_context, ma
     db.commit.assert_called_once()
 
 
+def test_org_admin_cannot_assign_super_admin(make_auth_context, make_user):
+    auth = make_auth_context(
+        roles=['org_admin'],
+        permissions={'users:manage', 'roles:manage'},
+    )
+    existing_user = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.return_value = existing_user
+
+    with pytest.raises(HTTPException) as exc:
+        admin.assign_user_role(
+            user_id=existing_user.id,
+            payload=AdminAssignRoleRequest(role_slug='super_admin'),
+            auth=auth,
+            db=db,
+        )
+
+    assert exc.value.status_code == 403
+
+
 def test_list_admin_users_includes_roles(make_auth_context, make_user):
     auth = make_auth_context(roles=['org_admin'], permissions={'users:manage'})
     existing_user = make_user(organization_id=auth.organization_id)
