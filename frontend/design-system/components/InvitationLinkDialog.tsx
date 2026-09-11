@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 
 import { sendInvitationEmail } from '@/lib/api';
+import { DialogPanel } from './DialogPanel';
 
 type InvitationLinkDialogProps = {
   invitationUrl: string;
@@ -37,9 +38,13 @@ export function InvitationLinkDialog({
 
   return (
     <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl">
+      <DialogPanel
+        labelledBy="invitation-link-title"
+        onClose={onClose}
+        className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl"
+      >
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Invitation link ready</h2>
+          <h2 id="invitation-link-title" className="text-lg font-semibold text-gray-900">Invitation link ready</h2>
           <button
             type="button"
             onClick={onClose}
@@ -109,7 +114,7 @@ export function InvitationLinkDialog({
             Done
           </button>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { X } from 'lucide-react';
 
+import { DialogPanel } from '../DialogPanel';
+
 type Field = { label: string; value: string };
 
 export function CreateSummaryDialog({
@@ -16,10 +18,14 @@ export function CreateSummaryDialog({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-80 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl">
+    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <DialogPanel
+        labelledBy="create-summary-title"
+        onClose={onClose}
+        className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-xl"
+      >
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 id="create-summary-title" className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -58,7 +64,7 @@ export function CreateSummaryDialog({
             Create
           </button>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   );
 }
