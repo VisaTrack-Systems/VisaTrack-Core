@@ -60,6 +60,14 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 **Action:** Use role-specific response DTOs and projections. Never select or serialize `internal_notes` for a client request. Add an API integration test proving the field is absent, not merely `null`, for primary and related clients.
 
+#### AUTH-01 — Organization admins can promote users to platform super-admin
+
+**Evidence:** Organization admins receive both `users:manage` and `roles:manage` in `backend/app/services/rbac.py:16-37`. User creation and role assignment pass the caller-controlled `role_slug` directly to `assign_role_to_user` (`backend/app/api/routes/admin.py:803-860` and `:939-956`) without preventing an organization admin from granting the system-level `super_admin` role. `require_permissions` also treats multiple supplied permissions as **any-of**, not all-of (`backend/app/api/deps/auth.py:131-144`).
+
+**Impact:** Any organization administrator can promote an account to `super_admin`, switch to that role, and gain platform-wide administrative capabilities.
+
+**Action:** Enforce a privilege ceiling centrally: only an already-active `super_admin` may grant or revoke `super_admin`, and no caller may grant permissions above their own delegable set. Make permission dependency semantics explicit as `require_all_permissions`/`require_any_permission`, default sensitive writes to all-of, and add escalation/negative tests.
+
 ### P1
 
 #### SEC-03 — Role revocation, account disablement, and active-role least privilege are ineffective
@@ -91,12 +99,13 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 - Initiation checks the client-declared size at `backend/app/api/routes/cases.py:2683-2689`, but completion trusts S3 `ContentLength` and does not compare it with `s3_max_upload_bytes` at `cases.py:2751-2753`.
 - `backend/app/services/storage.py:43-63` creates a presigned PUT, which does not enforce a content-length range.
 - File type is client-controlled and unrestricted (`cases.py:2680-2691`); inline viewing is generated in `storage.py:78-100`.
+- The user-supplied stored filename is interpolated into `Content-Disposition` without removing quotes or control characters (`storage.py:86` and `:111`).
 - No antivirus/content-disarm/quarantine workflow exists.
 - KMS encryption is optional when `AWS_KMS_KEY_ID` is empty (`storage.py:50-56`).
 
 **Impact:** A user can upload oversized objects, create storage/cost pressure, and distribute malicious or active content. Sensitive immigration documents may be stored without the claimed KMS control.
 
-**Action:** Use presigned POST conditions or a controlled multipart workflow with an enforced maximum; re-check and delete oversized objects at completion. Use an allow-list based on magic-byte detection, sanitize filenames, quarantine uploads, scan asynchronously, and only expose clean files. Serve active formats as attachments from a separate origin. Require KMS, bucket public-access blocking, versioning, lifecycle/retention rules, and least-privilege IAM in production.
+**Action:** Use presigned POST conditions or a controlled multipart workflow with an enforced maximum; re-check and delete oversized objects at completion. Use an allow-list based on magic-byte detection, sanitize filenames, generate RFC 5987-safe download names, quarantine uploads, scan asynchronously, and only expose clean files. Serve active formats as attachments from a separate origin. Require KMS, bucket public-access blocking, versioning, lifecycle/retention rules, and least-privilege IAM in production.
 
 #### SEC-06 — Public bug-report endpoint enables email and resource abuse
 
@@ -158,9 +167,9 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 #### SEC-10 — Authentication lifecycle needs hardening
 
-**Evidence:** Access tokens last 60 minutes (`backend/app/core/config.py:26`); logout only clears browser state (`frontend/lib/api.ts:785-787`); password changes do not revoke tokens (`backend/app/api/routes/auth.py:304-316`). Password policy is only 8–128 characters (`backend/app/schemas/auth.py:72-79`). Email changes do not clear `email_verified` (`auth.py:224-236`). Login lockout is account-based with no endpoint-level/global throttling.
+**Evidence:** Access tokens last 60 minutes (`backend/app/core/config.py:26`); logout only clears browser state (`frontend/lib/api.ts:785-787`); password changes do not revoke tokens (`backend/app/api/routes/auth.py:304-316`). Password policy is only 8–128 characters (`backend/app/schemas/auth.py:72-79`). Email changes do not clear `email_verified` (`auth.py:224-236`). Invitation secrets are put in query strings (`backend/app/api/routes/admin.py:637` and `:878`, with similar lawyer flows), where they can enter history, referrers, proxy logs, and analytics. Login lockout is account-based with no endpoint-level/global throttling.
 
-**Action:** Add server-side session/token revocation, rotating refresh tokens with reuse detection, shorter access tokens, password-change revocation, breached-password checks, and risk-based throttling. Normalize email with a standards-aware validator and require verification before replacing the sign-in address. Avoid account-lockout abuse by combining progressive delay, IP/device signals, and monitoring.
+**Action:** Add server-side session/token revocation, rotating refresh tokens with reuse detection, shorter access tokens, password-change revocation, breached-password checks, and risk-based throttling. Redeem invitation secrets through a one-time POST or fragment-to-POST flow and never log complete invitation URLs. Normalize email with a standards-aware validator and require verification before replacing the sign-in address. Avoid account-lockout abuse by combining progressive delay, IP/device signals, and monitoring.
 
 #### SEC-11 — Audit trails lack tamper and retention controls
 
@@ -170,7 +179,7 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 #### SEC-12 — Production configuration is not validated
 
-**Evidence:** `backend/app/core/config.py:14-37` eagerly parses environment strings and silently supplies development defaults; S3/KMS/email readiness is discovered only when a feature is used. FastAPI docs remain exposed by default and trusted-host/HTTPS redirect behavior is not configured in the app.
+**Evidence:** `backend/app/core/config.py:14-37` eagerly parses environment strings and silently supplies development defaults; S3/KMS/email readiness is discovered only when a feature is used. `.env.example:6` commits a real-looking AWS account and KMS key ARN rather than a placeholder. FastAPI docs remain exposed by default and trusted-host/HTTPS redirect behavior is not configured in the app.
 
 **Action:** Use typed settings with environment-specific validation and fail fast. Validate URL schemes, secret length, token TTL, upload limits, allowed origins, KMS, and bucket names. Explicitly configure docs exposure, proxy trust, HTTPS, allowed hosts, and maximum request size for the deployment topology.
 
@@ -252,7 +261,7 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 #### OPS-02 — Deployment, backup, and recovery controls are not represented
 
-**Evidence:** No Dockerfile, infrastructure-as-code, deployment manifest, backup configuration, or disaster-recovery test is present in the repository.
+**Evidence:** No Dockerfile, infrastructure-as-code, deployment manifest, backup configuration, or disaster-recovery test is present in the repository. The root `docker-compose.yml` is empty.
 
 **Action:** Add a hardened non-root image and IaC, or clearly link the private operational source of truth. Document TLS termination, network boundaries, secrets, IAM, database encryption/backups/PITR, restore tests, multi-AZ expectations, S3 versioning, RPO/RTO, rollback, and incident response.
 
