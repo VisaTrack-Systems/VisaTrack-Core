@@ -40,6 +40,12 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      - name: Verify generated API client types
+        working-directory: frontend
+        run: |
+          npm run api:generate
+          git diff --exit-code -- lib/api.generated.ts
+
       - name: Audit production dependencies
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
@@ -116,6 +122,13 @@ jobs:
           source venv/bin/activate
           python -m compileall app
 
+      - name: Verify committed OpenAPI contract
+        working-directory: backend
+        run: |
+          source venv/bin/activate
+          python scripts/export_openapi.py
+          git diff --exit-code -- ../docs/api/openapi.json
+
       - name: Bootstrap empty PostgreSQL database
         working-directory: backend
         run: |
@@ -128,3 +141,25 @@ jobs:
         run: |
           source venv/bin/activate
           pytest tests -q
+
+  containers:
+    name: Container Build
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Validate Compose
+        run: docker compose config --quiet
+
+      - name: Build backend and worker image
+        run: docker build --tag visatrack-backend:test backend
+
+      - name: Build frontend image
+        run: >-
+          docker build
+          --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000
+          --tag visatrack-frontend:test
+          frontend

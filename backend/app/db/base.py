@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401,E402
     mfa_recovery_code,
     milestone,
     organization,
+    privacy_request,
     role,
     user,
     user_invitation,

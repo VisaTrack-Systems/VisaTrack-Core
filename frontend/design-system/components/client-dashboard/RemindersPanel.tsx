@@ -4,6 +4,7 @@ import { BellRing, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { DashboardReminder } from './types';
+import { DialogPanel } from '../DialogPanel';
 
 type RemindersPanelProps = {
   allReminders?: DashboardReminder[];
@@ -88,12 +89,12 @@ export function RemindersPanel({
           </div>
         </div>
       </div>
-      {selectedReminder ? (
+      {selectedReminder && !isBoardOpen ? (
         <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+          <DialogPanel labelledBy="reminder-detail-title" onClose={() => setSelectedReminderId(null)} className="w-full max-w-2xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-gray-900">{selectedReminder.title}</h3>
+                <h3 id="reminder-detail-title" className="text-base font-semibold text-gray-900">{selectedReminder.title}</h3>
                 <p className="text-xs text-gray-500 mt-1">
                   {selectedReminder.from} · {selectedReminder.time}
                 </p>
@@ -110,14 +111,14 @@ export function RemindersPanel({
             <div className="px-5 py-4">
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedReminder.body}</p>
             </div>
-          </div>
+          </DialogPanel>
         </div>
       ) : null}
       {isBoardOpen ? (
         <div className="fixed inset-0 z-[121] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-5xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+          <DialogPanel labelledBy="reminder-board-title" onClose={() => setIsBoardOpen(false)} className="w-full max-w-5xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">All Reminders</h3>
+              <h3 id="reminder-board-title" className="text-base font-semibold text-gray-900">All Reminders</h3>
               <button
                 type="button"
                 className="p-1 rounded hover:bg-gray-100"
@@ -165,7 +166,7 @@ export function RemindersPanel({
                 )}
               </div>
             </div>
-          </div>
+          </DialogPanel>
         </div>
       ) : null}
     </>
