@@ -13,7 +13,11 @@ type PageState =
 
 function InviteForm() {
   const router = useRouter();
-  const [token, setToken] = useState("");
+  const [token] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.hash.slice(1)).get("token") ?? ""
+  );
 
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [password, setPassword] = useState("");
@@ -21,21 +25,21 @@ function InviteForm() {
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fragmentToken = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
-    if (!fragmentToken) {
-      setState({ kind: "invalid", reason: "No invitation token found in the URL." });
+    if (!token) {
+      Promise.resolve().then(() => {
+        setState({ kind: "invalid", reason: "No invitation token found in the URL." });
+      });
       return;
     }
-    setToken(fragmentToken);
     window.history.replaceState(null, "", window.location.pathname);
 
-    verifyInvitation(fragmentToken)
+    verifyInvitation(token)
       .then((info) => setState({ kind: "ready", info }))
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Invalid or expired invitation.";
         setState({ kind: "invalid", reason: message });
       });
-  }, []);
+  }, [token]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
