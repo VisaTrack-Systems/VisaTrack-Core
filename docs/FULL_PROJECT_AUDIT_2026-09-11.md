@@ -130,6 +130,14 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 **Action:** Stream ZIP creation, impose per-case archive limits, or build archives asynchronously in object storage and return a short-lived link. Add concurrency, cancellation, timeout, and load tests.
 
+#### DATA-02 — Concurrent JSONB updates can lose case and document state
+
+**Evidence:** Portal permissions, custom document suites, custom documents, upload bindings, status overrides, and rejection notes are stored together in `cases.custom_fields`. Routes repeatedly read the Python dictionary, replace keys, and write the whole value (for example `backend/app/api/routes/cases.py:2182-2187`, `:2225`, `:2305`, `:2415-2419`, and `:2844-2859`). These flows do not lock the case row or use an optimistic version check.
+
+**Impact:** Concurrent actions such as a client completing an upload while a lawyer renames a document or changes portal permissions can overwrite each other. The result can be missing bindings, reverted permissions, or lost status/rejection data.
+
+**Action:** Normalize workflow state into relational tables with constraints. As an interim control, lock the case row with `SELECT ... FOR UPDATE` inside a short transaction or apply atomic `jsonb_set` updates with an optimistic version/`updated_at` predicate. Return `409 Conflict` on a stale write and add concurrent update tests.
+
 ### P2
 
 #### SEC-08 — Browser token storage and missing security headers amplify XSS impact
@@ -196,9 +204,25 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 #### REL-06 — Database pooling and transactions are not production-tuned
 
-**Evidence:** `backend/app/db/session.py:10-12` uses default engine pool settings; route handlers manually commit and mix ORM with large blocks of raw SQL.
+**Evidence:** `backend/app/db/session.py:10-12` uses default engine pool settings; route handlers manually commit and mix ORM with large blocks of raw SQL. `backend/app/db/deps.py:10-15` closes sessions but does not explicitly roll back when a request fails.
 
-**Action:** Set pool size/overflow/recycle/connect and statement timeouts from validated configuration. Standardize transaction boundaries, rollback/error mapping, deadlock retry, and isolation expectations. Review indexes with real query plans.
+**Action:** Set pool size/overflow/recycle/connect and statement timeouts from validated configuration. Standardize transaction boundaries, always roll back failed units of work, map integrity/deadlock failures, and document isolation expectations. Review indexes with real query plans.
+
+#### REL-07 — ORM, SQL schema, and status metrics have drifted
+
+**Evidence:** `Database/cases.sql:18-30` defines IRCC identifiers and timeline columns that are absent from `backend/app/models/case.py:18-53`, while raw workspace SQL still selects `start_date`. The API canonicalizes statuses to `intake`, `awaiting_client`, `in_progress`, and `closed` (`backend/app/api/routes/cases.py:89-94`), but admin/dashboard metrics and a database index still use legacy terminal values such as `approved`, `refused`, and `withdrawn`.
+
+**Impact:** Alembic autogeneration cannot represent the deployed schema, ORM-only changes can be destructive, and active/completed dashboard counts can be wrong after status consolidation.
+
+**Action:** Reconcile every model and schema column as part of migration consolidation. Put case status in one shared domain definition used by API validation, SQL constraints, indexes, filters, and metrics; backfill legacy values and add metric contract tests.
+
+#### REL-08 — Authentication writes have concurrency races
+
+**Evidence:** Login reads and increments `login_attempts` without a row lock or atomic update (`backend/app/api/routes/auth.py:99-119`). Invitation acceptance checks `accepted_at IS NULL` and updates later without locking the invitation (`auth.py:364-403`).
+
+**Impact:** Parallel login failures can under-count attempts and delay lockout. Concurrent invitation submissions can both pass the one-time check and perform duplicate/inconsistent setup work.
+
+**Action:** Use atomic `UPDATE ... RETURNING` or lock the relevant row for login counters. Lock and conditionally update invitation acceptance in one transaction, with database uniqueness/idempotency constraints and concurrency tests.
 
 #### QUAL-01 — Tests are mostly mocked units, with no enforced coverage or end-to-end suite
 
@@ -216,7 +240,7 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 #### QUAL-03 — Python builds are not reproducible
 
-**Evidence:** `backend/requirements.txt` uses broad ranges and no lock/hashes. CI upgrades pip and resolves dependencies afresh on every run.
+**Evidence:** `backend/requirements.txt` uses broad ranges and no lock/hashes. CI upgrades pip and resolves dependencies afresh on every run. A clean audit verification on 2026-09-11 resolved current packages and produced 101 passing tests plus one failure in `tests/api/test_router.py`: the test assumes every `api_router.routes` entry has `.path`, but the resolved FastAPI version exposes an `_IncludedRouter` entry.
 
 **Action:** Generate a reviewed lock with hashes for runtime and development dependencies, automate updates, scan both the lock and container/image, and record supported Python/PostgreSQL versions.
 
@@ -306,3 +330,13 @@ Add secure browser/session controls, remove plaintext password compatibility, im
 - Trust-account SQL includes cross-organization consistency checks and immutable financial fields.
 - CI builds both applications and runs backend/frontend tests.
 - Dependabot, CodeQL, SBOM, CODEOWNERS, a security disclosure policy, and contribution guidance exist, though several controls need enforcement or reactivation.
+
+## Audit verification results
+
+- `git diff --check`: passed.
+- Frontend install: completed, with npm reporting 31 known vulnerabilities (two critical, 15 high, 12 moderate, two low).
+- Frontend lint: passed with four warnings (two unused variables and two unoptimized image warnings).
+- Frontend tests: 59 passed across four files.
+- Frontend production build: passed.
+- Backend tests: 101 passed and one failed in `tests/api/test_router.py`; PyJWT also emitted two warnings that the configured 18-byte HMAC test/default key is below the 32-byte RFC 7518 recommendation.
+- Python vulnerability resolution was not treated as authoritative because runtime dependencies are ranges rather than a committed lock. Generate the lock first, then scan that exact artifact in CI.
