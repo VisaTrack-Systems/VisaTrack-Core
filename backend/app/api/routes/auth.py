@@ -100,7 +100,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthTokenResp
             User.organization_id == organization.id,
             cast(User.email, String) == normalized_email,
             User.deleted_at.is_(None),
-        )
+        ).with_for_update()
     )
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid organization or credentials")
@@ -374,7 +374,7 @@ def accept_invitation(
             UserInvitation.token_hash == token_hash,
             UserInvitation.accepted_at.is_(None),
             UserInvitation.revoked_at.is_(None),
-        )
+        ).with_for_update()
     )
     if invitation is None:
         raise HTTPException(status_code=400, detail="Invitation is invalid")
