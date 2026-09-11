@@ -5,11 +5,27 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request, Response
 
 from app.api.routes import auth
-from app.schemas.auth import AcceptInvitationRequest, ChangePasswordRequest, LoginRequest, UpdateCurrentUserSettingsRequest
+from app.schemas.auth import (
+    AcceptInvitationRequest,
+    ChangePasswordRequest,
+    LoginRequest,
+    UpdateCurrentUserSettingsRequest,
+    VerifyInvitationRequest,
+)
 from tests.support import FakeResult, row
+
+
+def browser_request() -> Request:
+    return Request({
+        'type': 'http',
+        'method': 'POST',
+        'path': '/api/v1/auth/login',
+        'headers': [(b'origin', b'http://localhost:3000')],
+        'client': ('127.0.0.1', 12345),
+    })
 
 
 def test_auth_helpers_normalize_and_detect_onboarding(make_user):
@@ -28,7 +44,12 @@ def test_login_rejects_locked_account(monkeypatch, make_user):
     db.scalar.side_effect = [organization, user]
 
     with pytest.raises(HTTPException) as exc:
-        auth.login(payload=row(organization_slug='acme', email='user@example.com', password='secret'), db=db)
+        auth.login(
+            payload=row(organization_slug='acme', email='user@example.com', password='secret'),
+            request=browser_request(),
+            response=Response(),
+            db=db,
+        )
 
     assert exc.value.status_code == 423
 
@@ -41,7 +62,12 @@ def test_login_invalid_password_increments_attempts(monkeypatch, make_user):
     monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: False)
 
     with pytest.raises(HTTPException) as exc:
-        auth.login(payload=row(organization_slug='acme', email='user@example.com', password='bad'), db=db)
+        auth.login(
+            payload=row(organization_slug='acme', email='user@example.com', password='bad'),
+            request=browser_request(),
+            response=Response(),
+            db=db,
+        )
 
     assert exc.value.status_code == 401
     assert user.login_attempts == 2
@@ -79,10 +105,17 @@ def test_login_success_returns_access_token(monkeypatch, make_user):
     db.scalar.side_effect = [organization, user]
     db.execute.return_value = FakeResult(rows=['lawyer'])
     monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: True)
-    monkeypatch.setattr(auth, 'create_access_token', lambda user_id, org_id, roles, active_role=None: 'token-123')
+    monkeypatch.setattr(auth, 'create_access_token', lambda *args, **kwargs: 'token-123')
+    monkeypatch.setattr(
+        auth,
+        'create_session',
+        lambda *args, **kwargs: row(session=row(id=uuid4()), refresh_token='refresh-token'),
+    )
 
     result = auth.login(
         payload=LoginRequest(organization_slug='acme', email='user@example.com', password='secret'),
+        request=browser_request(),
+        response=Response(),
         db=db,
     )
 
@@ -91,11 +124,40 @@ def test_login_success_returns_access_token(monkeypatch, make_user):
     db.commit.assert_called_once()
 
 
+def test_login_requires_second_factor_for_enrolled_user(monkeypatch, make_user):
+    organization = row(id=uuid4(), slug='acme')
+    user = make_user(
+        organization_id=organization.id,
+        status='active',
+        mfa_enabled=True,
+        mfa_secret='encrypted',
+    )
+    db = MagicMock()
+    db.scalar.side_effect = [organization, user]
+    db.execute.return_value = FakeResult(rows=['org_admin'])
+    monkeypatch.setattr(auth, 'verify_password', lambda password, stored_hash: True)
+
+    with pytest.raises(HTTPException) as exc:
+        auth.login(
+            payload=LoginRequest(
+                organization_slug='acme',
+                email='user@example.com',
+                password='secret',
+            ),
+            request=browser_request(),
+            response=Response(),
+            db=db,
+        )
+
+    assert exc.value.status_code == 401
+    assert exc.value.detail == 'MFA code required'
+
+
 def test_switch_active_role_reissues_token(monkeypatch, make_auth_context):
     auth_context = make_auth_context(roles=['lawyer', 'org_admin'])
     captured = {}
 
-    def fake_create_access_token(user_id, org_id, roles, active_role=None):
+    def fake_create_access_token(user_id, org_id, roles, active_role=None, **kwargs):
         captured['user_id'] = user_id
         captured['org_id'] = org_id
         captured['roles'] = roles
@@ -104,7 +166,9 @@ def test_switch_active_role_reissues_token(monkeypatch, make_auth_context):
 
     monkeypatch.setattr(auth, 'create_access_token', fake_create_access_token)
 
-    result = auth.switch_active_role(payload=row(role='org_admin'), auth=auth_context)
+    db = MagicMock()
+    db.scalar.return_value = row(revoked_at=None)
+    result = auth.switch_active_role(payload=row(role='org_admin'), auth=auth_context, db=db)
 
     assert result.access_token == 'token-role-switch'
     assert result.active_role == 'org_admin'
@@ -135,7 +199,6 @@ def test_update_me_settings_updates_fields_and_clears_mfa_secret(monkeypatch, ma
             last_name='User',
             phone='555-0100',
             avatar_url='https://example.com/a.png',
-            mfa_enabled=False,
             timezone='America/Vancouver',
             locale='fr-CA',
         ),
@@ -144,7 +207,7 @@ def test_update_me_settings_updates_fields_and_clears_mfa_secret(monkeypatch, ma
     )
 
     assert result.email == 'updated@example.com'
-    assert auth_context.user.mfa_secret is None
+    assert auth_context.user.mfa_secret == 'secret'
     db.commit.assert_called_once()
 
 
@@ -161,6 +224,8 @@ def test_change_password_updates_hash(monkeypatch, make_auth_context):
     )
 
     assert auth_context.user.password_hash == 'hashed:NewPassword123'
+    assert auth_context.user.token_version == 1
+    db.execute.assert_called_once()
     db.commit.assert_called_once()
 
 
@@ -210,7 +275,7 @@ def test_verify_invitation_returns_organization_slug(monkeypatch, make_user):
     db.scalar.side_effect = [invitation, user, organization]
     monkeypatch.setattr(auth, 'hash_invitation_token', lambda token: 'token-hash')
 
-    result = auth.verify_invitation(token='a' * 16, db=db)
+    result = auth.verify_invitation(payload=VerifyInvitationRequest(token='a' * 16), db=db)
 
     assert result.email == 'invitee@example.com'
     assert result.full_name == 'Invitee User'

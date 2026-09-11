@@ -26,13 +26,22 @@ def test_verify_password_rejects_unknown_hash_format():
 
 def test_access_token_can_be_decoded(monkeypatch):
     monkeypatch.setattr(security.settings, 'auth_secret_key', 'x' * 32)
-    token = security.create_access_token('user-1', 'org-1', ['lawyer'])
+    token = security.create_access_token(
+        'user-1',
+        'org-1',
+        ['lawyer'],
+        'lawyer',
+        session_id='00000000-0000-0000-0000-000000000001',
+        token_version=0,
+    )
     payload = security.decode_access_token(token)
 
     assert payload['sub'] == 'user-1'
     assert payload['org'] == 'org-1'
     assert payload['roles'] == ['lawyer']
     assert payload['type'] == 'access'
+    assert payload['active_role'] == 'lawyer'
+    assert payload['sid'] == '00000000-0000-0000-0000-000000000001'
 
 
 def test_decode_access_token_rejects_wrong_token_type(monkeypatch):

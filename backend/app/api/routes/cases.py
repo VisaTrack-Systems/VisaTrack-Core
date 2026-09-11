@@ -470,10 +470,10 @@ def _get_case_with_access(
         Case.deleted_at.is_(None),
     )
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
-        if "lawyer" in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
+        if auth.active_role == "lawyer":
             stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
-        elif "client" in auth.roles:
+        elif auth.active_role == "client":
             client_membership = (
                 select(CaseClient.id)
                 .where(
@@ -666,7 +666,7 @@ def _get_case_with_write_access(
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
         if case.primary_lawyer_id != auth.user_id and case.created_by != auth.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to modify this case")
 
@@ -679,7 +679,7 @@ def create_case(
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> CaseListItem:
-    if "super_admin" not in auth.roles and payload.organization_id != auth.organization_id:
+    if auth.active_role != "super_admin" and payload.organization_id != auth.organization_id:
         raise HTTPException(status_code=403, detail="Cross-organization access is not allowed")
 
     organization_exists = db.scalar(
@@ -821,7 +821,7 @@ def list_cases(
         .offset(offset)
     )
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
         stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
 
     if isinstance(status, str) and status.strip():
@@ -882,10 +882,10 @@ def get_case_by_number(
         .limit(1)
     )
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
-        if "lawyer" in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
+        if auth.active_role == "lawyer":
             stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
-        elif "client" in auth.roles:
+        elif auth.active_role == "client":
             client_membership = (
                 select(CaseClient.id)
                 .where(
@@ -1599,11 +1599,11 @@ def get_case_workspace_by_number(
     if case_row is None:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
-        if "lawyer" in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
+        if auth.active_role == "lawyer":
             if case_row["primary_lawyer_id"] != auth.user_id and case_row["created_by"] != auth.user_id:
                 raise HTTPException(status_code=404, detail="Case not found")
-        elif "client" in auth.roles:
+        elif auth.active_role == "client":
             if case_row["client_id"] != auth.user_id:
                 case_membership = db.execute(
                     text(
@@ -1640,12 +1640,7 @@ def get_case_workspace_by_number(
         custom_fields.get("document_rejection_notes")
     )
     portal_permissions_payload = _normalized_portal_permissions(custom_fields.get("portal_permissions"))
-    is_client_portal_view = (
-        "client" in auth.roles
-        and "lawyer" not in auth.roles
-        and "org_admin" not in auth.roles
-        and "super_admin" not in auth.roles
-    )
+    is_client_portal_view = auth.active_role == "client"
     portal_access = portal_permissions_payload["portal_access"]
     client_can_view_case_status = (
         portal_access in {"full_access", "read_only"}
@@ -2705,7 +2700,7 @@ def initiate_case_document_upload(
 ) -> CaseDocumentUploadInitiateResponse:
     case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
 
-    if "client" in auth.roles:
+    if auth.active_role == "client":
         client_capabilities = _client_portal_capabilities(case)
         if not client_capabilities["can_upload_documents"]:
             raise HTTPException(status_code=403, detail="Document uploads are disabled for this portal")
@@ -2772,7 +2767,7 @@ def complete_case_document_upload(
         for_update=True,
     )
 
-    if "client" in auth.roles:
+    if auth.active_role == "client":
         client_capabilities = _client_portal_capabilities(case)
         if not client_capabilities["can_upload_documents"]:
             raise HTTPException(status_code=403, detail="Document uploads are disabled for this portal")
@@ -3126,7 +3121,7 @@ def get_case_document_download_url(
 ) -> CaseDocumentDownloadResponse:
     case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
 
-    if "client" in auth.roles:
+    if auth.active_role == "client":
         client_capabilities = _client_portal_capabilities(case)
         if not client_capabilities["can_view_documents"]:
             raise HTTPException(status_code=403, detail="Document viewing is disabled for this portal")

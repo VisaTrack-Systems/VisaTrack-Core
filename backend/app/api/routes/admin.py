@@ -49,6 +49,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.services.audit import log_activity
 from app.services.email import DEFAULT_INVITATION_TEMPLATE, EmailNotConfiguredError, send_invitation_email
 from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
+from app.services.sessions import revoke_all_user_sessions
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -94,7 +95,7 @@ def _invitation_token_from_url(invitation_url: str) -> str:
     if origin not in allowed_origins or parsed.path.rstrip("/") != "/invite":
         raise HTTPException(status_code=400, detail="Invalid invitation link")
 
-    tokens = parse_qs(parsed.query).get("token", [])
+    tokens = parse_qs(parsed.fragment or parsed.query).get("token", [])
     if len(tokens) != 1 or not tokens[0]:
         raise HTTPException(status_code=400, detail="Invalid invitation link")
     return tokens[0]
@@ -658,7 +659,7 @@ def resend_invitation(
     db.commit()
 
     primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
-    invitation_url = f"{primary_origin}/invite?token={plain_token}"
+    invitation_url = f"{primary_origin}/invite#token={plain_token}"
     return ResendInvitationResponse(invitation_url=invitation_url)
 
 
@@ -927,7 +928,7 @@ def create_user(
         )
         db.add(invitation)
         primary_origin = settings.frontend_origin.split(",")[0].strip().rstrip("/")
-        invitation_url = f"{primary_origin}/invite?token={plain_token}"
+        invitation_url = f"{primary_origin}/invite#token={plain_token}"
 
     log_activity(
         db,
@@ -974,6 +975,8 @@ def delete_user(
     user.status = "disabled"
     user.updated_at = now
     db.add(user)
+    user.token_version = int(user.token_version or 0) + 1
+    revoke_all_user_sessions(db, user.id, reason="account_disabled")
 
     log_activity(
         db,
@@ -1046,6 +1049,9 @@ def remove_user_role(
     )
     if not removed:
         raise HTTPException(status_code=404, detail="Role assignment not found")
+    user.token_version = int(user.token_version or 0) + 1
+    db.add(user)
+    revoke_all_user_sessions(db, user.id, reason="role_revoked")
 
     log_activity(
         db,

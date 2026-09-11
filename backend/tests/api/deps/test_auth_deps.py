@@ -13,6 +13,7 @@ from tests.support import FakeResult, row
 
 def test_get_auth_context_success(monkeypatch, make_user):
     user = make_user()
+    session_id = uuid4()
     db = MagicMock()
     db.scalar.return_value = user
     db.execute.return_value = FakeResult([
@@ -22,7 +23,13 @@ def test_get_auth_context_success(monkeypatch, make_user):
     monkeypatch.setattr(
         auth_deps,
         'decode_access_token',
-        lambda token: {'sub': str(user.id), 'org': str(user.organization_id), 'roles': ['client']},
+        lambda token: {
+            'sub': str(user.id),
+            'org': str(user.organization_id),
+            'active_role': 'lawyer',
+            'sid': str(session_id),
+            'tv': 0,
+        },
     )
     credentials = row(scheme='Bearer', credentials='token')
 
@@ -41,7 +48,13 @@ def test_get_auth_context_rejects_locked_user(monkeypatch, make_user):
     monkeypatch.setattr(
         auth_deps,
         'decode_access_token',
-        lambda token: {'sub': str(user.id), 'org': str(user.organization_id), 'roles': []},
+        lambda token: {
+            'sub': str(user.id),
+            'org': str(user.organization_id),
+            'active_role': 'lawyer',
+            'sid': str(uuid4()),
+            'tv': 0,
+        },
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -71,7 +84,13 @@ def test_get_auth_context_rejects_inactive_user(monkeypatch, make_user):
     monkeypatch.setattr(
         auth_deps,
         'decode_access_token',
-        lambda token: {'sub': str(user.id), 'org': str(user.organization_id)},
+        lambda token: {
+            'sub': str(user.id),
+            'org': str(user.organization_id),
+            'active_role': 'lawyer',
+            'sid': str(uuid4()),
+            'tv': 0,
+        },
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -98,3 +117,30 @@ def test_role_checks_use_active_role_and_permissions_require_all(make_auth_conte
 
     with pytest.raises(HTTPException):
         auth_deps.require_permissions('users:manage', 'roles:manage')(auth)
+
+
+def test_get_auth_context_rejects_revoked_session(monkeypatch, make_user):
+    user = make_user()
+    session_id = uuid4()
+    db = MagicMock()
+    db.scalar.side_effect = [user, None]
+    monkeypatch.setattr(
+        auth_deps,
+        'decode_access_token',
+        lambda token: {
+            'sub': str(user.id),
+            'org': str(user.organization_id),
+            'active_role': 'lawyer',
+            'sid': str(session_id),
+            'tv': 0,
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        auth_deps.get_auth_context(
+            credentials=row(scheme='Bearer', credentials='token'),
+            db=db,
+        )
+
+    assert exc.value.status_code == 401
+    assert 'revoked' in exc.value.detail.lower()

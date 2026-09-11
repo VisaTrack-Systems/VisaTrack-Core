@@ -10,6 +10,7 @@ Base = declarative_base()
 from app.models import (  # noqa: F401,E402
     case,
     case_client,
+    mfa_recovery_code,
     milestone,
     organization,
     role,
@@ -17,4 +18,5 @@ from app.models import (  # noqa: F401,E402
     user_invitation,
     user_profile,
     user_role,
+    user_session,
 )

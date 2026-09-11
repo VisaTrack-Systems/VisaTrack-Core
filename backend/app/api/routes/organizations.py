@@ -25,6 +25,6 @@ def list_organizations(
         .limit(limit)
         .offset(offset)
     )
-    if "super_admin" not in auth.roles:
+    if auth.active_role != "super_admin":
         stmt = stmt.where(Organization.id == auth.organization_id)
     return list(db.scalars(stmt).all())

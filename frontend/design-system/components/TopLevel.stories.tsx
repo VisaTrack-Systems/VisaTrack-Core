@@ -223,7 +223,6 @@ export const ProfileSettingsOpen: Story = {
         email: 'lawyer@example.com',
         timezone: 'America/Toronto',
         locale: 'en-CA',
-        mfa_enabled: true,
       })
     );
   },
