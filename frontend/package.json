@@ -13,7 +13,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:stories": "vitest run --reporter=dot",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "api:generate": "openapi-typescript ../docs/api/openapi.json -o lib/api.generated.ts"
   },
   "dependencies": {
     "lucide-react": "^0.544.0",
@@ -38,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^28.1.0",
+    "openapi-typescript": "^7.13.0",
     "storybook": "10.6.0",
     "tailwindcss": "^4",
     "typescript": "^5",

@@ -2,6 +2,7 @@ import { ChevronDown, Info, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { type InvitationStyles, getInvitationTemplate, saveInvitationTemplate } from '@/lib/api';
+import { DialogPanel } from '../DialogPanel';
 
 const DEFAULT_INVITATION_TEMPLATE =
   'Hi {recipient_name},\n\n' +
@@ -88,12 +89,16 @@ function TemplateDialog({
 
   return (
     <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+      <DialogPanel
+        labelledBy="invitation-template-title"
+        onClose={onClose}
+        className="w-full max-w-lg bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+      >
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200 shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Edit Invitation Email</h2>
+            <h2 id="invitation-template-title" className="text-lg font-semibold text-gray-900">Edit Invitation Email</h2>
             {isCustom && (
               <span className="inline-block mt-1 text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
                 Custom template active
@@ -103,6 +108,7 @@ function TemplateDialog({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close invitation email editor"
             className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
             <X className="w-4 h-4" />
@@ -244,7 +250,7 @@ function TemplateDialog({
             </button>
           </div>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   );
 }

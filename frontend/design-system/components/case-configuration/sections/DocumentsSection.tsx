@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
+import { DialogPanel } from '../../DialogPanel';
 
 import { AddDocumentDialog } from '../dialogs/AddDocumentDialog';
 import { CaseConfigDialog } from '../dialogs/CaseConfigDialog';
@@ -433,10 +434,10 @@ export function DocumentsSection({
       ) : null}
       {noteTarget ? (
         <div className="fixed inset-0 z-[85] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+          <DialogPanel labelledBy="client-note-title" onClose={() => setNoteTarget(null)} className="w-full max-w-lg bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Client Note</h3>
+                <h3 id="client-note-title" className="text-base font-semibold text-gray-900">Client Note</h3>
                 <p className="text-xs text-gray-500 mt-1">{noteTarget.name}</p>
               </div>
               <button
@@ -460,7 +461,7 @@ export function DocumentsSection({
                 Close
               </button>
             </div>
-          </div>
+          </DialogPanel>
         </div>
       ) : null}
       {rejectionTarget ? (
