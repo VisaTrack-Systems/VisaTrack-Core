@@ -2,6 +2,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -84,6 +85,19 @@ def _normalize_email(value: str) -> str:
     if "@" not in normalized or normalized.startswith("@") or normalized.endswith("@"):
         raise HTTPException(status_code=400, detail="Invalid email address")
     return normalized
+
+
+def _invitation_token_from_url(invitation_url: str) -> str:
+    parsed = urlparse(invitation_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    allowed_origins = {value.rstrip("/") for value in settings.frontend_origins}
+    if origin not in allowed_origins or parsed.path.rstrip("/") != "/invite":
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+
+    tokens = parse_qs(parsed.query).get("token", [])
+    if len(tokens) != 1 or not tokens[0]:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+    return tokens[0]
 
 
 def _is_super_admin(auth: AuthContext) -> bool:
@@ -644,6 +658,32 @@ def send_invitation_email_endpoint(
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> None:
+    normalized_email = _normalize_email(payload.to_email)
+    plain_token = _invitation_token_from_url(payload.invitation_url)
+    now = datetime.now(timezone.utc)
+    invitation = db.scalar(
+        select(UserInvitation).where(
+            UserInvitation.organization_id == auth.organization_id,
+            cast(UserInvitation.email, String) == normalized_email,
+            UserInvitation.token_hash == hash_invitation_token(plain_token),
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.revoked_at.is_(None),
+            UserInvitation.expires_at > now,
+        )
+    )
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Active invitation not found")
+
+    invited_user = db.scalar(
+        select(User).where(
+            User.id == invitation.user_id,
+            User.organization_id == auth.organization_id,
+            User.deleted_at.is_(None),
+        )
+    )
+    if invited_user is None:
+        raise HTTPException(status_code=404, detail="Invited user not found")
+
     # Look up the org's custom invitation template and style options.
     org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
     body_template: str | None = None
@@ -653,12 +693,13 @@ def send_invitation_email_endpoint(
         body_template = email_templates.get("invitation") or None
         styles_data = email_templates.get("invitation_styles", {})
 
-    org_name = payload.organization_name or (org.name if org is not None else "VisaTrack")
+    org_name = org.name if org is not None else "VisaTrack"
+    recipient_name = f"{invited_user.first_name} {invited_user.last_name}".strip()
 
     try:
         send_invitation_email(
-            to_email=payload.to_email,
-            recipient_name=payload.recipient_name,
+            to_email=normalized_email,
+            recipient_name=recipient_name,
             invitation_url=payload.invitation_url,
             organization_name=org_name,
             body_template=body_template,
@@ -668,9 +709,9 @@ def send_invitation_email_endpoint(
             bold_org_name=styles_data.get("bold_org_name", True),
         )
     except EmailNotConfiguredError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Invitation email is unavailable") from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to send email: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Failed to send invitation email") from exc
 
 
 @router.get("/email-templates/invitation")

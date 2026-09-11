@@ -172,6 +172,7 @@ def test_get_case_by_number_returns_summary(make_auth_context):
 
     assert result.case_number == 'C-2026-001'
     assert result.milestones[0].name == 'Collect passport'
+    assert 'internal_notes' not in result.model_dump()
 
 
 def test_update_case_details_by_number_updates_case(monkeypatch, make_auth_context):

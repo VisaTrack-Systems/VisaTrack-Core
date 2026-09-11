@@ -18,8 +18,8 @@ class BugReportContext(BaseModel):
 
 class BugReportScreenshot(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
-    content_type: str = Field(min_length=1, max_length=128)
-    base64_content: str = Field(min_length=8, max_length=8_000_000)
+    content_type: Literal["image/png", "image/jpeg"]
+    base64_content: str = Field(min_length=8, max_length=2_000_000)
 
 
 class BugReportSubmitRequest(BaseModel):
