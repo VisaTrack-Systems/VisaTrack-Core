@@ -2,6 +2,7 @@
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -86,6 +87,19 @@ def _normalize_email(value: str) -> str:
     return normalized
 
 
+def _invitation_token_from_url(invitation_url: str) -> str:
+    parsed = urlparse(invitation_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    allowed_origins = {value.rstrip("/") for value in settings.frontend_origins}
+    if origin not in allowed_origins or parsed.path.rstrip("/") != "/invite":
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+
+    tokens = parse_qs(parsed.query).get("token", [])
+    if len(tokens) != 1 or not tokens[0]:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+    return tokens[0]
+
+
 def _is_super_admin(auth: AuthContext) -> bool:
     return auth.active_role == "super_admin"
 
@@ -100,6 +114,16 @@ def _require_org_scope(auth: AuthContext, organization_id: UUID) -> None:
         return
     if auth.organization_id != organization_id:
         raise HTTPException(status_code=403, detail="Cross-organization access is not allowed")
+
+
+def _require_delegable_role(auth: AuthContext, role_slug: str) -> str:
+    normalized_role = canonical_role_slug(role_slug)
+    if normalized_role == "super_admin" and not _is_super_admin(auth):
+        raise HTTPException(
+            status_code=403,
+            detail="Only an active super admin can manage the super admin role",
+        )
+    return normalized_role
 
 
 def _list_user_roles(
@@ -167,7 +191,7 @@ def get_admin_overview(
         .select_from(Case)
         .where(
             Case.deleted_at.is_(None),
-            cast(Case.status, String).notin_(["approved", "refused", "withdrawn", "closed"]),
+            cast(Case.status, String) != "closed",
             *org_filter,
         )
     ) or 0
@@ -176,7 +200,7 @@ def get_admin_overview(
         .select_from(Case)
         .where(
             Case.deleted_at.is_(None),
-            cast(Case.status, String).in_(["approved", "refused", "withdrawn", "closed"]),
+            cast(Case.status, String) == "closed",
             *org_filter,
         )
     ) or 0
@@ -644,6 +668,32 @@ def send_invitation_email_endpoint(
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> None:
+    normalized_email = _normalize_email(payload.to_email)
+    plain_token = _invitation_token_from_url(payload.invitation_url)
+    now = datetime.now(timezone.utc)
+    invitation = db.scalar(
+        select(UserInvitation).where(
+            UserInvitation.organization_id == auth.organization_id,
+            cast(UserInvitation.email, String) == normalized_email,
+            UserInvitation.token_hash == hash_invitation_token(plain_token),
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.revoked_at.is_(None),
+            UserInvitation.expires_at > now,
+        )
+    )
+    if invitation is None:
+        raise HTTPException(status_code=404, detail="Active invitation not found")
+
+    invited_user = db.scalar(
+        select(User).where(
+            User.id == invitation.user_id,
+            User.organization_id == auth.organization_id,
+            User.deleted_at.is_(None),
+        )
+    )
+    if invited_user is None:
+        raise HTTPException(status_code=404, detail="Invited user not found")
+
     # Look up the org's custom invitation template and style options.
     org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
     body_template: str | None = None
@@ -653,12 +703,13 @@ def send_invitation_email_endpoint(
         body_template = email_templates.get("invitation") or None
         styles_data = email_templates.get("invitation_styles", {})
 
-    org_name = payload.organization_name or (org.name if org is not None else "VisaTrack")
+    org_name = org.name if org is not None else "VisaTrack"
+    recipient_name = f"{invited_user.first_name} {invited_user.last_name}".strip()
 
     try:
         send_invitation_email(
-            to_email=payload.to_email,
-            recipient_name=payload.recipient_name,
+            to_email=normalized_email,
+            recipient_name=recipient_name,
             invitation_url=payload.invitation_url,
             organization_name=org_name,
             body_template=body_template,
@@ -668,9 +719,9 @@ def send_invitation_email_endpoint(
             bold_org_name=styles_data.get("bold_org_name", True),
         )
     except EmailNotConfiguredError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Invitation email is unavailable") from exc
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to send email: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Failed to send invitation email") from exc
 
 
 @router.get("/email-templates/invitation")
@@ -807,6 +858,7 @@ def create_user(
     db: Session = Depends(get_db),
 ) -> AdminCreateUserResponse:
     _require_org_scope(auth, payload.organization_id)
+    normalized_role = _require_delegable_role(auth, payload.role_slug)
 
     normalized_status = payload.status.strip().lower()
     is_invited = normalized_status == "invited"
@@ -856,7 +908,7 @@ def create_user(
     assign_role_to_user(
         db,
         user_id=new_user.id,
-        role_slug=payload.role_slug.strip().lower(),
+        role_slug=normalized_role,
         assigned_by=auth.user_id,
     )
 
@@ -868,7 +920,7 @@ def create_user(
             organization_id=payload.organization_id,
             user_id=new_user.id,
             email=normalized_email,
-            role_slug=payload.role_slug.strip().lower(),
+            role_slug=normalized_role,
             token_hash=hash_invitation_token(plain_token),
             expires_at=now + timedelta(hours=settings.invitation_expiry_hours),
             invited_by=auth.user_id,
@@ -884,7 +936,7 @@ def create_user(
         action="created",
         entity_type="user",
         entity_id=new_user.id,
-        new_values={"email": new_user.email, "role": payload.role_slug.strip().lower(), "invited": is_invited},
+        new_values={"email": new_user.email, "role": normalized_role, "invited": is_invited},
     )
 
     db.commit()
@@ -897,7 +949,7 @@ def create_user(
         status=new_user.status,
         organization_id=new_user.organization_id,
         created_at=new_user.created_at,
-        roles=[payload.role_slug.strip().lower()],
+        roles=[normalized_role],
         invitation_url=invitation_url,
     )
 
@@ -948,11 +1000,12 @@ def assign_user_role(
         raise HTTPException(status_code=404, detail="User not found")
 
     _require_org_scope(auth, user.organization_id)
+    normalized_role = _require_delegable_role(auth, payload.role_slug)
 
     assign_role_to_user(
         db,
         user_id=user.id,
-        role_slug=payload.role_slug.strip().lower(),
+        role_slug=normalized_role,
         assigned_by=auth.user_id,
     )
 
@@ -963,7 +1016,7 @@ def assign_user_role(
         action="assigned",
         entity_type="role",
         entity_id=user.id,
-        new_values={"role_slug": payload.role_slug.strip().lower()},
+        new_values={"role_slug": normalized_role},
     )
 
     db.commit()
@@ -982,7 +1035,7 @@ def remove_user_role(
 
     _require_org_scope(auth, user.organization_id)
 
-    normalized_role = role_slug.strip().lower()
+    normalized_role = _require_delegable_role(auth, role_slug)
     if user.id == auth.user_id and normalized_role in {"org_admin", "super_admin"}:
         raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
 

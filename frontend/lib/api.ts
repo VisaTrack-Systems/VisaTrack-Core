@@ -275,7 +275,6 @@ export type CaseSummary = {
   estimated_completion_from: string | null;
   estimated_completion_to: string | null;
   description: string | null;
-  internal_notes: string | null;
   milestones: MilestoneSummary[];
 };
 
@@ -475,7 +474,8 @@ export type CaseDocumentUploadInitiateInput = {
 export type CaseDocumentUploadInitiateResponse = {
   document_id: string;
   upload_url: string;
-  upload_headers: Record<string, string>;
+  upload_method: 'POST';
+  upload_fields: Record<string, string>;
   storage_key: string;
   expires_in_seconds: number;
   max_upload_bytes: number;
@@ -817,14 +817,10 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
 }
 
 export async function submitBugReport(input: SubmitBugReportInput): Promise<void> {
-  return requestVoid(
-    '/api/v1/feedback/bug-report',
-    {
-      method: 'POST',
-      body: JSON.stringify(input),
-    },
-    { includeAuth: false }
-  );
+  return requestVoid('/api/v1/feedback/bug-report', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export async function getCases(limit = 10): Promise<CaseListItem[]> {

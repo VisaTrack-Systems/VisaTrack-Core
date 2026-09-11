@@ -1,6 +1,7 @@
 """Case Management Routes: API endpoints for case CRUD operations, status updates, document handling, and case analytics."""
 import re
-from io import BytesIO
+from collections.abc import Iterator
+from tempfile import SpooledTemporaryFile
 from zipfile import ZIP_DEFLATED, ZipFile
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -8,6 +9,7 @@ from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import String, cast, select, text
 from sqlalchemy.orm import Session, aliased
 
@@ -60,11 +62,15 @@ from app.services.storage import (
     create_presigned_download,
     create_presigned_force_download,
     create_presigned_upload,
+    delete_object,
     get_object_bytes,
     head_object,
 )
 
 router = APIRouter(prefix="/cases", tags=["cases"])
+
+MAX_ARCHIVE_DOCUMENTS = 100
+ARCHIVE_MEMORY_THRESHOLD_BYTES = 16 * 1024 * 1024
 
 DEFAULT_PORTAL_PERMISSIONS = {
     "show_case_status_progress": True,
@@ -77,6 +83,12 @@ DEFAULT_PORTAL_PERMISSIONS = {
 
 ALLOWED_PORTAL_ACCESS = {"full_access", "limited_access", "read_only", "disabled"}
 ALLOWED_DOCUMENT_UPLOAD = {"enabled", "disabled"}
+ALLOWED_DOCUMENT_CONTENT_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/jpeg",
+    "image/png",
+}
 ALLOWED_REMINDERS = {"enabled", "disabled"}
 ALLOWED_DOCUMENT_STATUSES = {
     "requested",
@@ -229,6 +241,12 @@ def _generate_case_number(db: Session, organization_id: UUID) -> str:
     year = date.today().year
     prefix_like = f"C-{year}-%"
     capture_pattern = f"^C-{year}-([0-9]+)$"
+    lock_scope = f"case-number:{organization_id}:{year}"
+
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
+        {"scope": lock_scope},
+    )
 
     max_suffix = db.execute(
         text(
@@ -439,7 +457,13 @@ def _client_portal_capabilities(case: Case) -> dict[str, bool | str]:
     }
 
 
-def _get_case_with_access(*, case_number: str, auth: AuthContext, db: Session) -> Case:
+def _get_case_with_access(
+    *,
+    case_number: str,
+    auth: AuthContext,
+    db: Session,
+    for_update: bool = False,
+) -> Case:
     stmt = select(Case).where(
         Case.case_number == case_number,
         Case.organization_id == auth.organization_id,
@@ -460,6 +484,9 @@ def _get_case_with_access(*, case_number: str, auth: AuthContext, db: Session) -
                 .exists()
             )
             stmt = stmt.where((Case.client_id == auth.user_id) | client_membership)
+
+    if for_update:
+        stmt = stmt.with_for_update()
 
     case = db.scalar(stmt.limit(1))
     if case is None:
@@ -615,6 +642,14 @@ def _archive_entry_name(*, base_name: str, original_file_name: str, seen_names: 
     return f"{stem}{suffix}.{extension}" if extension else f"{stem}{suffix}"
 
 
+def _stream_temporary_file(file_obj, chunk_size: int = 1024 * 1024) -> Iterator[bytes]:
+    try:
+        while chunk := file_obj.read(chunk_size):
+            yield chunk
+    finally:
+        file_obj.close()
+
+
 def _get_case_with_write_access(
     *,
     case_number: str,
@@ -626,7 +661,7 @@ def _get_case_with_write_access(
             Case.case_number == case_number,
             Case.organization_id == auth.organization_id,
             Case.deleted_at.is_(None),
-        )
+        ).with_for_update()
     )
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -892,7 +927,6 @@ def get_case_by_number(
         estimated_completion_from=case.estimated_completion_from,
         estimated_completion_to=case.estimated_completion_to,
         description=case.description,
-        internal_notes=case.internal_notes,
         milestones=[
             MilestoneSummary(
                 id=milestone_row.id,
@@ -2687,8 +2721,8 @@ def initiate_case_document_upload(
             status_code=400,
             detail=f"File exceeds upload limit of {settings.s3_max_upload_bytes} bytes",
         )
-    if not file_type:
-        file_type = "application/octet-stream"
+    if file_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported document type")
 
     slot = _resolve_document_slot(case=case, document_id=document_id, db=db)
     storage_key = _build_document_storage_key(
@@ -2699,7 +2733,11 @@ def initiate_case_document_upload(
     )
 
     try:
-        upload = create_presigned_upload(object_key=storage_key, content_type=file_type)
+        upload = create_presigned_upload(
+            object_key=storage_key,
+            content_type=file_type,
+            max_bytes=settings.s3_max_upload_bytes,
+        )
     except StorageConfigurationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except StorageOperationError as exc:
@@ -2708,7 +2746,7 @@ def initiate_case_document_upload(
     return CaseDocumentUploadInitiateResponse(
         document_id=slot["logical_document_id"],
         upload_url=upload.url,
-        upload_headers=upload.headers,
+        upload_fields=upload.fields,
         storage_key=storage_key,
         expires_in_seconds=upload.expires_in_seconds,
         max_upload_bytes=settings.s3_max_upload_bytes,
@@ -2727,7 +2765,12 @@ def complete_case_document_upload(
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin", "client")),
     db: Session = Depends(get_db),
 ) -> CaseWorkspaceDocument:
-    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    case = _get_case_with_access(
+        case_number=case_number,
+        auth=auth,
+        db=db,
+        for_update=True,
+    )
 
     if "client" in auth.roles:
         client_capabilities = _client_portal_capabilities(case)
@@ -2749,7 +2792,29 @@ def complete_case_document_upload(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     actual_file_size = int(head_response.get("ContentLength") or payload.file_size_bytes)
-    actual_file_type = str(head_response.get("ContentType") or payload.file_type or "application/octet-stream")
+    actual_file_type = str(
+        head_response.get("ContentType")
+        or payload.file_type
+        or "application/octet-stream"
+    ).strip().lower()
+    if actual_file_size <= 0 or actual_file_size > settings.s3_max_upload_bytes:
+        try:
+            delete_object(object_key=payload.storage_key)
+        except StorageOperationError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Invalid upload could not be removed",
+            ) from exc
+        raise HTTPException(status_code=400, detail="Uploaded file exceeds the allowed size")
+    if actual_file_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        try:
+            delete_object(object_key=payload.storage_key)
+        except StorageOperationError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Invalid upload could not be removed",
+            ) from exc
+        raise HTTPException(status_code=400, detail="Unsupported uploaded document type")
     actual_file_name = payload.file_name.strip()
     normalized_client_note = (payload.client_note or "").strip() or None
     if normalized_client_note and len(normalized_client_note) > 2000:
@@ -2914,7 +2979,12 @@ def delete_client_uploaded_document(
     auth: AuthContext = Depends(require_roles("client")),
     db: Session = Depends(get_db),
 ) -> None:
-    case = _get_case_with_access(case_number=case_number, auth=auth, db=db)
+    case = _get_case_with_access(
+        case_number=case_number,
+        auth=auth,
+        db=db,
+        for_update=True,
+    )
     client_capabilities = _client_portal_capabilities(case)
     if not client_capabilities["can_upload_documents"]:
         raise HTTPException(status_code=403, detail="Document deletions are disabled for this portal")
@@ -3177,8 +3247,13 @@ def download_all_case_documents(
     archive_rows = latest_template_rows + bound_custom_rows + unbound_upload_rows
     if not archive_rows:
         raise HTTPException(status_code=404, detail="No uploaded documents are available for this case")
+    if len(archive_rows) > MAX_ARCHIVE_DOCUMENTS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Archive is limited to {MAX_ARCHIVE_DOCUMENTS} documents",
+        )
 
-    zip_buffer = BytesIO()
+    zip_buffer = SpooledTemporaryFile(max_size=ARCHIVE_MEMORY_THRESHOLD_BYTES)
     seen_names: dict[str, int] = {}
     try:
         with ZipFile(zip_buffer, mode="w", compression=ZIP_DEFLATED) as archive:
@@ -3209,4 +3284,9 @@ def download_all_case_documents(
     headers = {
         "Content-Disposition": f'attachment; filename="{archive_file_name}"',
     }
-    return Response(content=zip_buffer.getvalue(), media_type="application/zip", headers=headers)
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        _stream_temporary_file(zip_buffer),
+        media_type="application/zip",
+        headers=headers,
+    )

@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 
 import * as preview from './.storybook/preview';
 
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 setProjectAnnotations(preview);
 
 window.open = vi.fn();

@@ -57,13 +57,13 @@ def get_dashboard_overview(
     active_cases_count = db.scalar(
         select(func.count())
         .select_from(Case)
-        .where(Case.deleted_at.is_(None), Case.status.notin_(["closed", "approved", "refused", "withdrawn"]))
+        .where(Case.deleted_at.is_(None), Case.status != "closed")
         .where(*case_filter)
     )
     completed_cases_count = db.scalar(
         select(func.count())
         .select_from(Case)
-        .where(Case.status.in_(["closed", "approved", "refused", "withdrawn"]), Case.deleted_at.is_(None), *case_filter)
+        .where(Case.status == "closed", Case.deleted_at.is_(None), *case_filter)
     )
 
     client_user = User

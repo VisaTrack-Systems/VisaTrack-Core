@@ -29,7 +29,7 @@ def test_get_auth_context_success(monkeypatch, make_user):
     result = auth_deps.get_auth_context(credentials=credentials, db=db)
 
     assert result.user is user
-    assert set(result.roles) == {'client', 'lawyer'}
+    assert result.roles == ['lawyer']
     assert result.permissions == {'cases:view', 'documents:view'}
 
 
@@ -62,3 +62,39 @@ def test_require_roles_and_permissions(make_auth_context):
 
     with pytest.raises(HTTPException):
         auth_deps.require_permissions('cases:edit')(auth)
+
+
+def test_get_auth_context_rejects_inactive_user(monkeypatch, make_user):
+    user = make_user(status='disabled')
+    db = MagicMock()
+    db.scalar.return_value = user
+    monkeypatch.setattr(
+        auth_deps,
+        'decode_access_token',
+        lambda token: {'sub': str(user.id), 'org': str(user.organization_id)},
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        auth_deps.get_auth_context(
+            credentials=row(scheme='Bearer', credentials='token'),
+            db=db,
+        )
+
+    assert exc.value.status_code == 401
+    assert 'not active' in exc.value.detail.lower()
+
+
+def test_role_checks_use_active_role_and_permissions_require_all(make_auth_context):
+    auth = make_auth_context(
+        roles=['lawyer', 'org_admin'],
+        permissions={'users:manage'},
+    )
+    auth.active_role = 'lawyer'
+
+    assert auth_deps.require_roles('lawyer')(auth) is auth
+
+    with pytest.raises(HTTPException):
+        auth_deps.require_roles('org_admin')(auth)
+
+    with pytest.raises(HTTPException):
+        auth_deps.require_permissions('users:manage', 'roles:manage')(auth)

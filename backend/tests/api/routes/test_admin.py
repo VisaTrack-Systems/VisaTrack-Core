@@ -13,6 +13,7 @@ from app.schemas.admin import (
     AdminCaseAssignmentRequest,
     AdminCreateOrganizationRequest,
     AdminCreateUserRequest,
+    SendInvitationEmailRequest,
 )
 from tests.support import FakeResult, row
 
@@ -198,6 +199,26 @@ def test_assign_user_role_assigns_and_commits(monkeypatch, make_auth_context, ma
     db.commit.assert_called_once()
 
 
+def test_org_admin_cannot_assign_super_admin(make_auth_context, make_user):
+    auth = make_auth_context(
+        roles=['org_admin'],
+        permissions={'users:manage', 'roles:manage'},
+    )
+    existing_user = make_user(organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.return_value = existing_user
+
+    with pytest.raises(HTTPException) as exc:
+        admin.assign_user_role(
+            user_id=existing_user.id,
+            payload=AdminAssignRoleRequest(role_slug='super_admin'),
+            auth=auth,
+            db=db,
+        )
+
+    assert exc.value.status_code == 403
+
+
 def test_list_admin_users_includes_roles(make_auth_context, make_user):
     auth = make_auth_context(roles=['org_admin'], permissions={'users:manage'})
     existing_user = make_user(organization_id=auth.organization_id)
@@ -313,6 +334,75 @@ def test_revoke_invitation_marks_revoked(monkeypatch, make_auth_context):
 
     assert invitation.revoked_at is not None
     db.commit.assert_called_once()
+
+
+def test_send_invitation_email_requires_server_issued_invitation(
+    monkeypatch,
+    make_auth_context,
+    make_user,
+):
+    auth = make_auth_context(roles=['org_admin'])
+    token = 'valid-invitation-token'
+    invitation = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        user_id=uuid4(),
+        email='invite@example.com',
+        token_hash=admin.hash_invitation_token(token),
+        expires_at=datetime.now(timezone.utc),
+        accepted_at=None,
+        revoked_at=None,
+    )
+    invited_user = make_user(
+        id=invitation.user_id,
+        organization_id=auth.organization_id,
+        first_name='Invited',
+        last_name='User',
+    )
+    organization = row(
+        id=auth.organization_id,
+        name='Acme Law',
+        settings={},
+    )
+    db = MagicMock()
+    db.scalar.side_effect = [invitation, invited_user, organization]
+    fake_send = MagicMock()
+    monkeypatch.setattr(admin, 'send_invitation_email', fake_send)
+    monkeypatch.setattr(
+        admin.settings,
+        'frontend_origin',
+        'http://localhost:3000',
+    )
+
+    admin.send_invitation_email_endpoint(
+        payload=SendInvitationEmailRequest(
+            to_email='invite@example.com',
+            recipient_name='Attacker supplied',
+            invitation_url=f'http://localhost:3000/invite?token={token}',
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    assert fake_send.call_args.kwargs['recipient_name'] == 'Invited User'
+    assert fake_send.call_args.kwargs['organization_name'] == 'Acme Law'
+
+
+def test_send_invitation_email_rejects_untrusted_origin(make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+
+    with pytest.raises(HTTPException) as exc:
+        admin.send_invitation_email_endpoint(
+            payload=SendInvitationEmailRequest(
+                to_email='invite@example.com',
+                recipient_name='Invitee',
+                invitation_url='https://evil.example/invite?token=secret',
+            ),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
 
 
 def test_delete_user_soft_deletes_user(monkeypatch, make_auth_context, make_user):

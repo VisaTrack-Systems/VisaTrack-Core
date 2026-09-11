@@ -34,3 +34,4 @@ jobs:
         with:
           name: sbom-spdx
           path: sbom.spdx.json
+          retention-days: 30

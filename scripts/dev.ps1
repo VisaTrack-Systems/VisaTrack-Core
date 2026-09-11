@@ -114,7 +114,7 @@ if ($venvProbe -match "Could not find platform independent libraries <prefix>") 
 # Sync dependencies
 Write-Host "Syncing backend dependencies..."
 & $venvPython -m pip install --upgrade pip --quiet
-& $venvPython -m pip install --quiet -r requirements.txt
+& $venvPython -m pip install --quiet --require-hashes -r requirements.lock
 
 $reqDev = Join-Path $backendDir "requirements-dev.txt"
 if (Test-Path $reqDev) {

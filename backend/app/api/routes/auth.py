@@ -100,7 +100,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthTokenResp
             User.organization_id == organization.id,
             cast(User.email, String) == normalized_email,
             User.deleted_at.is_(None),
-        )
+        ).with_for_update()
     )
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid organization or credentials")
@@ -256,6 +256,11 @@ def update_me_settings(
         user.avatar_url = normalized_avatar_url or None
 
     if payload.mfa_enabled is not None:
+        if payload.mfa_enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="MFA enrollment is not available yet",
+            )
         user.mfa_enabled = payload.mfa_enabled
         if not payload.mfa_enabled:
             user.mfa_secret = None
@@ -374,7 +379,7 @@ def accept_invitation(
             UserInvitation.token_hash == token_hash,
             UserInvitation.accepted_at.is_(None),
             UserInvitation.revoked_at.is_(None),
-        )
+        ).with_for_update()
     )
     if invitation is None:
         raise HTTPException(status_code=400, detail="Invitation is invalid")

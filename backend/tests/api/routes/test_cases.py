@@ -67,6 +67,20 @@ def test_client_portal_capabilities_respect_permissions(make_auth_context):
     assert capabilities['can_upload_documents'] is False
 
 
+def test_generate_case_number_takes_transaction_lock():
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(rows=[]),
+        FakeResult(scalar_value=7),
+    ]
+
+    result = cases._generate_case_number(db, uuid4())
+
+    assert result.endswith('-008')
+    lock_statement = str(db.execute.call_args_list[0].args[0])
+    assert 'pg_advisory_xact_lock' in lock_statement
+
+
 def test_create_case_returns_created_case(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     client_user = row(
@@ -172,6 +186,7 @@ def test_get_case_by_number_returns_summary(make_auth_context):
 
     assert result.case_number == 'C-2026-001'
     assert result.milestones[0].name == 'Collect passport'
+    assert 'internal_notes' not in result.model_dump()
 
 
 def test_update_case_details_by_number_updates_case(monkeypatch, make_auth_context):
@@ -828,7 +843,15 @@ def test_initiate_case_document_upload_returns_presigned_upload(monkeypatch, mak
     db = MagicMock()
     monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
     monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
-    monkeypatch.setattr(cases, 'create_presigned_upload', lambda **kwargs: row(url='https://upload', headers={'Content-Type': 'application/pdf'}, expires_in_seconds=900))
+    monkeypatch.setattr(
+        cases,
+        'create_presigned_upload',
+        lambda **kwargs: row(
+            url='https://upload',
+            fields={'Content-Type': 'application/pdf'},
+            expires_in_seconds=900,
+        ),
+    )
 
     result = cases.initiate_case_document_upload(
         case_number='C-2026-001',
@@ -839,6 +862,7 @@ def test_initiate_case_document_upload_returns_presigned_upload(monkeypatch, mak
     )
 
     assert result.upload_url == 'https://upload'
+    assert result.upload_method == 'POST'
     assert result.storage_key.startswith(f'org/{auth.organization_id}/case/{case.id}/documents/')
 
 
@@ -881,6 +905,68 @@ def test_complete_case_document_upload_records_upload(monkeypatch, make_auth_con
 
     assert result.status == 'received'
     assert result.can_download is True
+
+
+def test_complete_case_document_upload_removes_oversized_object(
+    monkeypatch,
+    make_auth_context,
+):
+    auth = make_auth_context(roles=['client'])
+    document_id = str(uuid4())
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=auth.user_id,
+        custom_fields={},
+    )
+    slot = {
+        'kind': 'template',
+        'logical_document_id': document_id,
+        'template_id': document_id,
+        'name': 'Passport',
+        'required': True,
+        'instructions': 'Upload passport',
+        'previous_case_document_id': None,
+        'next_version': 1,
+    }
+    storage_key = (
+        f'org/{case.organization_id}/case/{case.id}/documents/'
+        f'{document_id}/uuid-passport.pdf'
+    )
+    deleted = []
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+    monkeypatch.setattr(
+        cases,
+        'head_object',
+        lambda **kwargs: {
+            'ContentLength': cases.settings.s3_max_upload_bytes + 1,
+            'ContentType': 'application/pdf',
+        },
+    )
+    monkeypatch.setattr(
+        cases,
+        'delete_object',
+        lambda **kwargs: deleted.append(kwargs['object_key']),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        cases.complete_case_document_upload(
+            case_number='C-2026-001',
+            document_id=document_id,
+            payload=CaseDocumentUploadCompleteRequest(
+                storage_key=storage_key,
+                file_name='passport.pdf',
+                file_type='application/pdf',
+                file_size_bytes=1024,
+            ),
+            request=row(client=row(host='127.0.0.1'), headers={}),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
+    assert deleted == [storage_key]
 
 
 def test_complete_case_document_upload_marks_requested_custom_document_received(monkeypatch, make_auth_context):

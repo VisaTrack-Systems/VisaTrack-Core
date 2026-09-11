@@ -20,7 +20,12 @@ def test_hash_password_rejects_empty_input():
         raise AssertionError('Expected ValueError for empty password')
 
 
-def test_access_token_can_be_decoded():
+def test_verify_password_rejects_unknown_hash_format():
+    assert security.verify_password('secret', 'secret') is False
+
+
+def test_access_token_can_be_decoded(monkeypatch):
+    monkeypatch.setattr(security.settings, 'auth_secret_key', 'x' * 32)
     token = security.create_access_token('user-1', 'org-1', ['lawyer'])
     payload = security.decode_access_token(token)
 
@@ -28,6 +33,27 @@ def test_access_token_can_be_decoded():
     assert payload['org'] == 'org-1'
     assert payload['roles'] == ['lawyer']
     assert payload['type'] == 'access'
+
+
+def test_decode_access_token_rejects_wrong_token_type(monkeypatch):
+    monkeypatch.setattr(
+        security.jwt,
+        'decode',
+        lambda *args, **kwargs: {
+            'sub': 'user-1',
+            'org': 'org-1',
+            'iat': 1,
+            'exp': 2,
+            'type': 'refresh',
+        },
+    )
+
+    try:
+        security.decode_access_token('token')
+    except security.jwt.InvalidTokenError:
+        pass
+    else:
+        raise AssertionError('Expected invalid token type to be rejected')
 
 
 def test_invitation_token_hash_is_deterministic():

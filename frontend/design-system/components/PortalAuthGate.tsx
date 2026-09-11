@@ -97,10 +97,12 @@ export function PortalAuthGate({
         ) : null}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Organization slug</label>
+          <label htmlFor="organization-slug" className="block text-sm font-medium text-gray-700 mb-1">Organization slug</label>
           <input
+            id="organization-slug"
             required
             type="text"
+            autoComplete="organization"
             value={organizationSlug}
             onChange={(event) => setOrganizationSlug(event.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
@@ -109,10 +111,12 @@ export function PortalAuthGate({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label htmlFor="sign-in-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
+            id="sign-in-email"
             required
             type="email"
+            autoComplete="username"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
@@ -120,10 +124,12 @@ export function PortalAuthGate({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label htmlFor="sign-in-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input
+            id="sign-in-password"
             required
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
