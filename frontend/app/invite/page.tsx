@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { acceptInvitation, verifyInvitation, type VerifyInvitationResult } from "@/lib/api";
 
 type PageState =
@@ -13,18 +13,25 @@ type PageState =
 
 function InviteForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-
-  const [state, setState] = useState<PageState>(() =>
-    token ? { kind: "loading" } : { kind: "invalid", reason: "No invitation token found in the URL." }
+  const [token] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.hash.slice(1)).get("token") ?? ""
   );
+
+  const [state, setState] = useState<PageState>({ kind: "loading" });
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      Promise.resolve().then(() => {
+        setState({ kind: "invalid", reason: "No invitation token found in the URL." });
+      });
+      return;
+    }
+    window.history.replaceState(null, "", window.location.pathname);
 
     verifyInvitation(token)
       .then((info) => setState({ kind: "ready", info }))

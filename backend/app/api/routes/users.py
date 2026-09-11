@@ -24,7 +24,7 @@ def list_users(
 ) -> list[UserListItem]:
     stmt = select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
 
-    if "super_admin" in auth.roles:
+    if auth.active_role == "super_admin":
         if organization_id is not None:
             stmt = stmt.where(User.organization_id == organization_id)
     else:

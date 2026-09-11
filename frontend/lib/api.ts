@@ -512,12 +512,28 @@ export type AuthLoginInput = {
   organization_slug: string;
   email: string;
   password: string;
+  mfa_code?: string;
 };
 
 export type AuthTokenResponse = {
   access_token: string;
   token_type: string;
   expires_in_seconds: number;
+};
+
+export type MfaEnrollment = {
+  secret: string;
+  provisioning_uri: string;
+};
+
+export type BrowserSession = {
+  id: string;
+  active_role: string;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+  expires_at: string;
+  current: boolean;
 };
 
 export type CurrentUser = {
@@ -562,7 +578,7 @@ export type UpdateCurrentUserSettingsInput = {
   last_name: string;
   phone: string | null;
   avatar_url: string | null;
-  mfa_enabled: boolean;
+  mfa_enabled?: boolean;
   timezone: string;
   locale: string;
 };
@@ -586,12 +602,12 @@ export type SubmitBugReportInput = {
 };
 
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
-const authTokenStorageKey = 'visatrack.access_token';
-
 let inMemoryAccessToken: string | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
 type RequestOptions = {
   includeAuth?: boolean;
+  retryAuth?: boolean;
 };
 
 type BlobResponse = {
@@ -600,19 +616,7 @@ type BlobResponse = {
 };
 
 function readStoredAccessToken(): string | null {
-  if (typeof window === 'undefined') {
-    return inMemoryAccessToken;
-  }
-
-  if (inMemoryAccessToken) {
-    return inMemoryAccessToken;
-  }
-
-  const fromStorage = window.localStorage.getItem(authTokenStorageKey);
-  if (fromStorage) {
-    inMemoryAccessToken = fromStorage;
-  }
-  return fromStorage;
+  return inMemoryAccessToken;
 }
 
 export function getAccessToken(): string | null {
@@ -621,16 +625,38 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string): void {
   inMemoryAccessToken = token;
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(authTokenStorageKey, token);
-  }
 }
 
 export function clearAccessToken(): void {
   inMemoryAccessToken = null;
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(authTokenStorageKey);
+    // Remove tokens persisted by older releases during the secure-session migration.
+    window.localStorage.removeItem('visatrack.access_token');
   }
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+  refreshPromise = (async () => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      clearAccessToken();
+      return false;
+    }
+    const token = (await response.json()) as AuthTokenResponse;
+    setAccessToken(token.access_token);
+    return true;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
 }
 
 async function parseErrorDetail(response: Response): Promise<string> {
@@ -697,8 +723,18 @@ async function requestJson<T>(
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
     cache: 'no-store',
   });
+
+  if (
+    response.status === 401 &&
+    options.includeAuth !== false &&
+    options.retryAuth !== false &&
+    (await refreshAccessToken())
+  ) {
+    return requestJson<T>(path, init, { ...options, retryAuth: false });
+  }
 
   if (!response.ok) {
     const detail = await parseErrorDetail(response);
@@ -726,8 +762,18 @@ async function requestVoid(
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
     cache: 'no-store',
   });
+
+  if (
+    response.status === 401 &&
+    options.includeAuth !== false &&
+    options.retryAuth !== false &&
+    (await refreshAccessToken())
+  ) {
+    return requestVoid(path, init, { ...options, retryAuth: false });
+  }
 
   if (!response.ok) {
     const detail = await parseErrorDetail(response);
@@ -752,8 +798,18 @@ async function requestBlob(
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
     cache: 'no-store',
   });
+
+  if (
+    response.status === 401 &&
+    options.includeAuth !== false &&
+    options.retryAuth !== false &&
+    (await refreshAccessToken())
+  ) {
+    return requestBlob(path, init, { ...options, retryAuth: false });
+  }
 
   if (!response.ok) {
     const detail = await parseErrorDetail(response);
@@ -783,7 +839,44 @@ export async function login(input: AuthLoginInput): Promise<AuthTokenResponse> {
 }
 
 export async function logout(): Promise<void> {
+  try {
+    await requestVoid('/api/v1/auth/logout', { method: 'POST' });
+  } finally {
+    clearAccessToken();
+  }
+}
+
+export async function beginMfaEnrollment(currentPassword: string): Promise<MfaEnrollment> {
+  return requestJson<MfaEnrollment>('/api/v1/auth/mfa/enroll', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword }),
+  });
+}
+
+export async function verifyMfaEnrollment(code: string): Promise<string[]> {
+  const result = await requestJson<{ recovery_codes: string[] }>('/api/v1/auth/mfa/verify', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return result.recovery_codes;
+}
+
+export async function disableMfa(currentPassword: string, code: string): Promise<void> {
+  await requestVoid('/api/v1/auth/mfa/disable', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, code }),
+  });
   clearAccessToken();
+}
+
+export async function listBrowserSessions(): Promise<BrowserSession[]> {
+  return requestJson<BrowserSession[]>('/api/v1/auth/sessions');
+}
+
+export async function revokeBrowserSession(sessionId: string): Promise<void> {
+  return requestVoid(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {
@@ -931,15 +1024,24 @@ export async function createAdminUser(input: AdminCreateUserInput): Promise<Admi
 
 export async function verifyInvitation(token: string): Promise<VerifyInvitationResult> {
   return requestJson<VerifyInvitationResult>(
-    `/api/v1/auth/verify-invitation?token=${encodeURIComponent(token)}`
+    '/api/v1/auth/verify-invitation',
+    {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    },
+    { includeAuth: false }
   );
 }
 
 export async function acceptInvitation(token: string, password: string): Promise<AcceptInvitationResult> {
-  return requestJson<AcceptInvitationResult>('/api/v1/auth/accept-invitation', {
-    method: 'POST',
-    body: JSON.stringify({ token, password }),
-  });
+  return requestJson<AcceptInvitationResult>(
+    '/api/v1/auth/accept-invitation',
+    {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    },
+    { includeAuth: false }
+  );
 }
 
 export async function deleteAdminUser(userId: string): Promise<void> {

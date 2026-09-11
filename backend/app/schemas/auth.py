@@ -10,6 +10,7 @@ class LoginRequest(BaseModel):
     organization_slug: str = Field(min_length=2, max_length=100)
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=128)
+    mfa_code: Optional[str] = Field(default=None, min_length=6, max_length=32)
 
 
 class AuthTokenResponse(BaseModel):
@@ -74,9 +75,45 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class MfaEnrollRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class MfaEnrollResponse(BaseModel):
+    secret: str
+    provisioning_uri: str
+
+
+class MfaVerifyEnrollmentRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=8)
+
+
+class MfaVerifyEnrollmentResponse(BaseModel):
+    recovery_codes: list[str]
+
+
+class MfaDisableRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=32)
+
+
+class SessionResponse(BaseModel):
+    id: UUID
+    active_role: str
+    user_agent: Optional[str]
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    current: bool
+
+
 class AcceptInvitationRequest(BaseModel):
     token: str = Field(min_length=16, max_length=512)
     password: str = Field(min_length=8, max_length=128)
+
+
+class VerifyInvitationRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
 
 
 class AcceptInvitationResponse(BaseModel):

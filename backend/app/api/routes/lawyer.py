@@ -219,7 +219,7 @@ def create_lawyer_client(
             invited_by=auth.user_id,
         )
         db.add(invitation)
-        invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite?token={plain_token}"
+        invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite#token={plain_token}"
 
     log_activity(
         db,
@@ -320,7 +320,7 @@ def list_lawyer_cases(
         .order_by(Case.created_at.desc())
     )
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
         stmt = stmt.where((Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id))
 
     rows = db.execute(stmt.limit(limit).offset(offset)).all()
@@ -437,7 +437,7 @@ def invite_client_to_case(
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    if "super_admin" not in auth.roles and "org_admin" not in auth.roles:
+    if auth.active_role not in {"super_admin", "org_admin"}:
         if case.primary_lawyer_id != auth.user_id and case.created_by != auth.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to invite clients for this case")
 
@@ -510,7 +510,7 @@ def invite_client_to_case(
 
     db.commit()
 
-    invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite?token={plain_token}"
+    invitation_url = f"{settings.frontend_origin.split(',')[0].strip().rstrip('/')}/invite#token={plain_token}"
     return InviteClientResponse(
         case_number=case.case_number,
         client_email=email,

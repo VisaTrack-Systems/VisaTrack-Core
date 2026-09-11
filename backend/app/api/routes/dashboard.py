@@ -44,9 +44,9 @@ def get_dashboard_overview(
     auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> DashboardOverview:
-    org_filter = [] if "super_admin" in auth.roles else [Organization.id == auth.organization_id]
-    user_filter = [] if "super_admin" in auth.roles else [User.organization_id == auth.organization_id]
-    case_filter = [] if "super_admin" in auth.roles else [Case.organization_id == auth.organization_id]
+    org_filter = [] if auth.active_role == "super_admin" else [Organization.id == auth.organization_id]
+    user_filter = [] if auth.active_role == "super_admin" else [User.organization_id == auth.organization_id]
+    case_filter = [] if auth.active_role == "super_admin" else [Case.organization_id == auth.organization_id]
 
     organizations_count = db.scalar(
         select(func.count()).select_from(Organization).where(Organization.deleted_at.is_(None), *org_filter)

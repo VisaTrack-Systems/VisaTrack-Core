@@ -23,7 +23,25 @@ class Settings:
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     auth_secret_key: str = os.getenv("AUTH_SECRET_KEY", "dev-only-change-me")
     auth_algorithm: str = os.getenv("AUTH_ALGORITHM", "HS256")
-    auth_access_token_minutes: int = int(os.getenv("AUTH_ACCESS_TOKEN_MINUTES", "60"))
+    auth_access_token_minutes: int = int(os.getenv("AUTH_ACCESS_TOKEN_MINUTES", "15"))
+    auth_refresh_token_days: int = int(os.getenv("AUTH_REFRESH_TOKEN_DAYS", "30"))
+    auth_refresh_cookie_name: str = os.getenv(
+        "AUTH_REFRESH_COOKIE_NAME", "visatrack_refresh"
+    )
+    auth_cookie_secure: bool = os.getenv(
+        "AUTH_COOKIE_SECURE",
+        "false" if app_env.strip().lower() in {"development", "local", "test"} else "true",
+    ).lower() == "true"
+    auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").lower()
+    mfa_encryption_key: str = os.getenv("MFA_ENCRYPTION_KEY", "")
+    mfa_required_roles: set[str] = {
+        role.strip().lower()
+        for role in os.getenv("MFA_REQUIRED_ROLES", "super_admin,org_admin").split(",")
+        if role.strip()
+    }
+    mfa_enforcement_enabled: bool = (
+        os.getenv("MFA_ENFORCEMENT_ENABLED", "false").lower() == "true"
+    )
     invitation_expiry_hours: int = int(os.getenv("INVITATION_EXPIRY_HOURS", "72"))
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
     s3_bucket_name: str = os.getenv("S3_BUCKET_NAME", "")
@@ -52,6 +70,17 @@ class Settings:
 
         if self.auth_algorithm != "HS256":
             raise RuntimeError("AUTH_ALGORITHM must be HS256")
+
+        if not self.mfa_encryption_key or self.mfa_encryption_key == self.auth_secret_key:
+            raise RuntimeError(
+                "MFA_ENCRYPTION_KEY must be configured separately from AUTH_SECRET_KEY"
+            )
+
+        if not self.auth_cookie_secure:
+            raise RuntimeError("AUTH_COOKIE_SECURE must be true outside local environments")
+
+        if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
+            raise RuntimeError("AUTH_COOKIE_SAMESITE must be lax, strict, or none")
 
     @property
     def frontend_origins(self) -> list[str]:
