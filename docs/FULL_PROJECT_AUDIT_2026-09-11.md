@@ -239,6 +239,22 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 **Action:** Build a test pyramid: unit tests, PostgreSQL/Testcontainers integration tests, auth/tenant negative tests, API contract tests, and Playwright user journeys. Enforce coverage on security-critical modules and publish reports. Add axe/WCAG checks and avoid presenting story rendering as visual regression unless screenshots are compared.
 
+#### QUAL-04 — Storybook CI builds the wrong, empty story tree
+
+**Evidence:** `frontend/.storybook/main.ts:4` searches `../figma/**/*.stories.@(ts|tsx)`, but the repository's stories are under `frontend/design-system`. CI runs `npm run build-storybook`, so the catalog build can succeed without exercising the actual stories. The separate Vitest story test uses a different discovery path.
+
+**Impact:** The Storybook and accessibility-addon CI signal is falsely green for production components.
+
+**Action:** Point Storybook and story tests at one shared `design-system/**/*.stories` pattern, fail CI when zero stories are discovered, and add accessibility assertions for critical states.
+
+#### A11Y-01 — Core forms and dialogs do not meet keyboard/screen-reader requirements
+
+**Evidence:** `frontend/design-system/components/admin-dashboard/ConfirmDialog.tsx:15-54` implements a modal as generic `div` elements without dialog semantics, accessible naming, focus containment/restoration, initial focus, or Escape handling. Its overlay also uses nonstandard `z-80`, while arbitrary Tailwind values elsewhere use bracket syntax. Login labels in `frontend/design-system/components/PortalAuthGate.tsx:99-130` have no `htmlFor` or matching input IDs. Similar overlay/label patterns recur across the design system.
+
+**Impact:** Keyboard and assistive-technology users may be unable to identify, navigate, dismiss, or safely operate destructive dialogs and authentication forms. Stacking errors can also place confirmation UI beneath another overlay.
+
+**Action:** Build or adopt a tested dialog primitive with `role="dialog"`, `aria-modal`, labelled title/description, focus trap/restoration, Escape, and deterministic stacking. Associate every label and input, add a skip link and main landmarks, respect reduced motion, and run automated axe plus manual keyboard/screen-reader checks against WCAG 2.2 AA.
+
 #### QUAL-02 — Request schemas are inconsistently bounded
 
 **Evidence:** Several case request models in `backend/app/schemas/case.py:22-32` and `:166-290` use unconstrained strings/text, unlike more carefully bounded admin schemas.
@@ -265,6 +281,14 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 
 **Action:** Add a hardened non-root image and IaC, or clearly link the private operational source of truth. Document TLS termination, network boundaries, secrets, IAM, database encryption/backups/PITR, restore tests, multi-AZ expectations, S3 versioning, RPO/RTO, rollback, and incident response.
 
+#### OPS-03 — Repository manifests and documentation contain conflicting sources of truth
+
+**Evidence:** The root `package-lock.json` describes an empty npm project but there is no root `package.json`. `backend/app/requirements.txt` duplicates the main requirements with a different dependency set. The root README claims an MIT license, but no `LICENSE` file exists. Several frontend/docs READMEs describe files that are absent or moved. `.vscode/settings.json:10-11` commits a developer-specific database username.
+
+**Impact:** Dependency scanners and IDEs can target the wrong manifest, developers receive inconsistent setup instructions, and distribution rights are ambiguous without the actual license text.
+
+**Action:** Remove the orphan lockfile or define a real workspace root; keep one generated/locked Python dependency source; add the intended license after owner approval; validate documentation links in CI; and replace personal editor/database settings with sanitized examples.
+
 #### PERF-01 — Frontend caching and rendering choices increase latency
 
 **Evidence:** `frontend/next.config.ts:10-20` applies `no-store` to every route, potentially including immutable assets. `frontend/app/page.tsx:9-18` disables SSR for the entire application shell.
@@ -287,6 +311,8 @@ This was not a live penetration test, cloud/IAM review, privacy legal opinion, o
 6. **Operational maturity:** define SLOs for API availability/latency and email/document workflows, synthetic checks, dashboards, on-call ownership, incident exercises, and capacity/load tests.
 7. **Accessibility and localization:** automate axe checks, perform manual screen-reader/keyboard audits, respect reduced motion, and validate locale/time-zone/date/currency handling.
 8. **Architecture:** split the very large `cases.py` route module into policy, query, command, document, billing, and serialization services with explicit transaction boundaries.
+9. **Frontend request lifecycle:** add `AbortController` cancellation and backoff to polling/fetch flows so unmounted or stale requests cannot overwrite newer state; pause refresh while forms contain unsaved edits.
+10. **Safer external windows:** avoid `window.open` for sensitive document URLs where possible; when required, enforce `noopener` and clear `window.opener`.
 
 ## Recommended remediation order
 
