@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from app.api.router import api_router
+from app.main import app
 
 
 def test_api_router_includes_expected_paths():
-    paths = {route.path for route in api_router.routes}
+    paths = {route.path for route in app.routes}
 
     assert '/health' in paths
     assert '/api/v1/auth/login' in paths
