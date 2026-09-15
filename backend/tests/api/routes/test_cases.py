@@ -556,6 +556,7 @@ def test_get_case_workspace_prefers_custom_document_status_over_bound_upload_sta
                     'uploaded_at': datetime.now(timezone.utc),
                     'expiry_date': None,
                     'file_name': 'bank-statement.pdf',
+                        'scan_status': 'clean',
                     'client_note': 'Uploaded by client',
                 }
             ]
