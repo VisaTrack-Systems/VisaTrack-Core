@@ -46,6 +46,7 @@ def test_create_invoice_calculates_money_and_scopes_case(make_auth_context):
                 }
             ]
         ),
+        FakeResult(),
         FakeResult(rows=[invoice_row]),
         FakeResult(),
         FakeResult(),
@@ -64,6 +65,7 @@ def test_create_invoice_calculates_money_and_scopes_case(make_auth_context):
                 )
             ],
         ),
+        idempotency_key="invoice-test-key",
         auth=auth,
         db=db,
     )
@@ -72,6 +74,61 @@ def test_create_invoice_calculates_money_and_scopes_case(make_auth_context):
     assert db.commit.call_count == 1
     case_params = db.execute.call_args_list[0].args[1]
     assert case_params["organization_id"] == str(auth.organization_id)
+
+
+def test_create_invoice_reuses_idempotent_result(make_auth_context):
+    auth = make_auth_context(roles=["lawyer"])
+    due_date = date.today() + timedelta(days=7)
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(
+            rows=[
+                {
+                    "id": uuid4(),
+                    "client_id": uuid4(),
+                    "primary_lawyer_id": auth.user_id,
+                    "created_by": auth.user_id,
+                }
+            ]
+        ),
+        FakeResult(
+            rows=[
+                {
+                    "id": uuid4(),
+                    "invoice_number": "INV-2026-ORIGINAL",
+                    "status": "sent",
+                    "subtotal": Decimal("50"),
+                    "tax_rate": Decimal("0"),
+                    "tax_amount": Decimal("0"),
+                    "total_amount": Decimal("50"),
+                    "amount_paid": Decimal("0"),
+                    "amount_due": Decimal("50"),
+                    "currency": "CAD",
+                    "issue_date": date.today(),
+                    "due_date": due_date,
+                }
+            ]
+        ),
+    ]
+
+    result = billing.create_invoice(
+        case_number="C-2026-001",
+        payload=InvoiceCreateRequest(
+            due_date=due_date,
+            items=[
+                InvoiceLineItemCreate(
+                    description="Retainer",
+                    unit_price=Decimal("50"),
+                )
+            ],
+        ),
+        idempotency_key="same-invoice-request",
+        auth=auth,
+        db=db,
+    )
+
+    assert result.invoice_number == "INV-2026-ORIGINAL"
+    db.commit.assert_not_called()
 
 
 def test_checkout_uses_stripe_hosted_page_and_idempotency(monkeypatch, make_auth_context):

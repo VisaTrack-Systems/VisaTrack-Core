@@ -51,9 +51,15 @@ def _invoice_response(row) -> InvoiceResponse:
 def create_invoice(
     case_number: str,
     payload: InvoiceCreateRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
     auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> InvoiceResponse:
+    if not _IDEMPOTENCY_PATTERN.fullmatch(idempotency_key):
+        raise HTTPException(
+            status_code=400,
+            detail="Idempotency-Key must be 8-255 URL-safe characters",
+        )
     case_row = db.execute(
         text(
             """
@@ -77,6 +83,25 @@ def create_invoice(
         and auth.user_id not in {case_row["primary_lawyer_id"], case_row["created_by"]}
     ):
         raise HTTPException(status_code=403, detail="Not authorized to bill this case")
+
+    existing_invoice = db.execute(
+        text(
+            """
+            SELECT id, invoice_number, status, subtotal, tax_rate, tax_amount,
+                   total_amount, amount_paid, amount_due, currency, issue_date, due_date
+            FROM invoices
+            WHERE organization_id = :organization_id
+              AND idempotency_key = :idempotency_key
+            """
+        ),
+        {
+            "organization_id": str(auth.organization_id),
+            "idempotency_key": idempotency_key,
+        },
+    ).mappings().first()
+    if existing_invoice is not None:
+        return _invoice_response(existing_invoice)
+
     if payload.due_date < date.today():
         raise HTTPException(status_code=400, detail="Invoice due date cannot be in the past")
 
@@ -96,11 +121,11 @@ def create_invoice(
             INSERT INTO invoices (
                 id, organization_id, case_id, client_id, invoice_number, status,
                 subtotal, tax_rate, tax_amount, total_amount, currency, issue_date,
-                due_date, notes, terms, amount_paid, sent_at, created_by
+                due_date, notes, terms, amount_paid, sent_at, created_by, idempotency_key
             ) VALUES (
                 :id, :organization_id, :case_id, :client_id, :invoice_number, 'sent',
                 :subtotal, :tax_rate, :tax_amount, :total_amount, :currency, CURRENT_DATE,
-                :due_date, :notes, :terms, 0, NOW(), :created_by
+                :due_date, :notes, :terms, 0, NOW(), :created_by, :idempotency_key
             )
             RETURNING id, invoice_number, status, subtotal, tax_rate, tax_amount,
                       total_amount, amount_paid, amount_due, currency, issue_date, due_date
@@ -121,6 +146,7 @@ def create_invoice(
             "notes": payload.notes,
             "terms": payload.terms,
             "created_by": str(auth.user_id),
+            "idempotency_key": idempotency_key,
         },
     ).mappings().one()
 

@@ -1247,12 +1247,14 @@ export async function acknowledgeCaseReminder(
 
 export async function createCaseInvoice(
   caseNumber: string,
-  payload: InvoiceCreateInput
+  payload: InvoiceCreateInput,
+  idempotencyKey: string
 ): Promise<Invoice> {
   return requestJson<Invoice>(
     `/api/v1/billing/cases/${encodeURIComponent(caseNumber)}/invoices`,
     {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     }
   );

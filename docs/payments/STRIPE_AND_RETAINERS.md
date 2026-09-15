@@ -10,7 +10,8 @@ CVC values, or raw payment credentials.
 2. The client sees the outstanding invoice in the client portal and selects **Make
    Payment**.
 3. The API creates one Stripe Checkout Session for the invoice's current outstanding
-   balance. `Idempotency-Key` is required, and an unexpired session is reused.
+   balance. `Idempotency-Key` is required for invoice and Checkout creation, and an
+   unexpired Checkout Session is reused.
 4. Stripe redirects the client back to VisaTrack after Checkout.
 5. Only a signed Stripe webhook marks the payment and invoice paid. Browser redirects
    are never treated as proof of payment.

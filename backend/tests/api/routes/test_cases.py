@@ -1167,6 +1167,39 @@ def test_get_case_document_download_url_returns_presigned_link(monkeypatch, make
     assert result.file_name == 'passport.pdf'
 
 
+def test_get_case_document_download_url_blocks_quarantined_file(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['client'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, custom_fields={})
+    slot = {
+        'logical_document_id': str(uuid4()),
+        'name': 'Retainer Agreement',
+        'bound_case_document': {
+            'id': uuid4(),
+            'file_path': 'quarantine/org/x/retainer.pdf',
+            'file_name': 'retainer.pdf',
+            'scan_status': 'pending',
+        },
+    }
+    monkeypatch.setattr(cases, '_get_case_with_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, '_resolve_document_slot', lambda **kwargs: slot)
+    monkeypatch.setattr(
+        cases,
+        '_client_portal_capabilities',
+        lambda case: {'can_view_documents': True},
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        cases.get_case_document_download_url(
+            case_number='C-2026-001',
+            document_id=slot['logical_document_id'],
+            request=row(client=row(host='127.0.0.1'), headers={}),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 409
+
+
 def test_download_all_case_documents_returns_zip(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=['lawyer'])
     case = row(id=uuid4(), case_number='C-2026-001', organization_id=auth.organization_id, custom_fields={})

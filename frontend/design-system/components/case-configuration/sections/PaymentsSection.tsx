@@ -41,19 +41,23 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
 
     setSubmitting(true);
     try {
-      await createCaseInvoice(workspace.case.case_number, {
-        due_date: dueDate,
-        tax_rate: parsedTaxPercent / 100,
-        notes: notes.trim() || null,
-        items: [
-          {
-            description: description.trim(),
-            quantity: 1,
-            unit_price: parsedAmount,
-            category: 'professional_fees',
-          },
-        ],
-      });
+      await createCaseInvoice(
+        workspace.case.case_number,
+        {
+          due_date: dueDate,
+          tax_rate: parsedTaxPercent / 100,
+          notes: notes.trim() || null,
+          items: [
+            {
+              description: description.trim(),
+              quantity: 1,
+              unit_price: parsedAmount,
+              category: 'professional_fees',
+            },
+          ],
+        },
+        `invoice-${crypto.randomUUID()}`
+      );
       setAmount('');
       setNotes('');
       await onInvoiceCreated();

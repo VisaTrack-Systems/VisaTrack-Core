@@ -18,6 +18,7 @@ must approve purposes, lawful bases, notices, residency, and retention periods.
 
 - AWS: compute, RDS, S3, KMS, logging and backup regions.
 - Resend: invitation/support email addresses and message content.
+- Stripe: client email, invoice identifiers, payment amount/currency, and payment status.
 - Vercel: frontend request and deployment metadata.
 - GitHub: source, CI logs, and issue/support content.
 - Any monitoring, SIEM, error tracking, or support vendor enabled in production.

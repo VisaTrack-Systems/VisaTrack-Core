@@ -3733,7 +3733,9 @@ export interface operations {
     create_invoice_api_v1_billing_cases__case_number__invoices_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 case_number: string;
             };

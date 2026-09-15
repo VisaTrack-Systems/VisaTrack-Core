@@ -18,6 +18,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.add_column("invoices", sa.Column("idempotency_key", sa.String(length=255)))
+    op.create_unique_constraint(
+        "uq_invoices_org_idempotency",
+        "invoices",
+        ["organization_id", "idempotency_key"],
+    )
     op.add_column("payments", sa.Column("idempotency_key", sa.String(length=255)))
     op.add_column(
         "payments",
@@ -70,3 +76,5 @@ def downgrade() -> None:
     op.drop_column("payments", "checkout_url")
     op.drop_column("payments", "provider_checkout_session_id")
     op.drop_column("payments", "idempotency_key")
+    op.drop_constraint("uq_invoices_org_idempotency", "invoices", type_="unique")
+    op.drop_column("invoices", "idempotency_key")
