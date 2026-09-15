@@ -38,10 +38,6 @@ services:
 
   backend:
     build: ./backend
-    command:
-      - /bin/sh
-      - -c
-      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment: &backend-environment
       APP_ENV: development
       DATABASE_URL: postgresql://visatrack:local-development-only@postgres:5432/visatrack

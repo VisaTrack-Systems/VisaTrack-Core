@@ -29,4 +29,4 @@ COPY --from=builder --chown=visatrack:visatrack /app/package.json ./package.json
 COPY --from=production-dependencies --chown=visatrack:visatrack /app/node_modules ./node_modules
 USER visatrack
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["sh", "-c", "exec node_modules/.bin/next start --hostname 0.0.0.0 --port ${PORT:-3000}"]
