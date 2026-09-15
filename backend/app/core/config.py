@@ -11,14 +11,30 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(REPO_ROOT / ".env")
 
+LOCAL_ENVIRONMENTS = {"development", "local", "test"}
+DEFAULT_AUTH_SECRET_KEY = "dev-only-change-me"
+DEFAULT_DATABASE_URL = "postgresql://localhost/visatrack"
+
+
+def normalize_database_url(raw: str) -> str:
+    """Return a SQLAlchemy-compatible URL.
+
+    Managed Postgres providers hand out `postgres://` URLs, which SQLAlchemy 2
+    refuses to load because it has no driver registered under that name.
+    """
+    url = raw.strip()
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://") :]
+    return url
+
 
 class Settings:
     app_name: str = os.getenv("APP_NAME", "VisaTrack API")
     app_version: str = os.getenv("APP_VERSION", "0.1.0")
     app_env: str = os.getenv("APP_ENV", "development")
 
-    database_url: str = os.getenv(
-        "DATABASE_URL", "postgresql://localhost/visatrack"
+    database_url: str = normalize_database_url(
+        os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
     )
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     auth_secret_key: str = os.getenv("AUTH_SECRET_KEY", "dev-only-change-me")
@@ -64,37 +80,53 @@ class Settings:
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
 
     def validate_security(self) -> None:
-        """Reject unsafe authentication settings outside local development."""
-        if self.app_env.strip().lower() in {"development", "local", "test"}:
+        """Reject unsafe authentication settings outside local development.
+
+        Every violation is reported in a single error so a failed container
+        start names all of the variables that still need to be supplied.
+        """
+        if self.app_env.strip().lower() in LOCAL_ENVIRONMENTS:
             return
 
+        problems: list[str] = []
+
         if (
-            self.auth_secret_key == "dev-only-change-me"
+            self.auth_secret_key == DEFAULT_AUTH_SECRET_KEY
             or len(self.auth_secret_key.encode("utf-8")) < 32
         ):
-            raise RuntimeError(
-                "AUTH_SECRET_KEY must be configured with at least 32 bytes "
-                "outside development, local, and test environments"
+            problems.append(
+                "AUTH_SECRET_KEY must be configured with at least 32 bytes"
             )
 
         if self.auth_algorithm != "HS256":
-            raise RuntimeError("AUTH_ALGORITHM must be HS256")
+            problems.append("AUTH_ALGORITHM must be HS256")
 
         if not self.mfa_encryption_key or self.mfa_encryption_key == self.auth_secret_key:
-            raise RuntimeError(
+            problems.append(
                 "MFA_ENCRYPTION_KEY must be configured separately from AUTH_SECRET_KEY"
             )
 
         if not self.auth_cookie_secure:
-            raise RuntimeError("AUTH_COOKIE_SECURE must be true outside local environments")
+            problems.append("AUTH_COOKIE_SECURE must be true")
 
         if self.auth_cookie_samesite not in {"lax", "strict", "none"}:
-            raise RuntimeError("AUTH_COOKIE_SAMESITE must be lax, strict, or none")
+            problems.append("AUTH_COOKIE_SAMESITE must be lax, strict, or none")
 
-        if not self.s3_bucket_name or not self.aws_kms_key_id or not self.audit_archive_bucket:
+        for name, value in (
+            ("S3_BUCKET_NAME", self.s3_bucket_name),
+            ("AWS_KMS_KEY_ID", self.aws_kms_key_id),
+            ("AUDIT_ARCHIVE_BUCKET", self.audit_archive_bucket),
+        ):
+            if not value:
+                problems.append(f"{name} is required")
+
+        if not self.database_url or self.database_url == DEFAULT_DATABASE_URL:
+            problems.append("DATABASE_URL must point at the deployed database")
+
+        if problems:
             raise RuntimeError(
-                "S3_BUCKET_NAME, AWS_KMS_KEY_ID, and AUDIT_ARCHIVE_BUCKET are required "
-                "outside local environments"
+                f"Invalid configuration for APP_ENV={self.app_env.strip()}: "
+                + "; ".join(problems)
             )
 
     @property

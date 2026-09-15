@@ -36,3 +36,66 @@ def test_production_rejects_default_auth_secret():
 
     with pytest.raises(RuntimeError, match='AUTH_SECRET_KEY'):
         candidate.validate_security()
+
+
+def test_production_reports_every_missing_variable():
+    from app.core.config import Settings
+
+    candidate = Settings()
+    candidate.app_env = 'production'
+    candidate.auth_secret_key = 'x' * 32
+    candidate.mfa_encryption_key = 'y' * 32
+    candidate.auth_cookie_secure = True
+    candidate.s3_bucket_name = ''
+    candidate.aws_kms_key_id = ''
+    candidate.audit_archive_bucket = ''
+    candidate.database_url = 'postgresql://localhost/visatrack'
+
+    with pytest.raises(RuntimeError) as failure:
+        candidate.validate_security()
+
+    message = str(failure.value)
+    assert 'S3_BUCKET_NAME' in message
+    assert 'AWS_KMS_KEY_ID' in message
+    assert 'AUDIT_ARCHIVE_BUCKET' in message
+    assert 'DATABASE_URL' in message
+
+
+def test_production_accepts_complete_configuration():
+    from app.core.config import Settings
+
+    candidate = Settings()
+    candidate.app_env = 'production'
+    candidate.auth_secret_key = 'x' * 32
+    candidate.mfa_encryption_key = 'y' * 32
+    candidate.auth_cookie_secure = True
+    candidate.s3_bucket_name = 'visatrack-docs-prod'
+    candidate.aws_kms_key_id = 'arn:aws:kms:us-east-1:1:key/2'
+    candidate.audit_archive_bucket = 'visatrack-audit-prod'
+    candidate.database_url = 'postgresql://user:pw@db.internal:5432/visatrack'
+
+    candidate.validate_security()
+
+
+def test_database_url_normalizes_managed_postgres_scheme(monkeypatch):
+    monkeypatch.setenv('DATABASE_URL', 'postgres://user:pw@db.internal:5432/visatrack')
+    import app.core.config as config_module
+
+    importlib.reload(config_module)
+
+    assert config_module.settings.database_url == (
+        'postgresql://user:pw@db.internal:5432/visatrack'
+    )
+
+
+def test_database_url_keeps_supported_schemes(monkeypatch):
+    monkeypatch.setenv(
+        'DATABASE_URL', ' postgresql+psycopg2://user:pw@db.internal:5432/visatrack '
+    )
+    import app.core.config as config_module
+
+    importlib.reload(config_module)
+
+    assert config_module.settings.database_url == (
+        'postgresql+psycopg2://user:pw@db.internal:5432/visatrack'
+    )
