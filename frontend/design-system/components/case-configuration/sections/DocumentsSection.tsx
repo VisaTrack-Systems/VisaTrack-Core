@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, Upload, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 import { DialogPanel } from '../../DialogPanel';
@@ -34,6 +34,9 @@ type DocumentsSectionProps = {
   viewingDocumentId: string | null;
   onDownloadDocument: (documentId: string) => Promise<void>;
   downloadingDocumentId: string | null;
+  onUploadDocument: (documentId: string, file: File) => Promise<void>;
+  onAddRetainer: (file: File) => Promise<void>;
+  uploadingDocumentId: string | null;
   onUpdateDocumentStatus: (
     documentId: string,
     status: CaseDocumentStatus,
@@ -63,6 +66,9 @@ export function DocumentsSection({
   viewingDocumentId,
   onDownloadDocument,
   downloadingDocumentId,
+  onUploadDocument,
+  onAddRetainer,
+  uploadingDocumentId,
   onUpdateDocumentStatus,
   updatingDocumentId,
   onDeleteDocument,
@@ -159,7 +165,9 @@ export function DocumentsSection({
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Document Requests</h2>
-          <p className="text-gray-600">Configure and manage document requests for this case</p>
+          <p className="text-gray-600">
+            Configure requests and securely add retainers or other firm-provided documents.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
@@ -195,6 +203,29 @@ export function DocumentsSection({
                 <Plus className="w-4 h-4" />
                 Add Custom Document
               </button>
+              <label
+                className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors flex items-center gap-2 ${
+                  addingDocument || uploadingDocumentId !== null
+                    ? 'cursor-wait opacity-60'
+                    : 'cursor-pointer hover:bg-gray-50'
+                }`}
+              >
+                <Upload className="w-4 h-4" />
+                Add Retainer
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  disabled={addingDocument || uploadingDocumentId !== null}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) {
+                      void onAddRetainer(file);
+                    }
+                  }}
+                />
+              </label>
               <button
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
                 onClick={() => setIsCreateSuiteDialogOpen(true)}
@@ -329,6 +360,32 @@ export function DocumentsSection({
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
+                              <label
+                                className={`p-1 rounded ${
+                                  uploadingDocumentId === document.id
+                                    ? 'cursor-wait opacity-50'
+                                    : 'cursor-pointer hover:bg-gray-100'
+                                }`}
+                                title={document.can_download ? 'Replace file' : 'Upload retainer or firm document'}
+                              >
+                                <Upload className="w-4 h-4 text-gray-600" />
+                                <span className="sr-only">
+                                  {document.can_download ? `Replace ${document.name}` : `Upload ${document.name}`}
+                                </span>
+                                <input
+                                  className="sr-only"
+                                  type="file"
+                                  accept=".pdf,.jpg,.jpeg,.png,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                  disabled={uploadingDocumentId !== null}
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = '';
+                                    if (file) {
+                                      void onUploadDocument(document.id, file);
+                                    }
+                                  }}
+                                />
+                              </label>
                               <button
                                 className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
                                 disabled={!document.can_download || viewingDocumentId === document.id}

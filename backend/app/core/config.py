@@ -62,6 +62,9 @@ class Settings:
     resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.ca")
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
+    stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
+    stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    stripe_currency: str = os.getenv("STRIPE_CURRENCY", "cad").strip().lower()
 
     def validate_security(self) -> None:
         """Reject unsafe authentication settings outside local development."""
@@ -96,6 +99,14 @@ class Settings:
                 "S3_BUCKET_NAME, AWS_KMS_KEY_ID, and AUDIT_ARCHIVE_BUCKET are required "
                 "outside local environments"
             )
+
+        if not self.stripe_secret_key or not self.stripe_webhook_secret:
+            raise RuntimeError(
+                "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are required outside local environments"
+            )
+
+        if len(self.stripe_currency) != 3 or not self.stripe_currency.isalpha():
+            raise RuntimeError("STRIPE_CURRENCY must be a three-letter ISO currency code")
 
     @property
     def frontend_origins(self) -> list[str]:

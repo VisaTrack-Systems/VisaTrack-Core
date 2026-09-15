@@ -9,6 +9,7 @@ import { mockCaseWorkspace, mockClientCases, mockPortalPermissions } from '../de
 vi.mock('@/lib/api', () => ({
   getClientCases: vi.fn(),
   getCaseWorkspaceByNumber: vi.fn(),
+  createInvoiceCheckoutSession: vi.fn(),
   markCaseReminderRead: vi.fn(async () => ({})),
   acknowledgeCaseReminder: vi.fn(async () => ({})),
   initiateCaseDocumentUpload: vi.fn(async () => ({})),
@@ -17,7 +18,7 @@ vi.mock('@/lib/api', () => ({
   getCaseDocumentDownloadUrl: vi.fn(async () => ({ download_url: 'https://example.com/file', file_name: 'file.pdf' })),
 }));
 
-import { getCaseWorkspaceByNumber, getClientCases } from '@/lib/api';
+import { createInvoiceCheckoutSession, getCaseWorkspaceByNumber, getClientCases } from '@/lib/api';
 
 function makeWorkspaceWithPermissions(overrides: Partial<(typeof mockPortalPermissions)>) {
   return {
@@ -89,5 +90,24 @@ describe('ClientDashboard permission behavior', () => {
     const disabledUploadButtons = screen.getAllByRole('button', { name: 'Uploads Disabled' });
     expect(disabledUploadButtons.length).toBeGreaterThan(0);
     expect(disabledUploadButtons[0]).toBeDisabled();
+  });
+
+  it('shows secure payment action when a visible invoice is due', async () => {
+    vi.mocked(createInvoiceCheckoutSession).mockResolvedValue({
+      payment_id: 'payment-1',
+      checkout_url: 'https://checkout.stripe.com/c/pay/test',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+    vi.mocked(getCaseWorkspaceByNumber).mockResolvedValue(
+      makeWorkspaceWithPermissions({
+        portal_access: 'full_access',
+      })
+    );
+
+    render(<ClientDashboard />);
+
+    expect(await screen.findByRole('heading', { name: 'Billing Summary' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Make Payment/ })).toBeEnabled();
+    expect(screen.getByText('Secure card entry is hosted by Stripe.')).toBeInTheDocument();
   });
 });

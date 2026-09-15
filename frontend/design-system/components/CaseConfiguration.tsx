@@ -9,9 +9,11 @@ import {
   deleteCaseDocument,
   deleteCaseMilestone,
   downloadCaseDocumentsArchive,
+  completeCaseDocumentUpload,
   type CaseDocumentStatus,
   getCaseDocumentDownloadUrl,
   getCaseDocumentViewUrl,
+  initiateCaseDocumentUpload,
   type CasePortalPermissions,
   type CaseWorkspace,
   renameCaseDocument,
@@ -124,6 +126,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
   const [viewingDocumentId, setViewingDocumentId] = useState<string | null>(null);
   const [updatingDocumentId, setUpdatingDocumentId] = useState<string | null>(null);
+  const [uploadingDocumentId, setUploadingDocumentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -577,6 +580,76 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
   };
 
+  const handleUploadDocument = async (documentId: string, file: File): Promise<void> => {
+    if (!workspace) {
+      return;
+    }
+
+    setUploadingDocumentId(documentId);
+    try {
+      const upload = await initiateCaseDocumentUpload(
+        workspace.case.case_number,
+        documentId,
+        {
+          file_name: file.name,
+          file_type: file.type || 'application/octet-stream',
+          file_size_bytes: file.size,
+        }
+      );
+      const form = new FormData();
+      Object.entries(upload.upload_fields).forEach(([key, value]) => form.append(key, value));
+      form.append('file', file);
+      const storageResponse = await fetch(upload.upload_url, {
+        method: upload.upload_method,
+        body: form,
+      });
+      if (!storageResponse.ok) {
+        throw new Error(`Storage upload failed: ${storageResponse.status}`);
+      }
+      await completeCaseDocumentUpload(workspace.case.case_number, documentId, {
+        storage_key: upload.storage_key,
+        file_name: file.name,
+        file_type: file.type || 'application/octet-stream',
+        file_size_bytes: file.size,
+        client_note: 'Uploaded by the legal team for client review.',
+      });
+      await refreshWorkspace(workspace.case.case_number);
+      showNotice('success', `${file.name} uploaded for malware scanning.`);
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : 'Unknown error';
+      showNotice('error', `Failed to upload document: ${message}`);
+    } finally {
+      setUploadingDocumentId(null);
+    }
+  };
+
+  const handleAddRetainer = async (file: File): Promise<void> => {
+    if (!workspace || workspace.document_suites.length === 0) {
+      showNotice('error', 'Create a document suite before adding a retainer.');
+      return;
+    }
+    const suiteId = workspace.document_suites[0].id;
+    setIsAddingDocument(true);
+    try {
+      const retainer = await createCaseCustomDocument(workspace.case.case_number, {
+        name: 'Retainer Agreement',
+        suite_id: suiteId,
+        required: false,
+        due_date: null,
+        instructions: 'Review this agreement and contact your legal team with any questions.',
+      });
+      setExpandedSuites((previous) =>
+        previous.includes(suiteId) ? previous : [...previous, suiteId]
+      );
+      await handleUploadDocument(retainer.id, file);
+    } catch (createError) {
+      const message = createError instanceof Error ? createError.message : 'Unknown error';
+      showNotice('error', `Failed to add retainer: ${message}`);
+    } finally {
+      setIsAddingDocument(false);
+    }
+  };
+
   const handleUpdateDocumentStatus = async (
     documentId: string,
     status: CaseDocumentStatus,
@@ -857,6 +930,9 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           viewingDocumentId={viewingDocumentId}
           onDownloadDocument={handleDownloadDocument}
           downloadingDocumentId={downloadingDocumentId}
+          onUploadDocument={handleUploadDocument}
+          onAddRetainer={handleAddRetainer}
+          uploadingDocumentId={uploadingDocumentId}
           onUpdateDocumentStatus={handleUpdateDocumentStatus}
           updatingDocumentId={updatingDocumentId}
           onDeleteDocument={handleDeleteDocument}
@@ -880,7 +956,12 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
     }
 
     if (activeSection === 'payments') {
-      return <PaymentsSection workspace={workspace} />;
+      return (
+        <PaymentsSection
+          workspace={workspace}
+          onInvoiceCreated={() => refreshWorkspace(workspace.case.case_number)}
+        />
+      );
     }
 
     if (activeSection === 'reminders') {

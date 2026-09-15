@@ -1,6 +1,11 @@
 /** ClientDashboard: Main dashboard view for client/applicant users. Displays case status, milestones, documents, and appointment schedules. */
 
+import { useState } from 'react';
+
+import { createInvoiceCheckoutSession } from '@/lib/api';
+
 import { AppointmentsPanel } from './client-dashboard/AppointmentsPanel';
+import { BillingSummaryPanel } from './client-dashboard/BillingSummaryPanel';
 import { CaseSummaryCard } from './client-dashboard/CaseSummaryCard';
 import { DocumentChecklistPanel } from './client-dashboard/DocumentChecklistPanel';
 import { RemindersPanel } from './client-dashboard/RemindersPanel';
@@ -25,6 +30,7 @@ export function ClientDashboard() {
     requiredDocuments,
     completedRequiredDocuments,
     capabilities,
+    billingInfo,
     uploadDocument,
     deleteUploadedDocument,
     downloadDocument,
@@ -33,6 +39,8 @@ export function ClientDashboard() {
     deletingDocumentId,
     downloadingDocumentId,
   } = useClientDashboardData();
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   if (loading) {
     return <div className="min-h-screen bg-gray-50 p-10 text-gray-600">Loading client dashboard...</div>;
@@ -51,8 +59,30 @@ export function ClientDashboard() {
     capabilities.canViewCaseStatus ||
     capabilities.canViewDocuments ||
     capabilities.canViewMilestones ||
-    capabilities.canViewReminders;
+    capabilities.canViewReminders ||
+    capabilities.canViewBilling;
   const firstName = workspace.case.client_name.trim().split(/\s+/)[0] || workspace.case.client_name;
+  const payableInvoice = workspace.payment_items.find(
+    (invoice) => invoice.amount_due > 0 && !['draft', 'cancelled', 'paid', 'refunded'].includes(invoice.status)
+  );
+
+  const makePayment = async () => {
+    if (!payableInvoice) {
+      return;
+    }
+    setPaymentPending(true);
+    setPaymentError(null);
+    try {
+      const checkout = await createInvoiceCheckoutSession(
+        payableInvoice.id,
+        `portal-${crypto.randomUUID()}`
+      );
+      window.location.assign(checkout.checkout_url);
+    } catch (requestError) {
+      setPaymentError(requestError instanceof Error ? requestError.message : 'Unable to open secure checkout');
+      setPaymentPending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -128,6 +158,15 @@ export function ClientDashboard() {
           </div>
 
           <div className="space-y-6">
+            {capabilities.canViewBilling ? (
+              <BillingSummaryPanel
+                billingInfo={billingInfo}
+                canPay={Boolean(payableInvoice)}
+                paying={paymentPending}
+                error={paymentError}
+                onPay={makePayment}
+              />
+            ) : null}
             {capabilities.canViewReminders ? (
               <RemindersPanel
                 allReminders={allReminders}

@@ -1,7 +1,7 @@
 """API Router: Main FastAPI router that aggregates all sub-routers for cases, users, auth, and other domain endpoints."""
 from fastapi import APIRouter
 
-from app.api.routes import admin, auth, cases, client, dashboard, feedback, health, lawyer, organizations, privacy, users
+from app.api.routes import admin, auth, billing, cases, client, dashboard, feedback, health, lawyer, organizations, privacy, users
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -15,3 +15,4 @@ api_router.include_router(lawyer.router, prefix="/api/v1")
 api_router.include_router(client.router, prefix="/api/v1")
 api_router.include_router(feedback.router, prefix="/api/v1")
 api_router.include_router(privacy.router, prefix="/api/v1")
+api_router.include_router(billing.router, prefix="/api/v1")
