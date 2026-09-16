@@ -666,6 +666,7 @@ def test_form_mapping_only_accepts_values_present_in_named_evidence():
     assert evidence["ClientName"]["sources"] == ["D1"]
     assert unresolved == ["BirthDate", "Province"]
     assert ai._source_supports_value("Client name is Sam", "M") is False
+    assert ai._evidence_values_text({"email": "person@example.com"}) == "person@example.com"
 
 
 def test_form_template_hash_allowlist_fails_closed(monkeypatch):

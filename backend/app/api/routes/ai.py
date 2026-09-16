@@ -1256,7 +1256,7 @@ def _build_case_context(
     )
     citations: list[AiCitation] = []
     evidence: list[str] = [structured]
-    source_texts = {"Case data": structured_text}
+    source_texts = {"Case data": _evidence_values_text(structured_data)}
     for index, chunk in enumerate(chunks, start=1):
         source_id = f"D{index}"
         content = str(chunk["content"])
@@ -1381,6 +1381,14 @@ def _prompt_json(value: object) -> str:
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
     )
+
+
+def _evidence_values_text(value: object) -> str:
+    if isinstance(value, dict):
+        return " ".join(_evidence_values_text(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return " ".join(_evidence_values_text(item) for item in value)
+    return "" if value is None else str(value)
 
 
 def _bounded_provider_history(rows) -> list[dict[str, str]]:
