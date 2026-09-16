@@ -287,10 +287,45 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Form Drafts */
+        get: operations["list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get"];
         put?: never;
         /** Create Form Draft */
         post: operations["create_form_draft_api_v1_ai_cases__case_number__form_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Review Form Draft */
+        patch: operations["review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Form Draft */
+        get: operations["download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1675,6 +1710,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Finish Reason */
+            finish_reason?: string | null;
             /**
              * Id
              * Format: uuid
@@ -1686,6 +1723,8 @@ export interface components {
             prompt_version?: string | null;
             /** Provider */
             provider?: ("openai" | "anthropic") | null;
+            /** Requested Model */
+            requested_model?: string | null;
             /**
              * Role
              * @enum {string}
@@ -1750,6 +1789,20 @@ export interface components {
              */
             source_document_id: string;
         };
+        /** AiFormDraftDownloadResponse */
+        AiFormDraftDownloadResponse: {
+            /** Download Url */
+            download_url: string;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** AiFormDraftResponse */
         AiFormDraftResponse: {
             /** Citations */
@@ -1769,6 +1822,8 @@ export interface components {
             };
             /** File Name */
             file_name: string;
+            /** Finish Reason */
+            finish_reason: string | null;
             /**
              * Id
              * Format: uuid
@@ -1785,6 +1840,8 @@ export interface components {
              * @enum {string}
              */
             provider: "openai" | "anthropic";
+            /** Requested Model */
+            requested_model: string;
             /** Source Document Id */
             source_document_id: string | null;
             /** Source Sha256 */
@@ -1795,6 +1852,68 @@ export interface components {
             unsupported_fields: string[];
             /** Warning */
             warning: string;
+        };
+        /** AiFormDraftReviewRequest */
+        AiFormDraftReviewRequest: {
+            /**
+             * Adobe Validation Completed
+             * @default false
+             */
+            adobe_validation_completed: boolean;
+            /** Review Note */
+            review_note: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "reviewed" | "superseded";
+        };
+        /** AiFormDraftSummaryResponse */
+        AiFormDraftSummaryResponse: {
+            /** Adobe Validation Completed */
+            adobe_validation_completed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Requested Model */
+            requested_model: string;
+            /** Review Note */
+            review_note: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Source Document Id */
+            source_document_id: string | null;
+            /** Source Sha256 */
+            source_sha256: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "reviewed" | "superseded";
+            /** Unresolved Fields */
+            unresolved_fields: string[];
+            /** Unsupported Fields */
+            unsupported_fields: string[];
         };
         /** AiFormFieldEvidence */
         AiFormFieldEvidence: {
@@ -1810,9 +1929,15 @@ export interface components {
         };
         /** AiProviderConnectRequest */
         AiProviderConnectRequest: {
-            /** Api Key */
+            /**
+             * Api Key
+             * Format: password
+             */
             api_key: string;
-            /** Current Password */
+            /**
+             * Current Password
+             * Format: password
+             */
             current_password: string;
             /** Data Processing Acknowledged */
             data_processing_acknowledged: boolean;
@@ -3754,6 +3879,37 @@ export interface operations {
             };
         };
     };
+    list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_form_draft_api_v1_ai_cases__case_number__form_drafts_post: {
         parameters: {
             query?: never;
@@ -3778,6 +3934,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiFormDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiFormDraftReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftDownloadResponse"];
                 };
             };
             /** @description Validation Error */

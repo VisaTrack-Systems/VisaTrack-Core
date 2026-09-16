@@ -541,8 +541,10 @@ export type AiChatMessage = {
   content: string;
   citations: AiCitation[];
   provider: AiProvider | null;
+  requested_model: string | null;
   model: string | null;
   prompt_version: string | null;
+  finish_reason: string | null;
   created_at: string;
 };
 
@@ -562,8 +564,10 @@ export type AiFormDraft = {
   download_url: string;
   expires_in_seconds: number;
   provider: AiProvider;
+  requested_model: string;
   model: string;
   prompt_version: string;
+  finish_reason: string | null;
   source_sha256: string;
   populated_fields: string[];
   unresolved_fields: string[];
@@ -572,6 +576,32 @@ export type AiFormDraft = {
   citations: AiCitation[];
   warning: string;
   created_at: string;
+};
+
+export type AiFormDraftSummary = {
+  id: string;
+  source_document_id: string | null;
+  file_name: string;
+  provider: AiProvider;
+  requested_model: string;
+  model: string;
+  prompt_version: string;
+  source_sha256: string;
+  status: 'draft' | 'reviewed' | 'superseded';
+  unresolved_fields: string[];
+  unsupported_fields: string[];
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  adobe_validation_completed: boolean;
+  created_at: string;
+};
+
+export type AiFormDraftDownload = {
+  id: string;
+  file_name: string;
+  download_url: string;
+  expires_in_seconds: number;
 };
 
 export type InvoiceCreateInput = {
@@ -1421,6 +1451,38 @@ export async function createAiFormDraft(
         instructions: instructions ?? null,
       }),
     }
+  );
+}
+
+export async function listAiFormDrafts(
+  caseNumber: string
+): Promise<AiFormDraftSummary[]> {
+  return requestJson<AiFormDraftSummary[]>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts`
+  );
+}
+
+export async function downloadAiFormDraft(
+  caseNumber: string,
+  draftId: string
+): Promise<AiFormDraftDownload> {
+  return requestJson<AiFormDraftDownload>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts/${encodeURIComponent(draftId)}/download`
+  );
+}
+
+export async function reviewAiFormDraft(
+  caseNumber: string,
+  draftId: string,
+  input: {
+    status: 'reviewed' | 'superseded';
+    review_note: string;
+    adobe_validation_completed: boolean;
+  }
+): Promise<AiFormDraftSummary> {
+  return requestJson<AiFormDraftSummary>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts/${encodeURIComponent(draftId)}`,
+    { method: 'PATCH', body: JSON.stringify(input) }
   );
 }
 

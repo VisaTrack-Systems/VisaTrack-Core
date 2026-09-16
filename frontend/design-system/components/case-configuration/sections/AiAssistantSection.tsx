@@ -5,6 +5,7 @@ import { Bot, FileOutput, KeyRound, RefreshCw, Send, ShieldAlert, Trash2 } from 
 
 import {
   type AiChat,
+  type AiFormDraftSummary,
   type AiProvider,
   type AiProviderConnection,
   type AiProviderModels,
@@ -15,6 +16,7 @@ import {
   createCaseAiChat,
   completeCaseDocumentUpload,
   deleteAiChat,
+  downloadAiFormDraft,
   disconnectAiProvider,
   getAiChat,
   getCaseDocumentViewUrl,
@@ -22,6 +24,7 @@ import {
   indexCaseForAi,
   initiateCaseDocumentUpload,
   listAiProviderConnections,
+  listAiFormDrafts,
   listCaseAiChats,
   selectAiProviderModel,
   sendAiChatMessage,
@@ -46,12 +49,18 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   const [question, setQuestion] = useState('');
   const [formDocumentId, setFormDocumentId] = useState('');
   const [formInstructions, setFormInstructions] = useState('');
+  const [formDrafts, setFormDrafts] = useState<AiFormDraftSummary[]>([]);
   const [formResult, setFormResult] = useState<{
     warning: string;
     provider: AiProvider;
+    requestedModel: string;
     model: string;
+    finishReason: string | null;
     promptVersion: string;
     sourceSha256: string;
+    downloadUrl: string;
+    fileName: string;
+    expiresInSeconds: number;
     unresolved: string[];
     unsupported: string[];
     evidence: Record<string, { value: string; sources: string[] }>;
@@ -76,30 +85,60 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      try {
-        const [providerConnections, caseChats] = await Promise.all([
-          listAiProviderConnections(),
-          listCaseAiChats(caseNumber),
-        ]);
-        if (ignore) return;
+      const [connectionsResult, chatsResult, draftsResult] = await Promise.allSettled([
+        listAiProviderConnections(),
+        listCaseAiChats(caseNumber),
+        listAiFormDrafts(caseNumber),
+      ]);
+      if (ignore) return;
+      if (connectionsResult.status === 'fulfilled') {
+        const providerConnections = connectionsResult.value;
         setConnections(providerConnections);
-        setChats(caseChats);
         const initialConnection = providerConnections[0];
         if (initialConnection) {
           setProvider(initialConnection.provider);
-          const availableModels = await getAiProviderModels(initialConnection.provider);
-          if (ignore) return;
-          setModels(availableModels);
+          try {
+            const availableModels = await getAiProviderModels(initialConnection.provider);
+            if (!ignore) setModels(availableModels);
+          } catch (modelError) {
+            if (!ignore) {
+              setError(
+                modelError instanceof Error
+                  ? modelError.message
+                  : 'AI generation is unavailable; stored keys can still be disconnected'
+              );
+            }
+          }
         }
+      } else {
+        setError(
+          connectionsResult.reason instanceof Error
+            ? connectionsResult.reason.message
+            : 'Unable to load AI provider connections'
+        );
+      }
+      if (chatsResult.status === 'fulfilled') {
+        const caseChats = chatsResult.value;
+        setChats(caseChats);
         if (caseChats[0]) {
-          const initialChat = await getAiChat(caseChats[0].id);
-          if (ignore) return;
-          setChat(initialChat);
+          try {
+            const initialChat = await getAiChat(caseChats[0].id);
+            if (!ignore) setChat(initialChat);
+          } catch (chatError) {
+            if (!ignore) {
+              setError(chatError instanceof Error ? chatError.message : 'Unable to load AI chat');
+            }
+          }
         }
-      } catch (loadError) {
-        if (!ignore) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load AI assistant');
-        }
+      } else if (connectionsResult.status === 'fulfilled') {
+        setError(
+          chatsResult.reason instanceof Error
+            ? chatsResult.reason.message
+            : 'AI generation is unavailable; stored keys can still be disconnected'
+        );
+      }
+      if (draftsResult.status === 'fulfilled') {
+        setFormDrafts(draftsResult.value);
       }
     };
     void load();
@@ -113,8 +152,9 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     setBusy('provider');
     setError(null);
     setNotice(null);
+    let saved: AiProviderConnection;
     try {
-      const saved = await connectAiProvider({
+      saved = await connectAiProvider({
         provider,
         api_key: apiKey,
         data_processing_acknowledged: approved,
@@ -129,10 +169,20 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       setCurrentPassword('');
       setMfaCode('');
       setApproved(false);
-      setModels(await getAiProviderModels(provider));
       setNotice(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} connected.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Provider connection failed');
+      setBusy(null);
+      return;
+    }
+    try {
+      setModels(await getAiProviderModels(provider));
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? `Provider connected, but models could not be refreshed: ${requestError.message}`
+          : 'Provider connected, but models could not be refreshed'
+      );
     } finally {
       setBusy(null);
     }
@@ -223,11 +273,24 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     setError(null);
     try {
       await deleteAiChat(chat.id);
-      const remaining = chats.filter((item) => item.id !== chat.id);
-      setChats(remaining);
-      setChat(remaining[0] ? await getAiChat(remaining[0].id) : null);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Could not delete chat');
+      setBusy(null);
+      return;
+    }
+    const remaining = chats.filter((item) => item.id !== chat.id);
+    setChats(remaining);
+    if (!remaining[0]) {
+      setChat(null);
+      setBusy(null);
+      return;
+    }
+    try {
+      setChat(await getAiChat(remaining[0].id));
+    } catch (requestError) {
+      setChat(null);
+      setNotice('Conversation deleted, but the next chat could not be loaded.');
+      setError(requestError instanceof Error ? requestError.message : 'Could not load next chat');
     } finally {
       setBusy(null);
     }
@@ -238,8 +301,8 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     if (!question.trim()) return;
     setBusy('message');
     setError(null);
+    let target = chat;
     try {
-      let target = chat;
       if (!target) {
         target = await createCaseAiChat(caseNumber, question.trim().slice(0, 80));
         setChats((current) => [target as AiChat, ...current]);
@@ -247,9 +310,16 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       }
       await sendAiChatMessage(target.id, question.trim(), provider);
       setQuestion('');
-      setChat(await getAiChat(target.id));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'AI request failed');
+      setBusy(null);
+      return;
+    }
+    try {
+      setChat(await getAiChat(target.id));
+    } catch (requestError) {
+      setNotice('Answer created, but the conversation could not be refreshed.');
+      setError(requestError instanceof Error ? requestError.message : 'Conversation refresh failed');
     } finally {
       setBusy(null);
     }
@@ -261,7 +331,6 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     setBusy('form');
     setError(null);
     setFormResult(null);
-    const popup = window.open('', '_blank');
     try {
       const draft = await createAiFormDraft(
         caseNumber,
@@ -269,38 +338,46 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         provider,
         formInstructions.trim() || null
       );
-      if (popup && !popup.closed) {
-        popup.location.href = draft.download_url;
-      } else {
-        window.location.assign(draft.download_url);
-      }
       setFormResult({
         warning: draft.warning,
         provider: draft.provider,
+        requestedModel: draft.requested_model,
         model: draft.model,
+        finishReason: draft.finish_reason,
         promptVersion: draft.prompt_version,
         sourceSha256: draft.source_sha256,
+        downloadUrl: draft.download_url,
+        fileName: draft.file_name,
+        expiresInSeconds: draft.expires_in_seconds,
         unresolved: draft.unresolved_fields,
         unsupported: draft.unsupported_fields,
         evidence: draft.field_evidence,
         citations: draft.citations,
       });
+      try {
+        setFormDrafts(await listAiFormDrafts(caseNumber));
+      } catch {
+        setNotice('Draft created, but history could not be refreshed.');
+      }
     } catch (requestError) {
-      popup?.close();
       setError(requestError instanceof Error ? requestError.message : 'Form draft failed');
     } finally {
       setBusy(null);
     }
   };
 
-  const openSource = async (documentId: string) => {
+  const openSource = async (documentId: string, pageNumber?: number | null) => {
     const popup = window.open('', '_blank');
     try {
       const source = await getCaseDocumentViewUrl(caseNumber, documentId);
+      const viewUrl = pageNumber
+        ? `${source.view_url}#page=${encodeURIComponent(String(pageNumber))}`
+        : source.view_url;
       if (popup && !popup.closed) {
-        popup.location.href = source.view_url;
+        popup.opener = null;
+        popup.location.href = viewUrl;
       } else {
-        window.location.assign(source.view_url);
+        window.location.assign(viewUrl);
       }
     } catch (requestError) {
       popup?.close();
@@ -308,8 +385,28 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     }
   };
 
+  const downloadPriorDraft = async (draftId: string) => {
+    const popup = window.open('', '_blank');
+    setError(null);
+    try {
+      const draft = await downloadAiFormDraft(caseNumber, draftId);
+      if (popup && !popup.closed) {
+        popup.opener = null;
+        popup.location.href = draft.download_url;
+      } else {
+        window.location.assign(draft.download_url);
+      }
+    } catch (requestError) {
+      popup?.close();
+      setError(requestError instanceof Error ? requestError.message : 'Could not download draft');
+    }
+  };
+
   const uploadForm = async (file: File) => {
-    if (file.type !== 'application/pdf') {
+    if (
+      !file.name.toLowerCase().endsWith('.pdf') ||
+      (file.type && file.type !== 'application/pdf')
+    ) {
       setError('Official form upload must be a PDF.');
       return;
     }
@@ -325,7 +422,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       });
       const upload = await initiateCaseDocumentUpload(caseNumber, slot.id, {
         file_name: file.name,
-        file_type: file.type,
+        file_type: 'application/pdf',
         file_size_bytes: file.size,
       });
       const form = new FormData();
@@ -341,21 +438,28 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       await completeCaseDocumentUpload(caseNumber, slot.id, {
         storage_key: upload.storage_key,
         file_name: file.name,
-        file_type: file.type,
+        file_type: 'application/pdf',
         file_size_bytes: file.size,
         client_note: 'Official form uploaded by the legal team.',
       });
-      await onWorkspaceRefresh();
       setNotice('PDF uploaded to quarantine. Generate a draft after malware scanning is clean.');
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'PDF form upload failed');
+      setBusy(null);
+      return;
+    }
+    try {
+      await onWorkspaceRefresh();
+    } catch (refreshError) {
+      setNotice('PDF uploaded to quarantine, but the case view could not be refreshed.');
+      setError(refreshError instanceof Error ? refreshError.message : 'Case refresh failed');
     } finally {
       setBusy(null);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={busy !== null}>
       <div>
         <div className="flex items-center gap-2">
           <Bot className="h-6 w-6 text-red-700" />
@@ -394,6 +498,11 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               onChange={(event) => {
                 const next = event.target.value as AiProvider;
                 setProvider(next);
+                setApiKey('');
+                setCurrentPassword('');
+                setMfaCode('');
+                setApproved(false);
+                setError(null);
                 const nextConnection = connections.find((item) => item.provider === next);
                 setModels(null);
                 if (nextConnection) {
@@ -512,6 +621,16 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             </button>
           </div>
         ) : null}
+        {connected && !models ? (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void disconnectProvider()}
+            className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+          >
+            {busy === 'disconnect-provider' ? 'Disconnecting…' : 'Disconnect provider'}
+          </button>
+        ) : null}
       </section>
 
       <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-chat-heading">
@@ -547,13 +666,24 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             </select>
           </label>
         ) : null}
-        <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto" aria-live="polite">
+        <div
+          className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-red-500"
+          aria-label="Conversation transcript"
+          tabIndex={0}
+        >
           {chat?.messages.map((message) => (
-            <article key={message.id} className={`rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-blue-200 bg-blue-50'}`}>
+            <article
+              key={message.id}
+              aria-label={message.role === 'user' ? 'Your message' : 'AI assistant response'}
+              className={`rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-blue-200 bg-blue-50'}`}
+            >
               <p className="whitespace-pre-wrap text-gray-900">{message.content}</p>
               {message.role === 'assistant' && message.provider && message.model ? (
                 <p className="mt-2 text-xs text-gray-500">
                   {message.provider} / {message.model}
+                  {message.requested_model && message.requested_model !== message.model
+                    ? ` · requested ${message.requested_model}`
+                    : ''}
                   {message.prompt_version ? ` · prompt ${message.prompt_version}` : ''}
                 </p>
               ) : null}
@@ -566,7 +696,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                         <button
                           type="button"
                           className="font-semibold text-blue-800 underline"
-                          onClick={() => void openSource(citation.case_document_id)}
+                          onClick={() => void openSource(citation.case_document_id, citation.page_number)}
                         >
                           {citation.source_id} · {citation.document_name}
                         </button>
@@ -610,7 +740,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             Form drafting is disabled until your firm approves exact PDF revisions.
           </p>
         ) : null}
-        <label className={`mt-4 flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm ${busy === 'form-upload' ? 'cursor-wait opacity-50' : models?.form_drafts_enabled === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+        <label className={`mt-4 flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm focus-within:ring-2 focus-within:ring-red-500 ${busy === 'form-upload' ? 'cursor-wait opacity-50' : models?.form_drafts_enabled === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
           {busy === 'form-upload' ? 'Uploading and quarantining…' : 'Upload official PDF form'}
           <input
             className="sr-only"
@@ -658,12 +788,16 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
           </button>
         </form>
         {formResult ? (
-          <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <div role="status" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             <p>{formResult.warning}</p>
             <p className="mt-2 text-xs">
               Generated with {formResult.provider} / {formResult.model}. Template SHA-256:{' '}
               <code className="break-all">{formResult.sourceSha256}</code>
               {' '}Prompt: {formResult.promptVersion}.
+              {formResult.requestedModel !== formResult.model
+                ? ` Requested model: ${formResult.requestedModel}.`
+                : ''}
+              {formResult.finishReason ? ` Finish reason: ${formResult.finishReason}.` : ''}
             </p>
             {formResult.unresolved.length > 0 ? (
               <p className="mt-2">Unresolved fields: {formResult.unresolved.join(', ')}</p>
@@ -693,7 +827,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                         <button
                           type="button"
                           className="font-medium underline"
-                          onClick={() => void openSource(citation.case_document_id)}
+                          onClick={() => void openSource(citation.case_document_id, citation.page_number)}
                         >
                           {citation.source_id}: {citation.document_name}
                         </button>
@@ -704,6 +838,47 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                 ) : null}
               </details>
             ) : null}
+            <p className="mt-3 text-xs">
+              Review the evidence and unresolved controls before downloading. This link expires in{' '}
+              {Math.max(1, Math.floor(formResult.expiresInSeconds / 60))} minutes.
+            </p>
+            <a
+              href={formResult.downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex rounded-lg bg-gray-900 px-4 py-2 text-sm text-white"
+            >
+              Download {formResult.fileName}
+            </a>
+          </div>
+        ) : null}
+        {formDrafts.length > 0 ? (
+          <div className="mt-5">
+            <h4 className="text-sm font-semibold text-gray-900">Recent review drafts</h4>
+            <ul className="mt-2 space-y-2">
+              {formDrafts.slice(0, 10).map((draft) => (
+                <li
+                  key={draft.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{draft.file_name}</p>
+                    <p className="text-xs text-gray-600">
+                      {draft.status} · {draft.provider} / {draft.model} ·{' '}
+                      {draft.unresolved_fields.length} unresolved ·{' '}
+                      {draft.unsupported_fields.length} unsupported
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void downloadPriorDraft(draft.id)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    Get new download link
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </section>

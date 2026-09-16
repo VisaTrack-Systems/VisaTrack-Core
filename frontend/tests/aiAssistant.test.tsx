@@ -7,6 +7,8 @@ import { AiAssistantSection } from '../design-system/components/case-configurati
 import {
   disconnectAiProvider,
   getAiChat,
+  getAiProviderModels,
+  listAiFormDrafts,
   listAiProviderConnections,
   listCaseAiChats,
   sendAiChatMessage,
@@ -23,6 +25,8 @@ vi.mock('@/lib/api', () => ({
     form_drafts_enabled: false,
   })),
   getAiChat: vi.fn(),
+  listAiFormDrafts: vi.fn(async () => []),
+  downloadAiFormDraft: vi.fn(),
   getCaseDocumentViewUrl: vi.fn(),
   connectAiProvider: vi.fn(),
   selectAiProviderModel: vi.fn(),
@@ -41,6 +45,7 @@ describe('AiAssistantSection', () => {
   beforeEach(() => {
     vi.mocked(listAiProviderConnections).mockResolvedValue([]);
     vi.mocked(listCaseAiChats).mockResolvedValue([]);
+    vi.mocked(listAiFormDrafts).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -56,6 +61,26 @@ describe('AiAssistantSection', () => {
     expect(screen.getByText(/firm approved this provider/)).toBeInTheDocument();
     expect(screen.getByText(/Supports standard AcroForm PDFs only/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled();
+  });
+
+  it('clears provider-specific secrets and approval when provider changes', async () => {
+    render(<AiAssistantSection workspace={mockCaseWorkspace} onWorkspaceRefresh={async () => {}} />);
+
+    const apiKey = await screen.findByLabelText('API key');
+    const password = screen.getByLabelText('Current VisaTrack password');
+    const mfa = screen.getByLabelText(/MFA code/);
+    const approval = screen.getByRole('checkbox');
+    await userEvent.type(apiKey, 'sk-openai-secret');
+    await userEvent.type(password, 'current-password');
+    await userEvent.type(mfa, '123456');
+    await userEvent.click(approval);
+
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'anthropic');
+
+    expect(apiKey).toHaveValue('');
+    expect(password).toHaveValue('');
+    expect(mfa).toHaveValue('');
+    expect(approval).not.toBeChecked();
   });
 
   it('binds requests to the visible provider and can remove its stored key', async () => {
@@ -85,8 +110,10 @@ describe('AiAssistantSection', () => {
       content: 'Answer',
       citations: [],
       provider: 'openai',
+      requested_model: 'gpt-test',
       model: 'gpt-test',
       prompt_version: 'chat-2026-09-16-v1',
+      finish_reason: 'completed',
       created_at: '2026-09-16T00:00:00Z',
     });
     vi.mocked(disconnectAiProvider).mockResolvedValue();
@@ -111,5 +138,28 @@ describe('AiAssistantSection', () => {
     await waitFor(() => {
       expect(disconnectAiProvider).toHaveBeenCalledWith('openai');
     });
+  });
+
+  it('keeps emergency key revocation available when generation is disabled', async () => {
+    vi.mocked(listAiProviderConnections).mockResolvedValue([
+      {
+        provider: 'anthropic',
+        key_hint: '…9876',
+        selected_model: 'claude-approved',
+        last_verified_at: '2026-09-16T00:00:00Z',
+        data_processing_acknowledged_at: '2026-09-16T00:00:00Z',
+        acknowledgement_version: '2026-09-16-v1',
+      },
+    ]);
+    vi.mocked(listCaseAiChats).mockRejectedValue(new Error('AI assistant is disabled'));
+    vi.mocked(getAiProviderModels).mockRejectedValue(new Error('AI assistant is disabled'));
+    vi.mocked(disconnectAiProvider).mockResolvedValue();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<AiAssistantSection workspace={mockCaseWorkspace} onWorkspaceRefresh={async () => {}} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Disconnect provider' }));
+
+    expect(disconnectAiProvider).toHaveBeenCalledWith('anthropic');
   });
 });
