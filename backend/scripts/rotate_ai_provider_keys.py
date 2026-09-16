@@ -7,7 +7,13 @@ instance and worker uses the new key, then remove the previous key.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from sqlalchemy import text
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.db.session import SessionLocal
 from app.services.ai_credentials import decrypt_provider_key, encrypt_provider_key

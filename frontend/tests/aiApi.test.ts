@@ -9,8 +9,10 @@ describe('AI API request controls', () => {
   });
 
   it('sends an explicit provider and idempotency key for chat', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return new Response(
         JSON.stringify({
           id: 'message-1',
           role: 'assistant',
@@ -22,8 +24,8 @@ describe('AI API request controls', () => {
           created_at: '2026-09-16T00:00:00Z',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     await sendAiChatMessage(
@@ -44,8 +46,10 @@ describe('AI API request controls', () => {
   });
 
   it('sends provider provenance and idempotency for form drafts', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return new Response(
         JSON.stringify({
           id: 'draft-1',
           source_document_id: 'document-1',
@@ -65,8 +69,8 @@ describe('AI API request controls', () => {
           created_at: '2026-09-16T00:00:00Z',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
-    );
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     await createAiFormDraft(
