@@ -8,7 +8,12 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.routes import ai
-from app.schemas.ai import AiFormDraftCreateRequest, AiProviderConnectRequest
+from app.schemas.ai import (
+    AiChatMessageCreateRequest,
+    AiFormDraftCreateRequest,
+    AiProviderConnectRequest,
+)
+from app.services.ai_providers import AiCompletion
 from tests.support import FakeResult
 
 
@@ -435,6 +440,102 @@ def test_failed_usage_attempt_is_persisted_for_rate_and_monitoring():
     db.commit.assert_called_once()
 
 
+def test_chat_request_uses_explicit_provider_and_records_provenance(
+    monkeypatch, make_auth_context
+):
+    auth = make_auth_context(roles=["lawyer"])
+    chat_id = uuid4()
+    case_id = uuid4()
+    client_id = uuid4()
+    document_id = uuid4()
+    usage_id = uuid4()
+    created_at = datetime.now(timezone.utc)
+    citation = ai.AiCitation(
+        source_id="D1",
+        case_document_id=document_id,
+        document_name="Passport",
+        page_number=1,
+        excerpt="Expiry 2030-01-01",
+    )
+    provider_connection = MagicMock(
+        return_value={
+            "provider": "anthropic",
+            "encrypted_api_key": "ciphertext",
+            "selected_model": "claude-approved",
+        }
+    )
+    finish_usage = MagicMock()
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(),
+        FakeResult(),
+        FakeResult(
+            rows=[
+                {
+                    "id": uuid4(),
+                    "role": "assistant",
+                    "content": "Expiry 2030-01-01 [D1]",
+                    "citations": [citation.model_dump(mode="json")],
+                    "provider": "anthropic",
+                    "model": "claude-approved",
+                    "prompt_version": ai._CHAT_PROMPT_VERSION,
+                    "created_at": created_at,
+                }
+            ]
+        ),
+        FakeResult(),
+    ]
+    monkeypatch.setattr(
+        ai,
+        "_owned_chat",
+        lambda *args, **kwargs: {"case_id": case_id, "client_id": client_id},
+    )
+    monkeypatch.setattr(ai, "_provider_connection", provider_connection)
+    monkeypatch.setattr(ai, "decrypt_provider_key", lambda value: "provider-key")
+    monkeypatch.setattr(
+        ai,
+        "_build_case_context",
+        lambda *args, **kwargs: ("context", [citation], {"D1": citation.excerpt}),
+    )
+    monkeypatch.setattr(ai, "_reserve_ai_usage", lambda *args, **kwargs: usage_id)
+    monkeypatch.setattr(
+        ai,
+        "complete",
+        lambda **kwargs: AiCompletion(
+            content="Expiry 2030-01-01 [D1]",
+            input_tokens=20,
+            output_tokens=8,
+        ),
+    )
+    monkeypatch.setattr(ai, "_finish_ai_usage", finish_usage)
+    monkeypatch.setattr(ai, "log_activity", MagicMock())
+
+    result = ai.send_message(
+        chat_id=chat_id,
+        payload=AiChatMessageCreateRequest(
+            content="What is the passport expiry?",
+            provider="anthropic",
+        ),
+        idempotency_key="chat-request-1234",
+        auth=auth,
+        db=db,
+    )
+
+    assert result.provider == "anthropic"
+    assert result.model == "claude-approved"
+    assert result.prompt_version == ai._CHAT_PROMPT_VERSION
+    assert result.citations[0].source_id == "D1"
+    assert provider_connection.call_args.args[2] == "anthropic"
+    finish_usage.assert_called_once_with(
+        db,
+        usage_id,
+        status_value="completed",
+        input_tokens=20,
+        output_tokens=8,
+    )
+    db.commit.assert_called_once()
+
+
 def test_chat_delete_is_blocked_by_cited_legal_hold(monkeypatch, make_auth_context):
     auth = make_auth_context(roles=["lawyer"])
     chat_id = uuid4()
@@ -579,6 +680,17 @@ def test_form_template_hash_allowlist_fails_closed(monkeypatch):
     assert ai._approved_form_sha256(approved_payload) == approved_hash
     with pytest.raises(HTTPException) as exc:
         ai._approved_form_sha256(b"different revision")
+
+    assert exc.value.status_code == 422
+
+
+def test_form_field_schema_has_bounded_prompt_size(monkeypatch):
+    monkeypatch.setattr(ai, "_MAX_FORM_SCHEMA_CHARS", 10)
+
+    with pytest.raises(HTTPException) as exc:
+        ai._serialized_form_fields(
+            {"LongFieldName": {"type": "/Tx", "options": []}}
+        )
 
     assert exc.value.status_code == 422
 
