@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 const apiOrigin = new URL(
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 ).origin;
+const developmentScriptPolicy =
+  process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -11,7 +13,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${developmentScriptPolicy}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob: https:",
