@@ -1,7 +1,7 @@
 """add legal AI provider, retrieval, chat, and form draft records
 
 Revision ID: f26a4d9c8e10
-Revises: d94f13a8b6e5
+Revises: e15f8a2c7b91
 Create Date: 2026-09-15 23:55:00.000000
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "f26a4d9c8e10"
-down_revision: Union[str, Sequence[str], None] = "d94f13a8b6e5"
+down_revision: Union[str, Sequence[str], None] = "e15f8a2c7b91"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

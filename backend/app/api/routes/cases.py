@@ -1683,6 +1683,7 @@ def get_case_workspace_by_number(
                 cd.uploaded_at,
                 cd.expiry_date,
                 cd.file_name,
+                cd.scan_status,
                 cd.description AS client_note
             FROM document_suites ds
             LEFT JOIN document_templates dt ON dt.suite_id = ds.id AND dt.is_active = TRUE
@@ -1693,6 +1694,7 @@ def get_case_workspace_by_number(
                     cdx.uploaded_at,
                     cdx.expiry_date,
                     cdx.file_name,
+                    cdx.scan_status,
                     cdx.description
                 FROM case_documents cdx
                 WHERE
@@ -1756,7 +1758,10 @@ def get_case_workspace_by_number(
                         if document_row["latest_case_document_id"]
                         else None
                     ),
-                    can_download=document_row["latest_case_document_id"] is not None,
+                    can_download=(
+                        document_row["latest_case_document_id"] is not None
+                        and document_row["scan_status"] == "clean"
+                    ),
                 )
             )
 
@@ -1775,6 +1780,7 @@ def get_case_workspace_by_number(
                         uploaded_at,
                         expiry_date,
                         file_name,
+                        scan_status,
                         description AS client_note
                     FROM case_documents
                     WHERE case_id = :case_id
@@ -1796,6 +1802,7 @@ def get_case_workspace_by_number(
                 uploaded_at,
                 expiry_date,
                 file_name,
+                scan_status,
                 description AS client_note
             FROM case_documents
             WHERE
@@ -1836,7 +1843,7 @@ def get_case_workspace_by_number(
                 rejection_note=rejection_notes.get(custom_document_id),
                 file_name=custom_document_row["file_name"],
                 latest_case_document_id=custom_document_id,
-                can_download=True,
+                can_download=custom_document_row["scan_status"] == "clean",
             )
         )
 
@@ -1898,7 +1905,10 @@ def get_case_workspace_by_number(
                 rejection_note=rejection_notes.get(custom_document_id),
                 file_name=bound_file_name,
                 latest_case_document_id=str(bound_case_document["id"]) if bound_case_document else None,
-                can_download=bound_case_document is not None,
+                can_download=(
+                    bound_case_document is not None
+                    and bound_case_document["scan_status"] == "clean"
+                ),
             )
         )
 
@@ -3260,6 +3270,8 @@ def get_case_document_download_url(
     case_document = slot["bound_case_document"]
     if case_document is None:
         raise HTTPException(status_code=404, detail="No uploaded file is available for this document")
+    if str(case_document.get("scan_status") or "clean") != "clean":
+        raise HTTPException(status_code=409, detail="Document security scan is not complete")
 
     try:
         download_url = create_presigned_force_download(

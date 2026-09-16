@@ -564,6 +564,40 @@ export type AiFormDraft = {
   created_at: string;
 };
 
+export type InvoiceCreateInput = {
+  due_date: string;
+  tax_rate: number;
+  notes?: string | null;
+  terms?: string | null;
+  items: Array<{
+    description: string;
+    quantity: number;
+    unit_price: number;
+    category?: string | null;
+  }>;
+};
+
+export type Invoice = {
+  id: string;
+  invoice_number: string;
+  status: string;
+  subtotal: number | string;
+  tax_rate: number | string;
+  tax_amount: number | string;
+  total_amount: number | string;
+  amount_paid: number | string;
+  amount_due: number | string;
+  currency: string;
+  issue_date: string;
+  due_date: string;
+};
+
+export type CheckoutSession = {
+  payment_id: string;
+  checkout_url: string;
+  expires_at: string;
+};
+
 export type AuthLoginInput = {
   organization_slug: string;
   email: string;
@@ -1364,6 +1398,34 @@ export async function createAiFormDraft(
         source_document_id: sourceDocumentId,
         instructions: instructions ?? null,
       }),
+    }
+  );
+}
+
+export async function createCaseInvoice(
+  caseNumber: string,
+  payload: InvoiceCreateInput,
+  idempotencyKey: string
+): Promise<Invoice> {
+  return requestJson<Invoice>(
+    `/api/v1/billing/cases/${encodeURIComponent(caseNumber)}/invoices`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function createInvoiceCheckoutSession(
+  invoiceId: string,
+  idempotencyKey: string
+): Promise<CheckoutSession> {
+  return requestJson<CheckoutSession>(
+    `/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}/checkout-session`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
     }
   );
 }

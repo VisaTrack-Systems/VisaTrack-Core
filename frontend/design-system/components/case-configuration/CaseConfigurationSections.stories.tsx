@@ -93,6 +93,9 @@ export const Documents: Story = {
       renamingDocumentId={null}
       onDownloadDocument={async () => {}}
       downloadingDocumentId={null}
+      onUploadDocument={async () => {}}
+      onAddRetainer={async () => {}}
+      uploadingDocumentId={null}
       onViewDocument={async () => {}}
       viewingDocumentId={null}
       onUpdateDocumentStatus={updateDocumentStatus}
@@ -151,7 +154,7 @@ export const Timeline: Story = {
 };
 
 export const Payments: Story = {
-  render: () => <PaymentsSection workspace={mockCaseWorkspace} />,
+  render: () => <PaymentsSection workspace={mockCaseWorkspace} onInvoiceCreated={async () => {}} />,
 };
 
 export const Reminders: Story = {
