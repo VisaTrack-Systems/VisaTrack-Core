@@ -47,7 +47,9 @@ Provider privacy is contractual, not guaranteed merely by using an API key:
 - [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data)
   state that eligible customers may obtain Zero Data Retention (ZDR), with endpoint and
   feature limitations. This design uses stateless requests with `store=false` and does
-  not create provider-hosted files, threads, or vector stores.
+  not create provider-hosted files, threads, or vector stores. `store=false` disables
+  Responses application-state storage; it does **not** by itself disable provider abuse
+  monitoring retention or establish ZDR.
 - [Anthropic API retention](https://docs.anthropic.com/en/docs/build-with-claude/zero-data-retention)
   states that ZDR is an organization-level arrangement for qualified customers. Model
   and feature exceptions may apply.
@@ -93,16 +95,16 @@ server-side request forgery.
 
 | Threat | Control |
 | --- | --- |
-| Cross-tenant/client disclosure | Every query binds organization, case, lawyer assignment, and chat owner |
+| Cross-tenant/client disclosure | Every query binds organization, case, lawyer assignment, and chat owner; rollout is organization-allowlisted |
 | Quarantined document exposure | Indexing requires `scan_status='clean'`; downloads use existing clean gate |
-| Prompt injection in documents | Document text is delimited as untrusted evidence; it cannot define tools or instructions |
+| Prompt injection in documents | Document/template text is escaped and delimited as untrusted evidence; the model has no tools or mutation authority; red-team testing remains required |
 | Hallucinated facts | Source labels/page citations, explicit uncertainty instruction, retrieved context only |
 | Provider credential theft | Dedicated Fernet key, write-only API, masked display, revocation/delete endpoint |
 | Provider retention/training | Firm acknowledgement, stateless APIs, OpenAI `store=false`, no provider file/vector stores |
-| Excessive disclosure/cost | Local retrieval, bounded chunks/history/output, fixed providers, request timeout |
+| Excessive disclosure/cost | Matching chunks only, query-selected structured fields, bounded context/output, fixed providers, atomic attempt quota |
 | Unauthorized mutation | `ai:use` permission plus legal-staff role; chat has no write tools; form generation is a separate explicit endpoint |
 | Form corruption or silent submission | AcroForm-only support, output marked draft, unresolved fields and field-level evidence returned, no submit/sign action |
-| Document deletion/legal hold | Chunks reference case documents with cascading deletion; form drafts are auditable case artifacts |
+| Document deletion/legal hold | Final storage purge deletes extracted chunks and derived drafts; cited legal holds block derived-draft purge |
 
 Document text and model output remain untrusted content. Rendering uses ordinary React
 text nodes, not raw HTML.
@@ -115,10 +117,13 @@ text nodes, not raw HTML.
   approval acknowledgement, and last verification time.
 - `ai_chats`: organization/case/creator-bound conversation metadata.
 - `ai_chat_messages`: user/assistant messages, citations, model/provider, and token
-  usage where returned.
+  usage where returned, plus the prompt-policy version used.
 - `ai_document_chunks`: page-aware extracted text tied to a clean `case_document`.
 - `ai_form_drafts`: immutable source document reference, generated clean S3 key,
-  populated-field evidence, unresolved fields, model/provider, and creator.
+  source hash, populated-field evidence, citations, unresolved fields, model/provider,
+  prompt-policy version, and creator.
+- `ai_usage_events`: atomic, idempotent request reservations, completion state, model,
+  and token counts without prompt content.
 
 ### Retrieval
 
@@ -133,20 +138,23 @@ model, residency, deletion, and re-indexing policy is approved.
 - Anthropic Messages API
 
 Model discovery calls each provider's model-list endpoint using the stored credential.
-Chat and form-draft requests use the strongest available general-purpose model for that
-key by default (newer major versions first, then Opus/pro/max ahead of Sonnet/mini/haiku,
-then undated aliases ahead of dated snapshots). A lawyer may pin a specific model when
-the technically strongest option is not approved for the firm's ZDR eligibility,
-processing-region, latency, or cost policy. There is no
+The ranking is a recommendation based on model naming and recency, not an objective
+capability or privacy guarantee. The top recommendation is pinned when a key is
+connected. VisaTrack never silently replaces a pinned model: retirement requires an
+explicit lawyer selection, preserving the firm's ZDR, processing-region, latency, and
+cost decision. Production discovery is intersected with an operator-managed exact-model
+allowlist, and each AI request names the provider explicitly. There is no
 arbitrary OpenAI-compatible endpoint in the MVP.
 
 ### Form drafts
 
 The lawyer uploads an official PDF into the existing quarantine/scanning flow or
 selects a clean PDF already attached to the case. VisaTrack reads AcroForm
-field names, asks the selected model for a strict field mapping grounded in case
-context, discards unknown field names, fills a copied PDF, stores it under the clean
-derived-artifact prefix, and returns unresolved fields plus a short-lived download URL.
+field names, verifies the exact template SHA-256 against the deployment allowlist, asks
+the selected model for a strict field mapping grounded in case context, discards
+unknown or unsupported values, fills a copied PDF, stores it under the clean
+derived-artifact prefix, and returns every unfilled field plus a short-lived download
+URL. Form drafting has a separate feature flag from chat.
 
 ## Delivery phases
 

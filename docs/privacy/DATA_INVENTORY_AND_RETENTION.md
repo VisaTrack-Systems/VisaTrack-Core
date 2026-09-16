@@ -12,7 +12,7 @@ must approve purposes, lawful bases, notices, residency, and retention periods.
 | Authentication | sessions, MFA recovery hashes, login events | High | short operational/security period |
 | Audit/security | activity, document access, immutable archive | High | approved compliance period |
 | Support | bug reports and screenshots | Potentially very high | triage resolution plus short support period |
-| Legal AI | encrypted provider credentials, chat messages, retrieved document text, form drafts | Very high | case/chat deletion plus approved matter-record period |
+| Legal AI | encrypted provider credentials, chat messages, retrieved document text, form drafts, provider/model/token usage metadata | Very high | approved matter-record period; extracted text and derived forms purge with their eligible source; chats follow separate hold/retention decision |
 | Backups | RDS snapshots, S3 versions | Same as source | backup lifecycle and legal holds |
 
 ## Subprocessors requiring contractual review
@@ -47,3 +47,6 @@ Before production, attach:
 - completed access/deletion exercise using synthetic data
 
 Engineering must not claim compliance until these approvals and exercises exist.
+
+For the AI-specific lifecycle, provider disclosure, legal-hold behavior, and synthetic
+deletion exercise, see [`../ai/PRODUCTION_READINESS.md`](../ai/PRODUCTION_READINESS.md).

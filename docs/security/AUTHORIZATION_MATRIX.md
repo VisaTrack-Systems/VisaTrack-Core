@@ -14,8 +14,8 @@ and never grant access.
 | Grant/revoke `super_admin` | denied | denied | denied | allowed with audit event |
 | Apply/release legal hold | denied | denied | own organization | permitted platform scope |
 | View trust/financial records | explicitly related/visible only | assigned scope | own organization | permitted platform scope |
-| Use case AI/chat | denied | `ai:use` + assigned/created case + own provider key | `ai:use` + own organization + own provider key | permitted platform scope + own provider key |
-| Generate AI PDF draft | denied | assigned/created case + clean source PDF | own organization + clean source PDF | clean source PDF |
+| Use case AI/chat | denied | AI enabled + `ai:use` + assigned/created case + explicit own provider | AI enabled + `ai:use` + own organization + explicit own provider | AI enabled + permitted platform scope + explicit own provider |
+| Generate AI PDF draft | denied | separate form flag + assigned/created case + clean approved-hash PDF | separate form flag + own organization + clean approved-hash PDF | separate form flag + clean approved-hash PDF |
 
 ## Mandatory policy rules
 
@@ -30,6 +30,8 @@ and never grant access.
    result, and correlation ID.
 8. AI conversations are private to their creator, use only the selected case, and cannot
    call mutation or submission tools.
+9. Provider/model selection is explicit and pinned; retired models fail closed.
+10. Production provider-key creation requires password reauthentication and MFA.
 
 ## Required negative tests
 
