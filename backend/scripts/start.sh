@@ -9,11 +9,13 @@ cd "$(dirname "$0")/.."
 port="${PORT:-8000}"
 forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 
-if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+# Opt-in: the baseline revision creates tables unconditionally, so a database
+# that already has the schema must be stamped before migrating on boot.
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     echo "startup: applying alembic migrations"
     alembic upgrade head
 else
-    echo "startup: skipping alembic migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS})"
+    echo "startup: skipping alembic migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS:-false})"
 fi
 
 echo "startup: serving app.main:app on 0.0.0.0:${port}"

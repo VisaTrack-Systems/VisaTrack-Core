@@ -5,7 +5,7 @@ service reads its configuration from the `railway.json` in its root directory.
 
 | Service | Root directory | Config | Health check |
 | --- | --- | --- | --- |
-| API | `backend` | [backend/railway.json](../../backend/railway.json) | `/health/ready` |
+| API | `backend` | [backend/railway.json](../../backend/railway.json) | `/health/live` |
 | Worker | `backend` | same image, custom start command `python -m app.workers.main` | none |
 | Web | `frontend` | [frontend/railway.json](../../frontend/railway.json) | `/` |
 
@@ -38,10 +38,9 @@ never answered there. The three causes to rule out, in order:
 2. **The process exited.** `Settings.validate_security()` refuses to start outside
    `development`, `local`, and `test` when required variables are missing, and lists all of
    them in one error. Check the deploy logs for `Invalid configuration for APP_ENV=`.
-3. **The database is unreachable.** The start script runs `alembic upgrade head` before
-   serving, and `/health/ready` executes `SELECT 1`. Both fail when `DATABASE_URL` is
-   missing, points at the public proxy from inside the private network, or the Postgres
-   service is not attached.
+3. **The health-check path is not served.** The rollout gate is `/health/live`, which never
+   touches the database, so a managed-database hiccup cannot fail a deploy. `/health/ready`
+   executes `SELECT 1` and belongs in monitoring instead of the rollout gate.
 
 ## Required API variables
 
@@ -62,8 +61,19 @@ Reference the Postgres service instead of pasting credentials:
 | `RESEND_API_KEY` | transactional email key |
 | `FORWARDED_ALLOW_IPS` | `*` so audit logs record the client IP from Railway's proxy instead of the proxy itself |
 
-Optional: `RUN_MIGRATIONS=false` on any replica that must not apply migrations. Keep it
-enabled on exactly one service so schema changes ship with the deployment.
+### Migrations on boot
+
+`RUN_MIGRATIONS` defaults to `false`. The baseline revision runs the `Database/*.sql`
+files, which use plain `CREATE TABLE`, so `alembic upgrade head` fails against a database
+that already has the schema but no `alembic_version` table. Stamp such a database once
+from a machine that can reach it:
+
+```bash
+cd backend && alembic stamp head
+```
+
+Then set `RUN_MIGRATIONS=true` on exactly one service so later schema changes ship with
+the deployment.
 
 ## Typical gap against a live API service
 

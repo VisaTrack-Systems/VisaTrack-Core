@@ -34,7 +34,12 @@ def test_start_script_applies_migrations_before_serving():
     script = START_SCRIPT.read_text(encoding="utf-8")
 
     assert script.index("alembic upgrade head") < script.index("exec uvicorn")
-    assert 'RUN_MIGRATIONS:-true' in script
+
+
+def test_migrations_are_opt_in():
+    script = START_SCRIPT.read_text(encoding="utf-8")
+
+    assert '"${RUN_MIGRATIONS:-false}" = "true"' in script
 
 
 def test_dockerfile_runs_start_script():
@@ -44,12 +49,12 @@ def test_dockerfile_runs_start_script():
     assert "--port" not in dockerfile
 
 
-def test_railway_config_health_check_covers_dependencies():
+def test_railway_config_gates_rollout_on_process_liveness():
     config = json.loads(RAILWAY_CONFIG.read_text(encoding="utf-8"))
 
     assert config["build"]["builder"] == "DOCKERFILE"
     assert config["build"]["dockerfilePath"] == "Dockerfile"
-    assert config["deploy"]["healthcheckPath"] == "/health/ready"
+    assert config["deploy"]["healthcheckPath"] == "/health/live"
     assert config["deploy"]["healthcheckTimeout"] >= 60
 
 
