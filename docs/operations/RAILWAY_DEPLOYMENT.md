@@ -75,6 +75,13 @@ cd backend && alembic stamp head
 Then set `RUN_MIGRATIONS=true` on exactly one service so later schema changes ship with
 the deployment.
 
+Login depends on this: `POST /api/v1/auth/login` writes a row to `user_sessions` and reads
+`users.token_version`, both added after the baseline. A database still on the baseline
+schema answers login with a `500`, so a deployment that passes its health check can still
+fail every sign-in until the pending revisions are applied. All revisions after the
+baseline guard their statements with `IF EXISTS`/`IF NOT EXISTS` or create new tables, so
+`alembic upgrade head` is safe to run once the baseline is stamped.
+
 ## Typical gap against a live API service
 
 These are already enough for the API to talk to storage, mail, and Postgres. They are not
