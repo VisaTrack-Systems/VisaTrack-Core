@@ -84,6 +84,36 @@ date, evidence link, and approval decision.
 | Provider retention/training | Not enforceable by application code; contract, account settings, allowlist, and evidence remain launch gates |
 | Stacked Stripe checkout completion race | Outside PR #178's diff; PR #176 must prevent a late checkout response from downgrading a completed payment |
 
+## Remaining engineering gates before real client data
+
+- Run PDF/DOCX parsing in a resource-limited subprocess/container and maintain malformed,
+  decompression-bomb, and active-content corpora.
+- Add real HTTP tests over migrated PostgreSQL with deterministic S3/provider fakes,
+  including 100-way idempotency/quota/turn concurrency and failure injection.
+- Add an organization-admin policy record and UI for approved providers/models, approver,
+  evidence version, expiry, and user assignment; deployment allowlists are a fail-safe,
+  not the final governance interface.
+- Implement per-organization token/currency/concurrency budgets and tested provider-side
+  hard spend limits. Request-count limits alone are not a financial control.
+- Implement privacy access/export/correction/deletion execution across AI tables, S3,
+  provider copies, logs, and backups. The current privacy-request record is not execution.
+- Add metrics, dashboards, thresholds, paging ownership, and alert-delivery tests for
+  provider latency/status, tokens/spend, quota denials, stale usage/turns/jobs, parser
+  failures, indexing coverage, orphan cleanup, and audit-export lag.
+- Add a durable object-finalization/orphan-reconciliation worker and replay completed
+  idempotent responses rather than returning only a duplicate conflict.
+- Add extraction manifests for truncation, omitted image pages, source version, and
+  extractor coverage; show pending/partial/stale index state to the lawyer.
+- Add a form registry with official form number, language, revision, URL, hash, field
+  schema, Adobe evidence, and supersession notifications. A hash allowlist alone does
+  not detect a newly issued official revision.
+- Add frontend capability-driven navigation, cancellation, quota-reset display, review
+  controls, and authenticated AI accessibility/end-to-end coverage.
+- Run CodeQL, SBOM/license, secret, and container-image scans on the final stacked diff,
+  and test inside the same Python 3.12 runtime image used in production.
+- Replace destructive schema downgrade with the documented forward-fix/PITR strategy
+  and test populated upgrade, mixed-version deploy, restore, and rollback drills.
+
 ## Risks that remain after code controls
 
 ### Provider processing
