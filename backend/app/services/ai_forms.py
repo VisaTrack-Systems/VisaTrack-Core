@@ -55,13 +55,17 @@ def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
             "No supported AcroForm fields were found in this PDF"
         )
 
+    widget_fields = _widget_fields(reader)
     result: dict[str, dict[str, Any]] = {}
     for name, details in fields.items():
         if not isinstance(name, str) or not name.strip():
             continue
-        field_type = str(details.get("/FT") or "")
-        current_value = str(details.get("/V") or "")[:500]
-        field_flags = _optional_positive_int(details.get("/Ff")) or 0
+        widget = widget_fields.get(name) or details
+        field_type = str(details.get("/FT") or widget.get("/FT") or "")
+        current_value = str(details.get("/V") or widget.get("/V") or "")[:500]
+        field_flags = _optional_positive_int(
+            widget.get("/Ff", details.get("/Ff"))
+        ) or 0
         if field_type == "/Sig" and current_value:
             raise UnsupportedPdfFormError(
                 "Signed PDFs cannot be used as AI form templates"
@@ -72,11 +76,26 @@ def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
             "read_only": bool(field_flags & 1),
             "required": bool(field_flags & 2),
             "multi_select": bool(field_flags & (1 << 21)),
-            "max_length": _optional_positive_int(details.get("/MaxLen")),
-            "options": _field_options(details.get("/Opt")),
+            "max_length": _optional_positive_int(
+                widget.get("/MaxLen", details.get("/MaxLen"))
+            ),
+            "options": _field_options(widget.get("/Opt", details.get("/Opt"))),
         }
     if not result:
         raise UnsupportedPdfFormError("No named fields were found in this PDF")
+    return result
+
+
+def _widget_fields(reader: PdfReader) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for page in reader.pages:
+        for reference in page.get("/Annots") or []:
+            field = reference.get_object()
+            while field.get("/Parent"):
+                field = field["/Parent"].get_object()
+            name = str(field.get("/T") or "")
+            if name:
+                result[name] = field
     return result
 
 
