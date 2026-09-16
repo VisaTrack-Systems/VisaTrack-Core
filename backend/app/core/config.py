@@ -4,12 +4,20 @@ Handles APP_NAME, APP_VERSION, database URIs, and environment-specific configura
 
 import os
 from pathlib import Path
+from uuid import UUID
 
 from dotenv import load_dotenv
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(REPO_ROOT / ".env")
+
+
+def _is_canonical_uuid(value: str) -> bool:
+    try:
+        return str(UUID(value)) == value
+    except ValueError:
+        return False
 
 
 class Settings:
@@ -63,12 +71,41 @@ class Settings:
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
     ai_provider_encryption_key: str = os.getenv("AI_PROVIDER_ENCRYPTION_KEY", "")
+    ai_provider_encryption_key_previous: tuple[str, ...] = tuple(
+        key.strip()
+        for key in os.getenv("AI_PROVIDER_ENCRYPTION_KEY_PREVIOUS", "").split(",")
+        if key.strip()
+    )
     ai_enabled: bool = os.getenv("AI_ENABLED", "false").lower() == "true"
+    ai_enabled_organization_ids: set[str] = {
+        value.strip().lower()
+        for value in os.getenv("AI_ENABLED_ORGANIZATION_IDS", "").split(",")
+        if value.strip()
+    }
+    ai_allowed_models: set[str] = {
+        value.strip()
+        for value in os.getenv("AI_ALLOWED_MODELS", "").split(",")
+        if value.strip()
+    }
+    ai_form_drafts_enabled: bool = os.getenv(
+        "AI_FORM_DRAFTS_ENABLED", "false"
+    ).lower() == "true"
+    ai_require_mfa_for_keys: bool = os.getenv(
+        "AI_REQUIRE_MFA_FOR_KEYS",
+        "false" if app_env.strip().lower() in {"development", "local", "test"} else "true",
+    ).lower() == "true"
     ai_request_timeout_seconds: float = float(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
     ai_max_document_chars: int = int(os.getenv("AI_MAX_DOCUMENT_CHARS", "500000"))
     ai_max_context_chunks: int = int(os.getenv("AI_MAX_CONTEXT_CHUNKS", "8"))
     ai_max_history_messages: int = int(os.getenv("AI_MAX_HISTORY_MESSAGES", "12"))
+    ai_max_history_chars: int = int(os.getenv("AI_MAX_HISTORY_CHARS", "40000"))
     ai_max_requests_per_hour: int = int(os.getenv("AI_MAX_REQUESTS_PER_HOUR", "60"))
+    ai_max_reindex_documents: int = int(os.getenv("AI_MAX_REINDEX_DOCUMENTS", "100"))
+    ai_approved_form_sha256: set[str] = {
+        digest.strip().lower()
+        for digest in os.getenv("AI_APPROVED_FORM_SHA256", "").split(",")
+        if digest.strip()
+    }
     stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
     stripe_webhook_secret: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     stripe_currency: str = os.getenv("STRIPE_CURRENCY", "cad").strip().lower()
@@ -97,11 +134,82 @@ class Settings:
 
         if self.ai_enabled and (
             not self.ai_provider_encryption_key
+            or len(self.ai_provider_encryption_key.encode("utf-8")) < 32
             or self.ai_provider_encryption_key in {self.auth_secret_key, self.mfa_encryption_key}
         ):
             raise RuntimeError(
                 "AI_PROVIDER_ENCRYPTION_KEY must be configured independently of authentication keys"
             )
+
+        if self.ai_enabled and (
+            self.ai_provider_encryption_key in self.ai_provider_encryption_key_previous
+            or len(set(self.ai_provider_encryption_key_previous))
+            != len(self.ai_provider_encryption_key_previous)
+            or any(
+                len(key.encode("utf-8")) < 32
+                or key in {self.auth_secret_key, self.mfa_encryption_key}
+                for key in self.ai_provider_encryption_key_previous
+            )
+        ):
+            raise RuntimeError(
+                "AI_PROVIDER_ENCRYPTION_KEY_PREVIOUS contains duplicate or reused keys"
+            )
+
+        if self.ai_enabled and not self.ai_require_mfa_for_keys:
+            raise RuntimeError(
+                "AI_REQUIRE_MFA_FOR_KEYS must be true outside local environments"
+            )
+
+        if self.ai_enabled and not self.ai_enabled_organization_ids:
+            raise RuntimeError(
+                "AI_ENABLED_ORGANIZATION_IDS must explicitly scope production AI access"
+            )
+
+        if self.ai_enabled and not self.ai_allowed_models:
+            raise RuntimeError(
+                "AI_ALLOWED_MODELS must explicitly list production-approved models"
+            )
+
+        if any(
+            ":" not in value
+            or value.split(":", 1)[0] not in {"openai", "anthropic"}
+            or not value.split(":", 1)[1]
+            for value in self.ai_allowed_models
+        ):
+            raise RuntimeError("AI_ALLOWED_MODELS contains an invalid provider:model entry")
+
+        if any(
+            value != "*" and not _is_canonical_uuid(value)
+            for value in self.ai_enabled_organization_ids
+        ):
+            raise RuntimeError("AI_ENABLED_ORGANIZATION_IDS contains an invalid UUID")
+
+        if self.ai_form_drafts_enabled and not self.ai_enabled:
+            raise RuntimeError("AI_FORM_DRAFTS_ENABLED requires AI_ENABLED")
+
+        if self.ai_form_drafts_enabled and not self.ai_approved_form_sha256:
+            raise RuntimeError(
+                "AI_APPROVED_FORM_SHA256 must contain approved template hashes "
+                "when AI form drafts are enabled"
+            )
+
+        if any(
+            len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+            for digest in self.ai_approved_form_sha256
+        ):
+            raise RuntimeError("AI_APPROVED_FORM_SHA256 contains an invalid SHA-256 digest")
+
+        if self.ai_enabled and (
+            self.ai_request_timeout_seconds <= 0
+            or self.ai_max_document_chars <= 0
+            or not 1 <= self.ai_max_context_chunks <= 50
+            or not 1 <= self.ai_max_history_messages <= 50
+            or not 1000 <= self.ai_max_history_chars <= 500000
+            or not 1 <= self.ai_max_requests_per_hour <= 1000
+            or not 1 <= self.ai_max_reindex_documents <= 1000
+        ):
+            raise RuntimeError("AI numeric limits are outside supported production bounds")
 
         if not self.auth_cookie_secure:
             raise RuntimeError("AUTH_COOKIE_SECURE must be true outside local environments")
@@ -138,6 +246,25 @@ class Settings:
             origins = sorted(set(origins) | localhost_aliases)
 
         return origins
+
+    def ai_enabled_for_organization(self, organization_id: object) -> bool:
+        if not self.ai_enabled:
+            return False
+        if not self.ai_enabled_organization_ids:
+            return True
+        return (
+            "*"
+            in self.ai_enabled_organization_ids
+            or str(organization_id).lower() in self.ai_enabled_organization_ids
+        )
+
+    def allowed_ai_models_for(self, provider: str) -> set[str]:
+        prefix = f"{provider.strip().lower()}:"
+        return {
+            value[len(prefix) :]
+            for value in self.ai_allowed_models
+            if value.startswith(prefix)
+        }
 
 
 settings = Settings()

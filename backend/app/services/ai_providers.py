@@ -20,6 +20,10 @@ class AiProviderError(RuntimeError):
     pass
 
 
+class AiModelUnavailableError(AiProviderError):
+    pass
+
+
 @dataclass(frozen=True)
 class AiCompletion:
     content: str
@@ -49,6 +53,8 @@ def list_provider_models(provider: str, api_key: str) -> list[str]:
                 raise AiProviderError("Unsupported AI provider")
             response.raise_for_status()
             payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Provider model response was not an object")
     except (httpx.HTTPError, ValueError) as exc:
         raise AiProviderError("AI provider rejected the connection or could not be reached") from exc
 
@@ -75,9 +81,13 @@ def list_provider_models(provider: str, api_key: str) -> list[str]:
                     "transcribe",
                     "tts",
                     "codex",
+                    "computer-use",
+                    "deep-research",
                     "embed",
+                    "guard",
                     "moderation",
                     "instruct",
+                    "safety",
                     "whisper",
                     "dall-e",
                     "davinci",
@@ -91,6 +101,13 @@ def list_provider_models(provider: str, api_key: str) -> list[str]:
             (model_id, created)
             for model_id, created in models
             if model_id.startswith("claude-")
+        ]
+    if settings.ai_allowed_models:
+        allowed_models = settings.allowed_ai_models_for(normalized)
+        models = [
+            (model_id, created)
+            for model_id, created in models
+            if model_id in allowed_models
         ]
     return [
         model_id
@@ -111,9 +128,13 @@ def resolve_completion_model(
     if not models:
         raise AiProviderError("Provider returned no available models")
     pinned = (selected_model or "").strip()
-    if pinned and pinned in models:
+    if not pinned:
+        raise AiModelUnavailableError("Select an approved model before sending case data")
+    if pinned in models:
         return models, pinned
-    return models, models[0]
+    raise AiModelUnavailableError(
+        "The selected model is no longer available; review and select an approved model"
+    )
 
 
 def complete(
@@ -140,7 +161,7 @@ def complete(
                         "store": False,
                     },
                 )
-                response.raise_for_status()
+                _raise_completion_status(response)
                 return _parse_openai(response.json())
             if normalized == "anthropic":
                 response = client.post(
@@ -156,14 +177,29 @@ def complete(
                         "max_tokens": max_output_tokens,
                     },
                 )
-                response.raise_for_status()
+                _raise_completion_status(response)
                 return _parse_anthropic(response.json())
             raise AiProviderError("Unsupported AI provider")
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         raise AiProviderError("AI provider request failed") from exc
 
 
+def _raise_completion_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        detail = response.text.casefold()
+        if response.status_code in {400, 403, 404} and "model" in detail:
+            raise AiModelUnavailableError(
+                "The selected model is unavailable or no longer permitted; "
+                "review and select an approved model"
+            ) from exc
+        raise
+
+
 def _parse_openai(payload: dict[str, Any]) -> AiCompletion:
+    if not isinstance(payload, dict):
+        raise AiProviderError("AI provider returned an invalid response")
     content = str(payload.get("output_text") or "").strip()
     if not content:
         parts: list[str] = []
@@ -185,6 +221,8 @@ def _parse_openai(payload: dict[str, Any]) -> AiCompletion:
 
 
 def _parse_anthropic(payload: dict[str, Any]) -> AiCompletion:
+    if not isinstance(payload, dict):
+        raise AiProviderError("AI provider returned an invalid response")
     content = "\n".join(
         str(item.get("text") or "")
         for item in payload.get("content", [])

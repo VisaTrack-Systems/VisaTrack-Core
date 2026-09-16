@@ -9,6 +9,8 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.annotations import FreeText
 
 SUPPORTED_FIELD_TYPES = {"/Tx", "/Ch"}
+MAX_FORM_BYTES = 15 * 1024 * 1024
+MAX_FORM_PAGES = 100
 
 
 class UnsupportedPdfFormError(ValueError):
@@ -16,14 +18,32 @@ class UnsupportedPdfFormError(ValueError):
 
 
 def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
+    if len(payload) > MAX_FORM_BYTES:
+        raise UnsupportedPdfFormError(
+            f"PDF form exceeds the {MAX_FORM_BYTES // (1024 * 1024)} MB processing limit"
+        )
     try:
         reader = PdfReader(BytesIO(payload), strict=False)
-        root = reader.trailer["/Root"]
-        acroform = root.get("/AcroForm")
-        if acroform and acroform.get_object().get("/XFA"):
+        if len(reader.pages) > MAX_FORM_PAGES:
             raise UnsupportedPdfFormError(
-                "XFA forms are not supported; complete this form in Adobe Acrobat Reader"
+                f"PDF form exceeds the {MAX_FORM_PAGES}-page processing limit"
             )
+        root = reader.trailer["/Root"]
+        if root.get("/Perms"):
+            raise UnsupportedPdfFormError(
+                "PDFs with certification or usage-rights signatures cannot be modified"
+            )
+        acroform = root.get("/AcroForm")
+        if acroform:
+            resolved_acroform = acroform.get_object()
+            if resolved_acroform.get("/XFA"):
+                raise UnsupportedPdfFormError(
+                    "XFA forms are not supported; complete this form in Adobe Acrobat Reader"
+                )
+            if int(resolved_acroform.get("/SigFlags") or 0):
+                raise UnsupportedPdfFormError(
+                    "PDFs containing signature controls cannot be modified safely"
+                )
         fields = reader.get_fields() or {}
     except UnsupportedPdfFormError:
         raise
@@ -47,14 +67,22 @@ def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
         result[name] = {
             "type": field_type,
             "current_value": current_value,
-            "options": [
-                str(option)[:200]
-                for option in (details.get("/Opt") or [])
-            ][:100],
+            "options": _field_options(details.get("/Opt")),
         }
     if not result:
         raise UnsupportedPdfFormError("No named fields were found in this PDF")
     return result
+
+
+def _field_options(raw_options: Any) -> list[str]:
+    options: list[str] = []
+    for option in raw_options or []:
+        if isinstance(option, (list, tuple)):
+            if option:
+                options.append(str(option[0])[:200])
+        else:
+            options.append(str(option)[:200])
+    return options[:100]
 
 
 def fill_acroform(payload: bytes, values: dict[str, str]) -> bytes:

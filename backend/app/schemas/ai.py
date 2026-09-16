@@ -21,7 +21,7 @@ class AiProviderConnectRequest(BaseModel):
 
 
 class AiProviderSelectModelRequest(BaseModel):
-    selected_model: str | None = Field(default=None, max_length=200)
+    selected_model: str = Field(min_length=1, max_length=200)
 
 
 class AiProviderConnectionResponse(BaseModel):
@@ -30,6 +30,7 @@ class AiProviderConnectionResponse(BaseModel):
     selected_model: str | None
     last_verified_at: datetime | None
     data_processing_acknowledged_at: datetime
+    acknowledgement_version: str
 
 
 class AiProviderModelsResponse(BaseModel):
@@ -37,6 +38,7 @@ class AiProviderModelsResponse(BaseModel):
     models: list[str]
     selected_model: str | None
     recommended_model: str | None
+    form_drafts_enabled: bool
 
 
 class AiChatCreateRequest(BaseModel):
@@ -58,6 +60,7 @@ class AiChatMessageResponse(BaseModel):
     citations: list[AiCitation] = Field(default_factory=list)
     provider: AiProvider | None = None
     model: str | None = None
+    prompt_version: str | None = None
     created_at: datetime
 
 
@@ -72,6 +75,7 @@ class AiChatResponse(BaseModel):
 
 class AiChatMessageCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=12000)
+    provider: AiProvider
 
 
 class AiIndexResponse(BaseModel):
@@ -80,6 +84,7 @@ class AiIndexResponse(BaseModel):
 
 class AiFormDraftCreateRequest(BaseModel):
     source_document_id: UUID
+    provider: AiProvider
     instructions: str | None = Field(default=None, max_length=2000)
 
 
@@ -94,8 +99,13 @@ class AiFormDraftResponse(BaseModel):
     file_name: str
     download_url: str
     expires_in_seconds: int
+    provider: AiProvider
+    model: str
+    prompt_version: str
+    source_sha256: str
     populated_fields: list[str]
     unresolved_fields: list[str]
+    unsupported_fields: list[str]
     field_evidence: dict[str, AiFormFieldEvidence]
     citations: list[AiCitation]
     warning: str

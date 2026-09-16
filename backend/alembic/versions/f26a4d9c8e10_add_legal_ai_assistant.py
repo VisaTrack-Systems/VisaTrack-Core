@@ -38,6 +38,7 @@ def upgrade() -> None:
         sa.Column("key_hint", sa.String(length=20), nullable=False),
         sa.Column("selected_model", sa.String(length=200)),
         sa.Column("data_processing_acknowledged_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("acknowledgement_version", sa.String(length=50), nullable=False),
         sa.Column("last_verified_at", sa.DateTime(timezone=True)),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
@@ -69,6 +70,7 @@ def upgrade() -> None:
         sa.Column("citations", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
         sa.Column("provider", sa.String(length=30)),
         sa.Column("model", sa.String(length=200)),
+        sa.Column("prompt_version", sa.String(length=50)),
         sa.Column("input_tokens", sa.Integer()),
         sa.Column("output_tokens", sa.Integer()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
@@ -105,18 +107,56 @@ def upgrade() -> None:
         sa.Column("created_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("provider", sa.String(length=30), nullable=False),
         sa.Column("model", sa.String(length=200), nullable=False),
+        sa.Column("prompt_version", sa.String(length=50), nullable=False),
+        sa.Column("source_sha256", sa.String(length=64), nullable=False),
         sa.Column("file_name", sa.String(length=255), nullable=False),
         sa.Column("file_path", sa.String(length=500), nullable=False),
         sa.Column("field_values", postgresql.JSONB(), nullable=False),
+        sa.Column("citations", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
         sa.Column("unresolved_fields", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column("unsupported_fields", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
         sa.Column("status", sa.String(length=30), nullable=False, server_default="draft"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.CheckConstraint("status IN ('draft', 'reviewed', 'superseded')", name="ck_ai_form_drafts_status"),
     )
     op.create_index("idx_ai_form_drafts_case_created", "ai_form_drafts", ["case_id", "created_at"])
 
+    op.create_table(
+        "ai_usage_events",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column("organization_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("case_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("cases.id", ondelete="SET NULL")),
+        sa.Column("request_type", sa.String(length=30), nullable=False),
+        sa.Column("idempotency_key_hash", sa.String(length=64), nullable=False),
+        sa.Column("status", sa.String(length=30), nullable=False, server_default="started"),
+        sa.Column("provider", sa.String(length=30), nullable=False),
+        sa.Column("model", sa.String(length=200), nullable=False),
+        sa.Column("input_tokens", sa.Integer()),
+        sa.Column("output_tokens", sa.Integer()),
+        sa.Column("error_code", sa.String(length=100)),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("completed_at", sa.DateTime(timezone=True)),
+        sa.CheckConstraint("request_type IN ('chat', 'form_draft')", name="ck_ai_usage_events_request_type"),
+        sa.CheckConstraint("status IN ('started', 'completed', 'failed')", name="ck_ai_usage_events_status"),
+        sa.CheckConstraint("input_tokens IS NULL OR input_tokens >= 0", name="ck_ai_usage_events_input_tokens"),
+        sa.CheckConstraint("output_tokens IS NULL OR output_tokens >= 0", name="ck_ai_usage_events_output_tokens"),
+        sa.UniqueConstraint(
+            "organization_id",
+            "user_id",
+            "idempotency_key_hash",
+            name="uq_ai_usage_events_idempotency",
+        ),
+    )
+    op.create_index(
+        "idx_ai_usage_events_org_user_created",
+        "ai_usage_events",
+        ["organization_id", "user_id", "created_at"],
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("ai_usage_events")
     op.drop_table("ai_form_drafts")
     op.drop_table("ai_document_chunks")
     op.drop_table("ai_chat_messages")

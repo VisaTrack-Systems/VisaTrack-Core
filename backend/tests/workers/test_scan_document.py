@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import zipfile
+from unittest.mock import MagicMock
+from uuid import uuid4
 
+import pytest
+
+from app.workers import scan_document
 from app.workers.scan_document import _matches_declared_type
+from tests.support import FakeResult
 
 
 def test_magic_byte_validation_rejects_spoofed_pdf(tmp_path):
@@ -37,3 +43,53 @@ def test_docx_requires_office_package_structure(tmp_path):
     content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     assert _matches_declared_type(valid, content_type) is True
     assert _matches_declared_type(invalid, content_type) is False
+
+
+@pytest.mark.parametrize(
+    "ai_enabled, organization_allowed, expected_jobs",
+    [(False, True, 0), (True, False, 0), (True, True, 1)],
+)
+def test_clean_scan_only_queues_ai_index_when_feature_enabled(
+    monkeypatch, ai_enabled, organization_allowed, expected_jobs
+):
+    document_id = uuid4()
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(
+            rows=[
+                {
+                    "id": document_id,
+                    "case_id": uuid4(),
+                    "file_path": "quarantine/org/case/document.pdf",
+                    "file_type": "application/pdf",
+                    "scan_status": "pending",
+                    "organization_id": uuid4(),
+                    "client_id": uuid4(),
+                }
+            ]
+        ),
+        FakeResult(),
+        FakeResult(),
+    ]
+
+    def download_pdf(*, object_key, destination):
+        destination.write(b"%PDF-1.7\n")
+        destination.seek(0)
+
+    enqueue = MagicMock()
+    monkeypatch.setattr(scan_document.settings, "ai_enabled", ai_enabled)
+    monkeypatch.setattr(
+        scan_document.settings,
+        "ai_enabled_for_organization",
+        lambda organization_id: ai_enabled and organization_allowed,
+    )
+    monkeypatch.setattr(scan_document, "download_object", download_pdf)
+    monkeypatch.setattr(scan_document, "_scan", lambda path: (True, "clean", "test"))
+    monkeypatch.setattr(scan_document, "copy_object", MagicMock())
+    monkeypatch.setattr(scan_document, "delete_object", MagicMock())
+    monkeypatch.setattr(scan_document, "log_activity", MagicMock())
+    monkeypatch.setattr(scan_document, "enqueue_job", enqueue)
+
+    scan_document.scan_document(db, {"document_id": str(document_id)})
+
+    assert enqueue.call_count == expected_jobs

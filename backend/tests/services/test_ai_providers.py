@@ -1,5 +1,12 @@
+import pytest
+
 from app.services import ai_providers
-from app.services.ai_providers import _model_score, _parse_anthropic, _parse_openai
+from app.services.ai_providers import (
+    AiModelUnavailableError,
+    _model_score,
+    _parse_anthropic,
+    _parse_openai,
+)
 
 
 def test_parse_openai_stateless_response():
@@ -26,6 +33,15 @@ def test_parse_anthropic_text_blocks():
         }
     )
     assert result.content == "First\nSecond"
+
+
+@pytest.mark.parametrize(
+    "parser",
+    [_parse_openai, _parse_anthropic],
+)
+def test_provider_parsers_reject_non_object_payloads(parser):
+    with pytest.raises(ai_providers.AiProviderError, match="invalid response"):
+        parser([])  # type: ignore[arg-type]
 
 
 def test_model_ranking_prefers_strong_tier_before_recency():
@@ -71,6 +87,7 @@ def test_model_discovery_recommends_strong_general_model(monkeypatch):
                     {"id": "gpt-5.4-pro", "created": 90},
                     {"id": "gpt-5.4", "created": 80},
                     {"id": "gpt-audio", "created": 600},
+                    {"id": "o3-deep-research", "created": 650},
                     {"id": "text-embedding-3-large", "created": 700},
                 ]
             }
@@ -95,27 +112,35 @@ def test_model_discovery_recommends_strong_general_model(monkeypatch):
     assert models[0] == "gpt-5.4-pro"
     assert models[1] == "gpt-5.4"
     assert "gpt-audio" not in models
+    assert "o3-deep-research" not in models
     assert "text-embedding-3-large" not in models
 
+    monkeypatch.setattr(
+        ai_providers.settings,
+        "ai_allowed_models",
+        {"openai:gpt-5.4"},
+    )
+    assert ai_providers.list_provider_models("openai", "sk-test") == ["gpt-5.4"]
 
-def test_resolve_completion_model_uses_recommended_unless_pinned(monkeypatch):
+
+def test_resolve_completion_model_requires_available_pin(monkeypatch):
     monkeypatch.setattr(
         ai_providers,
         "list_provider_models",
         lambda provider, key: ["gpt-5.4-pro", "gpt-5.4", "gpt-5.4-mini"],
     )
 
-    _, auto = ai_providers.resolve_completion_model("openai", "sk-test", None)
-    _, stale = ai_providers.resolve_completion_model(
-        "openai", "sk-test", "gpt-retired"
-    )
     _, pinned = ai_providers.resolve_completion_model(
         "openai", "sk-test", "gpt-5.4-mini"
     )
 
-    assert auto == "gpt-5.4-pro"
-    assert stale == "gpt-5.4-pro"
     assert pinned == "gpt-5.4-mini"
+    with pytest.raises(AiModelUnavailableError, match="Select an approved model"):
+        ai_providers.resolve_completion_model("openai", "sk-test", None)
+    with pytest.raises(AiModelUnavailableError, match="no longer available"):
+        ai_providers.resolve_completion_model(
+            "openai", "sk-test", "gpt-retired"
+        )
 
 
 def test_openai_completion_forces_stateless_request(monkeypatch):
@@ -153,3 +178,34 @@ def test_openai_completion_forces_stateless_request(monkeypatch):
     )
 
     assert captured["store"] is False
+
+
+def test_completion_maps_retired_model_to_fail_closed_error(monkeypatch):
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, **kwargs):
+            request = ai_providers.httpx.Request("POST", url)
+            return ai_providers.httpx.Response(
+                404,
+                request=request,
+                json={"error": {"message": "model was not found"}},
+            )
+
+    monkeypatch.setattr(ai_providers.httpx, "Client", Client)
+
+    with pytest.raises(AiModelUnavailableError, match="selected model"):
+        ai_providers.complete(
+            provider="openai",
+            api_key="sk-test",
+            model="gpt-retired",
+            system="System",
+            messages=[{"role": "user", "content": "Question"}],
+        )

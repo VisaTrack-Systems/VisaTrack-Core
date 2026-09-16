@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+from zipfile import ZipFile
 
 from docx import Document
 from pypdf import PdfReader
@@ -11,6 +12,8 @@ from pypdf import PdfReader
 from app.core.config import settings
 
 MAX_PDF_PAGES = 250
+MAX_OFFICE_ENTRIES = 5000
+MAX_OFFICE_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 CHUNK_CHARS = 1400
 CHUNK_OVERLAP = 180
 
@@ -72,12 +75,22 @@ def _extract_pdf(payload: bytes) -> list[tuple[int, str]]:
 
 def _extract_docx(payload: bytes) -> str:
     try:
+        with ZipFile(BytesIO(payload)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_OFFICE_ENTRIES:
+                raise DocumentExtractionError("DOCX archive contains too many entries")
+            if sum(entry.file_size for entry in entries) > MAX_OFFICE_UNCOMPRESSED_BYTES:
+                raise DocumentExtractionError(
+                    "DOCX archive exceeds the uncompressed processing limit"
+                )
         document = Document(BytesIO(payload))
         return "\n".join(
             paragraph.text
             for paragraph in document.paragraphs
             if paragraph.text.strip()
         )
+    except DocumentExtractionError:
+        raise
     except Exception as exc:
         raise DocumentExtractionError("DOCX text extraction failed") from exc
 

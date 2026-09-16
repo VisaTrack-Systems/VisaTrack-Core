@@ -173,13 +173,14 @@ def scan_document(db: Session, payload: dict) -> None:
                 client_id=document["client_id"],
                 new_values={"scan_engine": "ClamAV"},
             )
-            enqueue_job(
-                db,
-                organization_id=document["organization_id"],
-                job_type="index_ai_document",
-                idempotency_key=f"index-ai-document:{document_id}",
-                payload={"document_id": str(document_id)},
-            )
+            if settings.ai_enabled_for_organization(document["organization_id"]):
+                enqueue_job(
+                    db,
+                    organization_id=document["organization_id"],
+                    job_type="index_ai_document",
+                    idempotency_key=f"index-ai-document:{document_id}",
+                    payload={"document_id": str(document_id)},
+                )
             db.commit()
         except Exception as exc:
             db.rollback()

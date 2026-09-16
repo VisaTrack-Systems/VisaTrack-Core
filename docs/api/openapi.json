@@ -778,10 +778,19 @@
             "minLength": 1,
             "title": "Content",
             "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
           }
         },
         "required": [
-          "content"
+          "content",
+          "provider"
         ],
         "title": "AiChatMessageCreateRequest",
         "type": "object"
@@ -819,6 +828,17 @@
               }
             ],
             "title": "Model"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
           },
           "provider": {
             "anyOf": [
@@ -952,6 +972,14 @@
             ],
             "title": "Instructions"
           },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
           "source_document_id": {
             "format": "uuid",
             "title": "Source Document Id",
@@ -959,7 +987,8 @@
           }
         },
         "required": [
-          "source_document_id"
+          "source_document_id",
+          "provider"
         ],
         "title": "AiFormDraftCreateRequest",
         "type": "object"
@@ -1002,12 +1031,28 @@
             "title": "Id",
             "type": "string"
           },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
           "populated_fields": {
             "items": {
               "type": "string"
             },
             "title": "Populated Fields",
             "type": "array"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
           },
           "source_document_id": {
             "anyOf": [
@@ -1021,11 +1066,22 @@
             ],
             "title": "Source Document Id"
           },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          },
           "unresolved_fields": {
             "items": {
               "type": "string"
             },
             "title": "Unresolved Fields",
+            "type": "array"
+          },
+          "unsupported_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Fields",
             "type": "array"
           },
           "warning": {
@@ -1039,8 +1095,13 @@
           "file_name",
           "download_url",
           "expires_in_seconds",
+          "provider",
+          "model",
+          "prompt_version",
+          "source_sha256",
           "populated_fields",
           "unresolved_fields",
+          "unsupported_fields",
           "field_evidence",
           "citations",
           "warning",
@@ -1147,6 +1208,10 @@
       },
       "AiProviderConnectionResponse": {
         "properties": {
+          "acknowledgement_version": {
+            "title": "Acknowledgement Version",
+            "type": "string"
+          },
           "data_processing_acknowledged_at": {
             "format": "date-time",
             "title": "Data Processing Acknowledged At",
@@ -1193,13 +1258,18 @@
           "key_hint",
           "selected_model",
           "last_verified_at",
-          "data_processing_acknowledged_at"
+          "data_processing_acknowledged_at",
+          "acknowledgement_version"
         ],
         "title": "AiProviderConnectionResponse",
         "type": "object"
       },
       "AiProviderModelsResponse": {
         "properties": {
+          "form_drafts_enabled": {
+            "title": "Form Drafts Enabled",
+            "type": "boolean"
+          },
           "models": {
             "items": {
               "type": "string"
@@ -1242,7 +1312,8 @@
           "provider",
           "models",
           "selected_model",
-          "recommended_model"
+          "recommended_model",
+          "form_drafts_enabled"
         ],
         "title": "AiProviderModelsResponse",
         "type": "object"
@@ -1250,18 +1321,15 @@
       "AiProviderSelectModelRequest": {
         "properties": {
           "selected_model": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selected Model"
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Selected Model",
+            "type": "string"
           }
         },
+        "required": [
+          "selected_model"
+        ],
         "title": "AiProviderSelectModelRequest",
         "type": "object"
       },
@@ -5854,6 +5922,15 @@
               "title": "Case Number",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -6044,6 +6121,15 @@
             "schema": {
               "format": "uuid",
               "title": "Chat Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
               "type": "string"
             }
           }

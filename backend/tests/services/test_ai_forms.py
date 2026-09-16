@@ -13,6 +13,7 @@ from pypdf.generic import (
 
 from app.services.ai_forms import (
     UnsupportedPdfFormError,
+    _field_options,
     fill_acroform,
     inspect_acroform,
 )
@@ -62,3 +63,27 @@ def test_named_acroform_field_is_filled_in_review_copy():
     assert inspect_acroform(draft)["ClientName"]["current_value"] == "Jane Doe"
     assert inspect_acroform(draft)["ClientName"]["options"] == []
     assert len(PdfReader(BytesIO(draft)).pages[0]["/Annots"]) == 2
+
+
+def test_certified_pdf_is_rejected_before_modification():
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer._root_object[NameObject("/Perms")] = DictionaryObject(
+        {NameObject("/DocMDP"): DictionaryObject()}
+    )
+    output = BytesIO()
+    writer.write(output)
+
+    with pytest.raises(UnsupportedPdfFormError, match="signatures"):
+        inspect_acroform(output.getvalue())
+
+
+def test_form_size_limit_is_enforced_before_parsing(monkeypatch):
+    monkeypatch.setattr("app.services.ai_forms.MAX_FORM_BYTES", 4)
+
+    with pytest.raises(UnsupportedPdfFormError, match="processing limit"):
+        inspect_acroform(b"12345")
+
+
+def test_choice_options_use_export_value_from_display_pairs():
+    assert _field_options([["CA", "Canada"], "Other"]) == ["CA", "Other"]
