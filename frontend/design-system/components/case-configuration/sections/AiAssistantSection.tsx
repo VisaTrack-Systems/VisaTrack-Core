@@ -16,6 +16,7 @@ import {
   completeCaseDocumentUpload,
   deleteAiChat,
   getAiChat,
+  getCaseDocumentViewUrl,
   getAiProviderModels,
   indexCaseForAi,
   initiateCaseDocumentUpload,
@@ -35,6 +36,8 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   const [connections, setConnections] = useState<AiProviderConnection[]>([]);
   const [provider, setProvider] = useState<AiProvider>('openai');
   const [apiKey, setApiKey] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
   const [approved, setApproved] = useState(false);
   const [models, setModels] = useState<AiProviderModels | null>(null);
   const [chats, setChats] = useState<AiChat[]>([]);
@@ -45,6 +48,8 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   const [formResult, setFormResult] = useState<{
     warning: string;
     unresolved: string[];
+    evidence: Record<string, { value: string; sources: string[] }>;
+    citations: Array<{ source_id: string; case_document_id: string; document_name: string; page_number: number | null }>;
   } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,12 +112,16 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         provider,
         api_key: apiKey,
         data_processing_acknowledged: approved,
+        current_password: currentPassword,
+        mfa_code: mfaCode.trim() || null,
       });
       setConnections((current) => [
         ...current.filter((item) => item.provider !== saved.provider),
         saved,
       ]);
       setApiKey('');
+      setCurrentPassword('');
+      setMfaCode('');
       setModels(await getAiProviderModels(provider));
       setNotice(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} connected.`);
     } catch (requestError) {
@@ -235,12 +244,29 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       setFormResult({
         warning: draft.warning,
         unresolved: draft.unresolved_fields,
+        evidence: draft.field_evidence,
+        citations: draft.citations,
       });
     } catch (requestError) {
       popup?.close();
       setError(requestError instanceof Error ? requestError.message : 'Form draft failed');
     } finally {
       setBusy(null);
+    }
+  };
+
+  const openSource = async (documentId: string) => {
+    const popup = window.open('', '_blank');
+    try {
+      const source = await getCaseDocumentViewUrl(caseNumber, documentId);
+      if (popup && !popup.closed) {
+        popup.location.href = source.view_url;
+      } else {
+        window.location.assign(source.view_url);
+      }
+    } catch (requestError) {
+      popup?.close();
+      setError(requestError instanceof Error ? requestError.message : 'Could not open source document');
     }
   };
 
@@ -354,6 +380,32 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
+          <div>
+            <label htmlFor="ai-current-password" className="block text-sm font-medium text-gray-700">
+              Current VisaTrack password
+            </label>
+            <input
+              id="ai-current-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="ai-mfa-code" className="block text-sm font-medium text-gray-700">
+              MFA code (required when MFA is enabled)
+            </label>
+            <input
+              id="ai-mfa-code"
+              autoComplete="one-time-code"
+              value={mfaCode}
+              onChange={(event) => setMfaCode(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
           <label className="flex items-start gap-2 text-sm text-gray-700 md:col-span-2">
             <input
               type="checkbox"
@@ -439,7 +491,13 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                   <ul className="mt-2 space-y-2">
                     {message.citations.map((citation) => (
                       <li key={`${message.id}-${citation.source_id}`}>
-                        <strong>{citation.source_id}</strong> · {citation.document_name}
+                        <button
+                          type="button"
+                          className="font-semibold text-blue-800 underline"
+                          onClick={() => void openSource(citation.case_document_id)}
+                        >
+                          {citation.source_id} · {citation.document_name}
+                        </button>
                         {citation.page_number ? ` · page ${citation.page_number}` : ''}
                         <p className="mt-1 text-gray-600">{citation.excerpt}</p>
                       </li>
@@ -527,6 +585,37 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             <p>{formResult.warning}</p>
             {formResult.unresolved.length > 0 ? (
               <p className="mt-2">Unresolved fields: {formResult.unresolved.join(', ')}</p>
+            ) : null}
+            {Object.keys(formResult.evidence).length > 0 ? (
+              <details className="mt-3">
+                <summary className="cursor-pointer font-medium">
+                  Populated field evidence ({Object.keys(formResult.evidence).length})
+                </summary>
+                <dl className="mt-2 space-y-2">
+                  {Object.entries(formResult.evidence).map(([field, evidence]) => (
+                    <div key={field}>
+                      <dt className="font-medium">{field}</dt>
+                      <dd>{evidence.value} · Sources: {evidence.sources.join(', ')}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {formResult.citations.length > 0 ? (
+                  <ul className="mt-3 space-y-1">
+                    {formResult.citations.map((citation) => (
+                      <li key={citation.source_id}>
+                        <button
+                          type="button"
+                          className="font-medium underline"
+                          onClick={() => void openSource(citation.case_document_id)}
+                        >
+                          {citation.source_id}: {citation.document_name}
+                        </button>
+                        {citation.page_number ? `, page ${citation.page_number}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </details>
             ) : null}
           </div>
         ) : null}

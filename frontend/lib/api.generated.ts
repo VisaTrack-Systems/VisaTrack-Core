@@ -1740,6 +1740,8 @@ export interface components {
         };
         /** AiFormDraftResponse */
         AiFormDraftResponse: {
+            /** Citations */
+            citations: components["schemas"]["AiCitation"][];
             /**
              * Created At
              * Format: date-time
@@ -1749,6 +1751,10 @@ export interface components {
             download_url: string;
             /** Expires In Seconds */
             expires_in_seconds: number;
+            /** Field Evidence */
+            field_evidence: {
+                [key: string]: components["schemas"]["AiFormFieldEvidence"];
+            };
             /** File Name */
             file_name: string;
             /**
@@ -1765,6 +1771,13 @@ export interface components {
             /** Warning */
             warning: string;
         };
+        /** AiFormFieldEvidence */
+        AiFormFieldEvidence: {
+            /** Sources */
+            sources: string[];
+            /** Value */
+            value: string;
+        };
         /** AiIndexResponse */
         AiIndexResponse: {
             /** Queued Documents */
@@ -1774,8 +1787,12 @@ export interface components {
         AiProviderConnectRequest: {
             /** Api Key */
             api_key: string;
+            /** Current Password */
+            current_password: string;
             /** Data Processing Acknowledged */
             data_processing_acknowledged: boolean;
+            /** Mfa Code */
+            mfa_code?: string | null;
             /**
              * Provider
              * @enum {string}

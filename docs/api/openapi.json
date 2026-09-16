@@ -966,6 +966,13 @@
       },
       "AiFormDraftResponse": {
         "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AiCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -978,6 +985,13 @@
           "expires_in_seconds": {
             "title": "Expires In Seconds",
             "type": "integer"
+          },
+          "field_evidence": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AiFormFieldEvidence"
+            },
+            "title": "Field Evidence",
+            "type": "object"
           },
           "file_name": {
             "title": "File Name",
@@ -1027,10 +1041,33 @@
           "expires_in_seconds",
           "populated_fields",
           "unresolved_fields",
+          "field_evidence",
+          "citations",
           "warning",
           "created_at"
         ],
         "title": "AiFormDraftResponse",
+        "type": "object"
+      },
+      "AiFormFieldEvidence": {
+        "properties": {
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "sources"
+        ],
+        "title": "AiFormFieldEvidence",
         "type": "object"
       },
       "AiIndexResponse": {
@@ -1054,9 +1091,28 @@
             "title": "Api Key",
             "type": "string"
           },
+          "current_password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
           "data_processing_acknowledged": {
             "title": "Data Processing Acknowledged",
             "type": "boolean"
+          },
+          "mfa_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfa Code"
           },
           "provider": {
             "enum": [
@@ -1083,7 +1139,8 @@
         "required": [
           "provider",
           "api_key",
-          "data_processing_acknowledged"
+          "data_processing_acknowledged",
+          "current_password"
         ],
         "title": "AiProviderConnectRequest",
         "type": "object"

@@ -19,11 +19,34 @@ def test_connect_provider_requires_data_processing_approval(make_auth_context):
                 provider="openai",
                 api_key="sk-test-provider-key",
                 data_processing_acknowledged=False,
+                current_password="current-password",
             ),
             auth=make_auth_context(roles=["lawyer"]),
             db=MagicMock(),
         )
     assert exc.value.status_code == 400
+
+
+def test_ai_access_requires_legal_role_and_explicit_permission(monkeypatch, make_auth_context):
+    monkeypatch.setattr(ai.settings, "ai_enabled", True)
+    with pytest.raises(HTTPException):
+        ai.require_ai_access(make_auth_context(roles=["lawyer"], permissions=set()))
+    with pytest.raises(HTTPException):
+        ai.require_ai_access(
+            make_auth_context(roles=["client"], permissions={"ai:use"})
+        )
+
+    allowed = make_auth_context(roles=["lawyer"], permissions={"ai:use"})
+    assert ai.require_ai_access(allowed) is allowed
+
+
+def test_ai_access_fails_closed_when_feature_is_disabled(monkeypatch, make_auth_context):
+    monkeypatch.setattr(ai.settings, "ai_enabled", False)
+    with pytest.raises(HTTPException) as exc:
+        ai.require_ai_access(
+            make_auth_context(roles=["lawyer"], permissions={"ai:use"})
+        )
+    assert exc.value.status_code == 503
 
 
 def test_connect_provider_verifies_and_never_returns_key(monkeypatch, make_auth_context):
@@ -46,6 +69,7 @@ def test_connect_provider_verifies_and_never_returns_key(monkeypatch, make_auth_
     ]
     monkeypatch.setattr(ai, "list_provider_models", lambda provider, key: ["gpt-test"])
     monkeypatch.setattr(ai, "encrypt_provider_key", lambda key: "ciphertext")
+    monkeypatch.setattr(ai, "verify_password", lambda password, hashed: True)
 
     result = ai.connect_provider(
         payload=AiProviderConnectRequest(
@@ -53,6 +77,7 @@ def test_connect_provider_verifies_and_never_returns_key(monkeypatch, make_auth_
             api_key="sk-secret-value-1234",
             selected_model="gpt-test",
             data_processing_acknowledged=True,
+            current_password="current-password",
         ),
         auth=auth,
         db=db,
@@ -63,6 +88,31 @@ def test_connect_provider_verifies_and_never_returns_key(monkeypatch, make_auth_
     insert_params = db.execute.call_args_list[0].args[1]
     assert insert_params["encrypted_api_key"] == "ciphertext"
     assert "sk-secret-value-1234" not in str(result)
+
+
+def test_connect_provider_reauthenticates_mfa_user(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=["lawyer"])
+    auth.user.mfa_enabled = True
+    provider_call = MagicMock()
+    monkeypatch.setattr(ai, "verify_password", lambda password, hashed: True)
+    monkeypatch.setattr(ai, "verify_user_mfa", lambda db, user, code: False)
+    monkeypatch.setattr(ai, "list_provider_models", provider_call)
+
+    with pytest.raises(HTTPException) as exc:
+        ai.connect_provider(
+            payload=AiProviderConnectRequest(
+                provider="anthropic",
+                api_key="sk-ant-provider-secret",
+                data_processing_acknowledged=True,
+                current_password="current-password",
+                mfa_code="000000",
+            ),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
+    provider_call.assert_not_called()
 
 
 def test_case_access_hides_another_lawyers_case(make_auth_context):
@@ -104,6 +154,26 @@ def test_usage_limit_returns_retry_after(make_auth_context):
 
     assert exc.value.status_code == 429
     assert exc.value.headers == {"Retry-After": "3600"}
+
+
+def test_chat_delete_is_blocked_by_cited_legal_hold(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=["lawyer"])
+    chat_id = uuid4()
+    monkeypatch.setattr(
+        ai,
+        "_owned_chat",
+        lambda *args, **kwargs: {
+            "case_id": uuid4(),
+            "client_id": uuid4(),
+        },
+    )
+    db = MagicMock()
+    db.execute.return_value = FakeResult(scalar_value=1)
+
+    with pytest.raises(HTTPException) as exc:
+        ai.delete_chat(chat_id=chat_id, auth=auth, db=db)
+
+    assert exc.value.status_code == 409
 
 
 def test_case_context_has_bounded_source_citations():

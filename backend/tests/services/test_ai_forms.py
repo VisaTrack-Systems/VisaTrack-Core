@@ -1,7 +1,7 @@
 from io import BytesIO
 
 import pytest
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 from pypdf.generic import (
     ArrayObject,
     BooleanObject,
@@ -61,3 +61,4 @@ def test_named_acroform_field_is_filled_in_review_copy():
 
     assert inspect_acroform(draft)["ClientName"]["current_value"] == "Jane Doe"
     assert inspect_acroform(draft)["ClientName"]["options"] == []
+    assert len(PdfReader(BytesIO(draft)).pages[0]["/Annots"]) == 2

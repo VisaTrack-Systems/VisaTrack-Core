@@ -4,6 +4,7 @@
 
 ```dotenv
 AI_PROVIDER_ENCRYPTION_KEY=<independent random secret>
+AI_ENABLED=false
 AI_REQUEST_TIMEOUT_SECONDS=60
 AI_MAX_DOCUMENT_CHARS=500000
 AI_MAX_CONTEXT_CHUNKS=8
@@ -15,6 +16,9 @@ AI_MAX_REQUESTS_PER_HOUR=60
 production secret manager: losing it makes stored BYOK credentials unreadable. Rotation
 requires a controlled decrypt/re-encrypt migration; changing it in place is not a
 rotation procedure.
+
+Keep `AI_ENABLED=false` through deployment and synthetic-case validation. Enable it
+only after the provider/privacy approvals and pilot controls below are recorded.
 
 The existing API and document worker deployments must run the same release. Apply
 Alembic migrations before starting the new worker code.
@@ -28,6 +32,10 @@ strongest full-size general-purpose model returned for that key. The lawyer must
 that recommendation when the model is not approved for the firm's retention, residency,
 cost, or latency requirements; “strongest” is a capability recommendation, not a privacy
 approval.
+
+Adding or replacing a provider key requires the current VisaTrack password and an MFA
+or recovery code when MFA is enabled. AI routes additionally require the `ai:use`
+permission on an active lawyer, organization-admin, or super-admin role.
 
 Before pilot use, the firm must:
 

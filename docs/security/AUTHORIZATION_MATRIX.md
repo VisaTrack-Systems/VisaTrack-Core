@@ -14,7 +14,7 @@ and never grant access.
 | Grant/revoke `super_admin` | denied | denied | denied | allowed with audit event |
 | Apply/release legal hold | denied | denied | own organization | permitted platform scope |
 | View trust/financial records | explicitly related/visible only | assigned scope | own organization | permitted platform scope |
-| Use case AI/chat | denied | assigned/created case + own provider key | own organization + own provider key | permitted platform scope + own provider key |
+| Use case AI/chat | denied | `ai:use` + assigned/created case + own provider key | `ai:use` + own organization + own provider key | permitted platform scope + own provider key |
 | Generate AI PDF draft | denied | assigned/created case + clean source PDF | own organization + clean source PDF | clean source PDF |
 
 ## Mandatory policy rules

@@ -13,6 +13,7 @@ vi.mock('@/lib/api', () => ({
     selected_model: 'gpt-test',
   })),
   getAiChat: vi.fn(),
+  getCaseDocumentViewUrl: vi.fn(),
   connectAiProvider: vi.fn(),
   selectAiProviderModel: vi.fn(),
   indexCaseForAi: vi.fn(),

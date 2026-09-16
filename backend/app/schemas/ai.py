@@ -16,6 +16,8 @@ class AiProviderConnectRequest(BaseModel):
     api_key: str = Field(min_length=16, max_length=500)
     selected_model: str | None = Field(default=None, min_length=1, max_length=200)
     data_processing_acknowledged: bool
+    current_password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)
 
 
 class AiProviderSelectModelRequest(BaseModel):
@@ -81,6 +83,11 @@ class AiFormDraftCreateRequest(BaseModel):
     instructions: str | None = Field(default=None, max_length=2000)
 
 
+class AiFormFieldEvidence(BaseModel):
+    value: str
+    sources: list[str]
+
+
 class AiFormDraftResponse(BaseModel):
     id: UUID
     source_document_id: UUID | None
@@ -89,5 +96,7 @@ class AiFormDraftResponse(BaseModel):
     expires_in_seconds: int
     populated_fields: list[str]
     unresolved_fields: list[str]
+    field_evidence: dict[str, AiFormFieldEvidence]
+    citations: list[AiCitation]
     warning: str
     created_at: datetime

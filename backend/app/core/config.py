@@ -63,6 +63,7 @@ class Settings:
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
     ai_provider_encryption_key: str = os.getenv("AI_PROVIDER_ENCRYPTION_KEY", "")
+    ai_enabled: bool = os.getenv("AI_ENABLED", "false").lower() == "true"
     ai_request_timeout_seconds: float = float(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
     ai_max_document_chars: int = int(os.getenv("AI_MAX_DOCUMENT_CHARS", "500000"))
     ai_max_context_chunks: int = int(os.getenv("AI_MAX_CONTEXT_CHUNKS", "8"))
@@ -94,7 +95,7 @@ class Settings:
                 "MFA_ENCRYPTION_KEY must be configured separately from AUTH_SECRET_KEY"
             )
 
-        if (
+        if self.ai_enabled and (
             not self.ai_provider_encryption_key
             or self.ai_provider_encryption_key in {self.auth_secret_key, self.mfa_encryption_key}
         ):

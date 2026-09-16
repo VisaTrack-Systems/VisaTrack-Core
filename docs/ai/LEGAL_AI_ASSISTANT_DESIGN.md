@@ -65,7 +65,8 @@ validation, and 2D barcodes:
 
 The MVP supports standard AcroForm text and choice fields. It rejects XFA-only,
 fieldless, and already-signed PDFs rather than flattening, forging, or corrupting them.
-A generated draft must be opened in current Adobe
+Every generated page carries a visible AI review-draft annotation. A generated draft
+must be opened in current Adobe
 Acrobat Reader, reviewed against source evidence, completed where unresolved, and
 validated using the form's official controls. VisaTrack does not generate IRCC
 barcodes or submit forms.
@@ -82,7 +83,8 @@ Lawyer browser
 S3 quarantine -> ClamAV worker -> S3 clean -> local text extraction worker
 ```
 
-Provider keys are encrypted with a dedicated application secret. They are never
+Provider keys are encrypted with a dedicated application secret and adding/replacing
+one requires the lawyer's current password plus MFA when enabled. They are never
 returned after creation, written to logs, included in audit payloads, or sent to the
 frontend. Model API hosts are fixed in code; users cannot provide a URL, preventing
 server-side request forgery.
@@ -98,8 +100,8 @@ server-side request forgery.
 | Provider credential theft | Dedicated Fernet key, write-only API, masked display, revocation/delete endpoint |
 | Provider retention/training | Firm acknowledgement, stateless APIs, OpenAI `store=false`, no provider file/vector stores |
 | Excessive disclosure/cost | Local retrieval, bounded chunks/history/output, fixed providers, request timeout |
-| Unauthorized mutation | Chat has no write tools; form generation is a separate explicit endpoint |
-| Form corruption or silent submission | AcroForm-only support, output marked draft, unresolved fields returned, no submit/sign action |
+| Unauthorized mutation | `ai:use` permission plus legal-staff role; chat has no write tools; form generation is a separate explicit endpoint |
+| Form corruption or silent submission | AcroForm-only support, output marked draft, unresolved fields and field-level evidence returned, no submit/sign action |
 | Document deletion/legal hold | Chunks reference case documents with cascading deletion; form drafts are auditable case artifacts |
 
 Document text and model output remain untrusted content. Rendering uses ordinary React

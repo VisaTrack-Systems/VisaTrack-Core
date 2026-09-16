@@ -12,9 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import AuthContext, require_roles
+from app.api.deps.auth import AuthContext, get_auth_context
 from app.core.config import settings
+from app.core.security import verify_password
 from app.db.deps import get_db
+from app.middleware.request_context import current_request_id
 from app.schemas.ai import (
     AiChatCreateRequest,
     AiChatMessageCreateRequest,
@@ -43,6 +45,7 @@ from app.services.ai_forms import (
 from app.services.ai_providers import AiProviderError, complete, list_provider_models
 from app.services.audit import log_activity
 from app.services.jobs import enqueue_job
+from app.services.mfa import verify_user_mfa
 from app.services.storage import (
     StorageConfigurationError,
     StorageOperationError,
@@ -58,6 +61,18 @@ _FORM_WARNING = (
     "fields, and run the official form validation in current Adobe Acrobat Reader. "
     "VisaTrack has not signed, validated, or submitted this form."
 )
+
+
+def require_ai_access(
+    auth: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    if not settings.ai_enabled:
+        raise HTTPException(status_code=503, detail="AI assistant is not enabled")
+    if auth.active_role not in _AI_ROLES:
+        raise HTTPException(status_code=403, detail="AI assistant is restricted to legal staff")
+    if "*" not in auth.permissions and "ai:use" not in auth.permissions:
+        raise HTTPException(status_code=403, detail="AI assistant permission is required")
+    return auth
 
 
 def _case_for_ai(case_number: str, auth: AuthContext, db: Session):
@@ -119,7 +134,7 @@ def _provider_connection(auth: AuthContext, db: Session, provider: str | None = 
 
 @router.get("/providers", response_model=list[AiProviderConnectionResponse])
 def list_connections(
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> list[AiProviderConnectionResponse]:
     rows = db.execute(
@@ -145,7 +160,7 @@ def list_connections(
 @router.put("/providers", response_model=AiProviderConnectionResponse)
 def connect_provider(
     payload: AiProviderConnectRequest,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiProviderConnectionResponse:
     if not payload.data_processing_acknowledged:
@@ -153,6 +168,14 @@ def connect_provider(
             status_code=400,
             detail="Confirm your firm approved this provider's data-processing terms",
         )
+    if not verify_password(payload.current_password, auth.user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if auth.user.mfa_enabled:
+        if not payload.mfa_code or not verify_user_mfa(db, auth.user, payload.mfa_code):
+            raise HTTPException(
+                status_code=400,
+                detail="A valid authenticator or recovery code is required",
+            )
     api_key = payload.api_key.strip()
     if len(api_key) < 16:
         raise HTTPException(status_code=400, detail="API key is too short")
@@ -209,6 +232,7 @@ def connect_provider(
         entity_type="ai_provider",
         entity_id=None,
         new_values={"provider": payload.provider, "model": selected_model},
+        request_id=current_request_id(),
     )
     db.commit()
     return AiProviderConnectionResponse(**dict(row))
@@ -217,7 +241,7 @@ def connect_provider(
 @router.get("/providers/{provider}/models", response_model=AiProviderModelsResponse)
 def get_models(
     provider: str,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiProviderModelsResponse:
     connection = _provider_connection(auth, db, provider)
@@ -251,7 +275,7 @@ def get_models(
 def select_model(
     provider: str,
     payload: AiProviderSelectModelRequest,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiProviderConnectionResponse:
     connection = _provider_connection(auth, db, provider)
@@ -286,7 +310,7 @@ def select_model(
 @router.delete("/providers/{provider}", status_code=status.HTTP_204_NO_CONTENT)
 def disconnect_provider(
     provider: str,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> None:
     connection = _provider_connection(auth, db, provider)
@@ -305,6 +329,7 @@ def disconnect_provider(
         entity_type="ai_provider",
         entity_id=None,
         new_values={"provider": provider},
+        request_id=current_request_id(),
     )
     db.commit()
 
@@ -312,7 +337,7 @@ def disconnect_provider(
 @router.post("/cases/{case_number}/index", response_model=AiIndexResponse)
 def index_case_documents(
     case_number: str,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiIndexResponse:
     case = _case_for_ai(case_number, auth, db)
@@ -348,7 +373,7 @@ def index_case_documents(
 @router.get("/cases/{case_number}/chats", response_model=list[AiChatResponse])
 def list_chats(
     case_number: str,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> list[AiChatResponse]:
     case = _case_for_ai(case_number, auth, db)
@@ -381,7 +406,7 @@ def list_chats(
 def create_chat(
     case_number: str,
     payload: AiChatCreateRequest,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiChatResponse:
     case = _case_for_ai(case_number, auth, db)
@@ -412,6 +437,7 @@ def create_chat(
         entity_id=row["id"],
         case_id=case["id"],
         client_id=case["client_id"],
+        request_id=current_request_id(),
     )
     db.commit()
     return AiChatResponse(**dict(row), messages=[])
@@ -420,7 +446,7 @@ def create_chat(
 @router.get("/chats/{chat_id}", response_model=AiChatResponse)
 def get_chat(
     chat_id: UUID,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiChatResponse:
     chat = _owned_chat(chat_id, auth, db)
@@ -444,10 +470,29 @@ def get_chat(
 @router.delete("/chats/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_chat(
     chat_id: UUID,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> None:
     chat = _owned_chat(chat_id, auth, db)
+    held_sources = db.execute(
+        text(
+            """
+            SELECT COUNT(*)
+            FROM ai_chat_messages m
+            CROSS JOIN LATERAL jsonb_array_elements(m.citations) citation
+            JOIN case_documents cd
+              ON cd.id = (citation->>'case_document_id')::uuid
+            WHERE m.chat_id = :chat_id
+              AND cd.legal_hold = TRUE
+            """
+        ),
+        {"chat_id": str(chat_id)},
+    ).scalar_one()
+    if int(held_sources or 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Chat cannot be deleted while a cited document is under legal hold",
+        )
     log_activity(
         db,
         organization_id=auth.organization_id,
@@ -457,6 +502,7 @@ def delete_chat(
         entity_id=chat_id,
         case_id=chat["case_id"],
         client_id=chat["client_id"],
+        request_id=current_request_id(),
     )
     db.execute(
         text("DELETE FROM ai_chats WHERE id = :chat_id"),
@@ -469,7 +515,7 @@ def delete_chat(
 def send_message(
     chat_id: UUID,
     payload: AiChatMessageCreateRequest,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiChatMessageResponse:
     chat = _owned_chat(chat_id, auth, db)
@@ -586,6 +632,7 @@ def send_message(
             "model": model,
             "source_ids": [citation.source_id for citation in used_citations],
         },
+        request_id=current_request_id(),
     )
     db.commit()
     return AiChatMessageResponse(**dict(assistant))
@@ -599,7 +646,7 @@ def send_message(
 def create_form_draft(
     case_number: str,
     payload: AiFormDraftCreateRequest,
-    auth: AuthContext = Depends(require_roles(*_AI_ROLES)),
+    auth: AuthContext = Depends(require_ai_access),
     db: Session = Depends(get_db),
 ) -> AiFormDraftResponse:
     case = _case_for_ai(case_number, auth, db)
@@ -793,6 +840,7 @@ def create_form_draft(
             "populated_field_count": len(values),
             "unresolved_field_count": len(unresolved),
         },
+        request_id=current_request_id(),
     )
     db.commit()
     return AiFormDraftResponse(
@@ -803,6 +851,8 @@ def create_form_draft(
         expires_in_seconds=settings.s3_presign_expires_seconds,
         populated_fields=sorted(values),
         unresolved_fields=unresolved,
+        field_evidence=field_evidence,
+        citations=form_citations,
         warning=_FORM_WARNING,
         created_at=created_at,
     )

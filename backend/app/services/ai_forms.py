@@ -6,6 +6,7 @@ from io import BytesIO
 from typing import Any
 
 from pypdf import PdfReader, PdfWriter
+from pypdf.annotations import FreeText
 
 SUPPORTED_FIELD_TYPES = {"/Tx", "/Ch"}
 
@@ -69,11 +70,24 @@ def fill_acroform(payload: bytes, values: dict[str, str]) -> bytes:
         reader = PdfReader(BytesIO(payload), strict=False)
         writer = PdfWriter()
         writer.clone_document_from_reader(reader)
-        for page in writer.pages:
+        for page_number, page in enumerate(writer.pages):
             writer.update_page_form_field_values(
                 page,
                 safe_values,
                 auto_regenerate=True,
+            )
+            page_width = float(page.mediabox.width)
+            page_height = float(page.mediabox.height)
+            writer.add_annotation(
+                page_number,
+                FreeText(
+                    text="AI-GENERATED REVIEW DRAFT — NOT VALIDATED, SIGNED, OR SUBMITTED",
+                    rect=(20, max(20, page_height - 36), max(40, page_width - 20), page_height - 12),
+                    font_size="9pt",
+                    font_color="7f1d1d",
+                    border_color="f59e0b",
+                    background_color="fef3c7",
+                ),
             )
         output = BytesIO()
         writer.write(output)

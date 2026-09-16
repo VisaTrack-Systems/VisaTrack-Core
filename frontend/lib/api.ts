@@ -560,6 +560,8 @@ export type AiFormDraft = {
   expires_in_seconds: number;
   populated_fields: string[];
   unresolved_fields: string[];
+  field_evidence: Record<string, { value: string; sources: string[] }>;
+  citations: AiCitation[];
   warning: string;
   created_at: string;
 };
@@ -1310,6 +1312,8 @@ export async function connectAiProvider(input: {
   api_key: string;
   selected_model?: string | null;
   data_processing_acknowledged: boolean;
+  current_password: string;
+  mfa_code?: string | null;
 }): Promise<AiProviderConnection> {
   return requestJson<AiProviderConnection>('/api/v1/ai/providers', {
     method: 'PUT',

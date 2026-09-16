@@ -18,6 +18,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.execute(
+        """
+        UPDATE roles
+        SET permissions = permissions || '["ai:use"]'::jsonb,
+            updated_at = NOW()
+        WHERE slug IN ('lawyer', 'org_admin')
+          AND organization_id IS NULL
+          AND NOT permissions ? 'ai:use'
+        """
+    )
     op.create_table(
         "ai_provider_connections",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
@@ -112,3 +122,12 @@ def downgrade() -> None:
     op.drop_table("ai_chat_messages")
     op.drop_table("ai_chats")
     op.drop_table("ai_provider_connections")
+    op.execute(
+        """
+        UPDATE roles
+        SET permissions = permissions - 'ai:use',
+            updated_at = NOW()
+        WHERE slug IN ('lawyer', 'org_admin')
+          AND organization_id IS NULL
+        """
+    )
