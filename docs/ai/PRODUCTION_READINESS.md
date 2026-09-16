@@ -51,6 +51,28 @@ date, evidence link, and approval decision.
 - Final source-document purge deletes extracted chunks and derived form objects, while
   legal holds block affected purges.
 
+## Security review disposition
+
+| Review item | Disposition |
+| --- | --- |
+| Cross-tenant/cross-case IDOR | Tenant, case assignment, chat owner, and explicit provider predicates retained; independent dynamic testing still required |
+| Silent model/provider drift | Fixed: provider is request-bound, model is pinned, allowlisted, and retirement fails closed |
+| Reindex queue amplification | Fixed: per-case cap plus document/hour idempotency |
+| Rate-limit race and free failed retries | Fixed: advisory-lock reservation and durable attempt event before completion |
+| Indexing while AI is disabled | Fixed: scan and index workers enforce global and organization flags |
+| Quarantine path mislabeled clean | Fixed: index/form paths require the configured clean prefix in addition to scan state |
+| Unrelated chunk disclosure | Fixed: full-text match is now a retrieval predicate, not merely sort priority |
+| Prompt delimiter injection | Reduced: structured/template/document content is JSON encoded with escaped delimiters; no model tools exist |
+| Form values with invented citations | Fixed for direct values: accepted values must occur in each named source; claim-level chat entailment remains an evaluation problem |
+| Missing/invalid form controls | Fixed: all unfilled supported fields and unsupported controls are returned; choice options are enforced |
+| Unapproved or signed form revision | Fixed: separate flag, exact hash allowlist, signature/XFA/size/page/schema checks |
+| Extracted/derived data outliving source purge | Fixed: eligible purge deletes chunks and forms that use the document; relevant holds block purge |
+| Generated S3 orphan after DB failure | Reduced: best-effort compensating deletion; bucket lifecycle remains required for exceptional cleanup failure |
+| BYOK key loss/rotation | Reduced: independent 32-byte key, previous-key decryption window, audited re-encryption script; secret-manager backup remains external |
+| Parser resource exhaustion | Reduced with byte/page/archive/schema bounds; container-level isolation remains required |
+| Provider retention/training | Not enforceable by application code; contract, account settings, allowlist, and evidence remain launch gates |
+| Stacked Stripe checkout completion race | Outside PR #178's diff; PR #176 must prevent a late checkout response from downgrading a completed payment |
+
 ## Risks that remain after code controls
 
 ### Provider processing
