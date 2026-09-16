@@ -26,8 +26,14 @@ def test_start_script_binds_assigned_port():
     assert 'cd "$(dirname "$0")/.."' in script
     assert 'port="${PORT:-8000}"' in script
     assert '--port "${port}"' in script
-    assert "--host 0.0.0.0" in script
     assert "exec uvicorn" in script
+
+
+def test_start_script_serves_ipv4_unless_overridden():
+    script = START_SCRIPT.read_text(encoding="utf-8")
+
+    assert '--host "${host}"' in script
+    assert 'host="${HOST:-0.0.0.0}"' in script
 
 
 def test_start_script_applies_migrations_before_serving():
