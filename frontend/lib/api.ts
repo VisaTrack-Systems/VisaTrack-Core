@@ -516,6 +516,7 @@ export type AiProviderConnection = {
   selected_model: string | null;
   last_verified_at: string | null;
   data_processing_acknowledged_at: string;
+  acknowledgement_version: string;
 };
 
 export type AiProviderModels = {
@@ -523,6 +524,7 @@ export type AiProviderModels = {
   models: string[];
   selected_model: string | null;
   recommended_model: string | null;
+  form_drafts_enabled: boolean;
 };
 
 export type AiCitation = {
@@ -540,6 +542,7 @@ export type AiChatMessage = {
   citations: AiCitation[];
   provider: AiProvider | null;
   model: string | null;
+  prompt_version: string | null;
   created_at: string;
 };
 
@@ -558,8 +561,13 @@ export type AiFormDraft = {
   file_name: string;
   download_url: string;
   expires_in_seconds: number;
+  provider: AiProvider;
+  model: string;
+  prompt_version: string;
+  source_sha256: string;
   populated_fields: string[];
   unresolved_fields: string[];
+  unsupported_fields: string[];
   field_evidence: Record<string, { value: string; sources: string[] }>;
   citations: AiCitation[];
   warning: string;
@@ -1329,7 +1337,7 @@ export async function getAiProviderModels(provider: AiProvider): Promise<AiProvi
 
 export async function selectAiProviderModel(
   provider: AiProvider,
-  selectedModel: string | null
+  selectedModel: string
 ): Promise<AiProviderConnection> {
   return requestJson<AiProviderConnection>(
     `/api/v1/ai/providers/${encodeURIComponent(provider)}/model`,
@@ -1379,12 +1387,18 @@ export async function deleteAiChat(chatId: string): Promise<void> {
   });
 }
 
-export async function sendAiChatMessage(chatId: string, content: string): Promise<AiChatMessage> {
+export async function sendAiChatMessage(
+  chatId: string,
+  content: string,
+  provider: AiProvider,
+  idempotencyKey = crypto.randomUUID()
+): Promise<AiChatMessage> {
   return requestJson<AiChatMessage>(
     `/api/v1/ai/chats/${encodeURIComponent(chatId)}/messages`,
     {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ content, provider }),
     }
   );
 }
@@ -1392,14 +1406,18 @@ export async function sendAiChatMessage(chatId: string, content: string): Promis
 export async function createAiFormDraft(
   caseNumber: string,
   sourceDocumentId: string,
-  instructions?: string | null
+  provider: AiProvider,
+  instructions?: string | null,
+  idempotencyKey = crypto.randomUUID()
 ): Promise<AiFormDraft> {
   return requestJson<AiFormDraft>(
     `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts`,
     {
       method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify({
         source_document_id: sourceDocumentId,
+        provider,
         instructions: instructions ?? null,
       }),
     }

@@ -1658,6 +1658,11 @@ export interface components {
         AiChatMessageCreateRequest: {
             /** Content */
             content: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
         };
         /** AiChatMessageResponse */
         AiChatMessageResponse: {
@@ -1677,6 +1682,8 @@ export interface components {
             id: string;
             /** Model */
             model?: string | null;
+            /** Prompt Version */
+            prompt_version?: string | null;
             /** Provider */
             provider?: ("openai" | "anthropic") | null;
             /**
@@ -1733,6 +1740,11 @@ export interface components {
             /** Instructions */
             instructions?: string | null;
             /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /**
              * Source Document Id
              * Format: uuid
              */
@@ -1762,12 +1774,25 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Model */
+            model: string;
             /** Populated Fields */
             populated_fields: string[];
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
             /** Source Document Id */
             source_document_id: string | null;
+            /** Source Sha256 */
+            source_sha256: string;
             /** Unresolved Fields */
             unresolved_fields: string[];
+            /** Unsupported Fields */
+            unsupported_fields: string[];
             /** Warning */
             warning: string;
         };
@@ -1803,6 +1828,8 @@ export interface components {
         };
         /** AiProviderConnectionResponse */
         AiProviderConnectionResponse: {
+            /** Acknowledgement Version */
+            acknowledgement_version: string;
             /**
              * Data Processing Acknowledged At
              * Format: date-time
@@ -1822,6 +1849,8 @@ export interface components {
         };
         /** AiProviderModelsResponse */
         AiProviderModelsResponse: {
+            /** Form Drafts Enabled */
+            form_drafts_enabled: boolean;
             /** Models */
             models: string[];
             /**
@@ -1837,7 +1866,7 @@ export interface components {
         /** AiProviderSelectModelRequest */
         AiProviderSelectModelRequest: {
             /** Selected Model */
-            selected_model?: string | null;
+            selected_model: string;
         };
         /** AuthTokenResponse */
         AuthTokenResponse: {
@@ -3728,7 +3757,9 @@ export interface operations {
     create_form_draft_api_v1_ai_cases__case_number__form_drafts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 case_number: string;
             };
@@ -3854,7 +3885,9 @@ export interface operations {
     send_message_api_v1_ai_chats__chat_id__messages_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 chat_id: string;
             };

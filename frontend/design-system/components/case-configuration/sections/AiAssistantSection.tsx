@@ -15,6 +15,7 @@ import {
   createCaseAiChat,
   completeCaseDocumentUpload,
   deleteAiChat,
+  disconnectAiProvider,
   getAiChat,
   getCaseDocumentViewUrl,
   getAiProviderModels,
@@ -47,7 +48,12 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   const [formInstructions, setFormInstructions] = useState('');
   const [formResult, setFormResult] = useState<{
     warning: string;
+    provider: AiProvider;
+    model: string;
+    promptVersion: string;
+    sourceSha256: string;
     unresolved: string[];
+    unsupported: string[];
     evidence: Record<string, { value: string; sources: string[] }>;
     citations: Array<{ source_id: string; case_document_id: string; document_name: string; page_number: number | null }>;
   } | null>(null);
@@ -122,6 +128,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       setApiKey('');
       setCurrentPassword('');
       setMfaCode('');
+      setApproved(false);
       setModels(await getAiProviderModels(provider));
       setNotice(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} connected.`);
     } catch (requestError) {
@@ -132,16 +139,40 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   };
 
   const changeModel = async (selectedModel: string) => {
+    if (!selectedModel) return;
     setBusy('model');
     setError(null);
     try {
-      const saved = await selectAiProviderModel(provider, selectedModel || null);
+      const saved = await selectAiProviderModel(provider, selectedModel);
       setConnections((current) =>
         current.map((item) => (item.provider === provider ? saved : item))
       );
-      setModels((current) => current ? { ...current, selected_model: selectedModel || null } : current);
+      setModels((current) => current ? { ...current, selected_model: selectedModel } : current);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Could not select model');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disconnectProvider = async () => {
+    if (
+      !connected ||
+      !window.confirm(
+        `Disconnect ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} and delete its stored key?`
+      )
+    ) {
+      return;
+    }
+    setBusy('disconnect-provider');
+    setError(null);
+    try {
+      await disconnectAiProvider(provider);
+      setConnections((current) => current.filter((item) => item.provider !== provider));
+      setModels(null);
+      setNotice(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} disconnected.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not disconnect provider');
     } finally {
       setBusy(null);
     }
@@ -212,8 +243,9 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       if (!target) {
         target = await createCaseAiChat(caseNumber, question.trim().slice(0, 80));
         setChats((current) => [target as AiChat, ...current]);
+        setChat(target);
       }
-      await sendAiChatMessage(target.id, question.trim());
+      await sendAiChatMessage(target.id, question.trim(), provider);
       setQuestion('');
       setChat(await getAiChat(target.id));
     } catch (requestError) {
@@ -234,6 +266,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       const draft = await createAiFormDraft(
         caseNumber,
         formDocumentId,
+        provider,
         formInstructions.trim() || null
       );
       if (popup && !popup.closed) {
@@ -243,7 +276,12 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
       }
       setFormResult({
         warning: draft.warning,
+        provider: draft.provider,
+        model: draft.model,
+        promptVersion: draft.prompt_version,
+        sourceSha256: draft.source_sha256,
         unresolved: draft.unresolved_fields,
+        unsupported: draft.unsupported_fields,
         evidence: draft.field_evidence,
         citations: draft.citations,
       });
@@ -358,7 +396,17 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                 setProvider(next);
                 const nextConnection = connections.find((item) => item.provider === next);
                 setModels(null);
-                if (nextConnection) void getAiProviderModels(next).then(setModels).catch(() => {});
+                if (nextConnection) {
+                  void getAiProviderModels(next)
+                    .then(setModels)
+                    .catch((requestError) => {
+                      setError(
+                        requestError instanceof Error
+                          ? requestError.message
+                          : 'Could not load provider models'
+                      );
+                    });
+                }
               }}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             >
@@ -429,24 +477,39 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             <label htmlFor="ai-model" className="block text-sm font-medium text-gray-700">Model</label>
             <select
               id="ai-model"
-              value={models.selected_model ?? ''}
+              value={models.selected_model ?? models.recommended_model ?? ''}
               disabled={busy !== null}
               onChange={(event) => void changeModel(event.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             >
-              <option value="">
-                Strongest available{models.recommended_model ? ` · ${models.recommended_model}` : ''}
-              </option>
+              {models.selected_model && !models.models.includes(models.selected_model) ? (
+                <option value={models.selected_model} disabled>
+                  {models.selected_model} · Unavailable—select an approved replacement
+                </option>
+              ) : null}
               {models.models.map((model) => (
                 <option key={model} value={model}>
-                  {model}{model === models.recommended_model ? ' · Recommended strongest model' : ''}
+                  {model}{model === models.recommended_model ? ' · Recommended model' : ''}
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              Chat and form drafts use the strongest general-purpose model currently available to
-              this key unless you pin a specific model for retention, region, cost, or latency policy.
+              The recommended model is selected when the key is connected and then pinned to prevent
+              silent model or retention-policy changes. Review and select a replacement explicitly.
             </p>
+            {models.selected_model && !models.models.includes(models.selected_model) ? (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                The pinned model is unavailable. AI requests will remain blocked until you select a replacement.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void disconnectProvider()}
+              className="mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+            >
+              {busy === 'disconnect-provider' ? 'Disconnecting…' : 'Disconnect provider'}
+            </button>
           </div>
         ) : null}
       </section>
@@ -488,6 +551,12 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
           {chat?.messages.map((message) => (
             <article key={message.id} className={`rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-blue-200 bg-blue-50'}`}>
               <p className="whitespace-pre-wrap text-gray-900">{message.content}</p>
+              {message.role === 'assistant' && message.provider && message.model ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  {message.provider} / {message.model}
+                  {message.prompt_version ? ` · prompt ${message.prompt_version}` : ''}
+                </p>
+              ) : null}
               {message.citations.length > 0 ? (
                 <details className="mt-3 text-xs text-gray-700">
                   <summary className="cursor-pointer font-medium">Sources ({message.citations.length})</summary>
@@ -536,13 +605,18 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         <p className="mt-1 text-xs text-gray-600">
           Supports standard AcroForm PDFs only. IRCC XFA/barcode forms still require Adobe Acrobat Reader.
         </p>
-        <label className={`mt-4 flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm ${busy === 'form-upload' ? 'cursor-wait opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+        {models && !models.form_drafts_enabled ? (
+          <p role="status" className="mt-2 text-sm text-amber-800">
+            Form drafting is disabled until your firm approves exact PDF revisions.
+          </p>
+        ) : null}
+        <label className={`mt-4 flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm ${busy === 'form-upload' ? 'cursor-wait opacity-50' : models?.form_drafts_enabled === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
           {busy === 'form-upload' ? 'Uploading and quarantining…' : 'Upload official PDF form'}
           <input
             className="sr-only"
             type="file"
             accept=".pdf,application/pdf"
-            disabled={busy !== null}
+            disabled={busy !== null || models?.form_drafts_enabled === false}
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = '';
@@ -579,15 +653,25 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <button type="submit" disabled={busy !== null || !connected || !formDocumentId} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">
+          <button type="submit" disabled={busy !== null || !connected || !formDocumentId || models?.form_drafts_enabled === false} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">
             {busy === 'form' ? 'Generating review draft…' : 'Generate review draft'}
           </button>
         </form>
         {formResult ? (
           <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             <p>{formResult.warning}</p>
+            <p className="mt-2 text-xs">
+              Generated with {formResult.provider} / {formResult.model}. Template SHA-256:{' '}
+              <code className="break-all">{formResult.sourceSha256}</code>
+              {' '}Prompt: {formResult.promptVersion}.
+            </p>
             {formResult.unresolved.length > 0 ? (
               <p className="mt-2">Unresolved fields: {formResult.unresolved.join(', ')}</p>
+            ) : null}
+            {formResult.unsupported.length > 0 ? (
+              <p className="mt-2">
+                Unsupported controls requiring manual completion: {formResult.unsupported.join(', ')}
+              </p>
             ) : null}
             {Object.keys(formResult.evidence).length > 0 ? (
               <details className="mt-3">
