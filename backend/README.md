@@ -129,6 +129,17 @@ alembic revision --autogenerate -m "migration message"
 
 ---
 
+## Deployment
+
+The container entrypoint is [scripts/start.sh](scripts/start.sh). It serves the app on
+`${PORT:-8000}`, because hosted platforms assign the listening port at runtime, and
+applies Alembic migrations first when `RUN_MIGRATIONS=true`.
+
+Platform setup, required variables, and health-check troubleshooting are documented in
+[../docs/operations/RAILWAY_DEPLOYMENT.md](../docs/operations/RAILWAY_DEPLOYMENT.md).
+
+---
+
 ## Tests
 
 Install dev dependencies and run tests:

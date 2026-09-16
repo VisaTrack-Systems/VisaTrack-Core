@@ -18,6 +18,7 @@ RUN python -m pip install --no-cache-dir --require-hashes -r requirements.lock
 COPY --chown=visatrack:visatrack . .
 USER visatrack
 
+ENV PORT=8000
 EXPOSE 8000
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["/app/scripts/start.sh"]
