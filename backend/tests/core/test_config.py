@@ -36,3 +36,80 @@ def test_production_rejects_default_auth_secret():
 
     with pytest.raises(RuntimeError, match='AUTH_SECRET_KEY'):
         candidate.validate_security()
+
+
+def _production_ai_settings():
+    from app.core.config import Settings
+
+    candidate = Settings()
+    candidate.app_env = 'production'
+    candidate.auth_secret_key = 'a' * 32
+    candidate.mfa_encryption_key = 'mfa-key'
+    candidate.auth_cookie_secure = True
+    candidate.s3_bucket_name = 'documents'
+    candidate.aws_kms_key_id = 'kms-key'
+    candidate.audit_archive_bucket = 'audit'
+    candidate.stripe_secret_key = 'sk_test'
+    candidate.stripe_webhook_secret = 'whsec_test'
+    candidate.ai_enabled = True
+    candidate.ai_enabled_organization_ids = {
+        '00000000-0000-0000-0000-000000000001'
+    }
+    candidate.ai_enabled_user_ids = {
+        '00000000-0000-0000-0000-000000000002'
+    }
+    candidate.ai_allowed_models = {'openai:gpt-approved'}
+    candidate.ai_provider_encryption_key = 'ai-' + ('k' * 32)
+    candidate.ai_provider_encryption_key_previous = ()
+    candidate.ai_require_mfa_for_keys = True
+    candidate.ai_form_drafts_enabled = False
+    candidate.ai_approved_form_sha256 = set()
+    return candidate
+
+
+def test_production_ai_keys_require_mfa_enrollment_policy():
+    candidate = _production_ai_settings()
+    candidate.ai_require_mfa_for_keys = False
+
+    with pytest.raises(RuntimeError, match='AI_REQUIRE_MFA_FOR_KEYS'):
+        candidate.validate_security()
+
+
+def test_production_ai_requires_explicit_organization_scope():
+    candidate = _production_ai_settings()
+    candidate.ai_enabled_organization_ids = set()
+
+    with pytest.raises(RuntimeError, match='AI_ENABLED_ORGANIZATION_IDS'):
+        candidate.validate_security()
+
+
+def test_production_ai_requires_explicit_model_allowlist():
+    candidate = _production_ai_settings()
+    candidate.ai_allowed_models = set()
+
+    with pytest.raises(RuntimeError, match='AI_ALLOWED_MODELS'):
+        candidate.validate_security()
+
+
+def test_production_ai_requires_explicit_user_scope():
+    candidate = _production_ai_settings()
+    candidate.ai_enabled_user_ids = set()
+
+    with pytest.raises(RuntimeError, match='AI_ENABLED_USER_IDS'):
+        candidate.validate_security()
+
+
+def test_production_form_drafts_require_approved_template_hashes():
+    candidate = _production_ai_settings()
+    candidate.ai_form_drafts_enabled = True
+
+    with pytest.raises(RuntimeError, match='AI_APPROVED_FORM_SHA256'):
+        candidate.validate_security()
+
+
+def test_production_accepts_bounded_ai_configuration():
+    candidate = _production_ai_settings()
+    candidate.ai_form_drafts_enabled = True
+    candidate.ai_approved_form_sha256 = {'a' * 64}
+
+    candidate.validate_security()

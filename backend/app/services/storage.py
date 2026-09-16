@@ -251,3 +251,27 @@ def get_object_bytes(*, object_key: str) -> bytes:
         ) from exc
     except (BotoCoreError, ClientError) as exc:
         raise StorageOperationError("Failed to retrieve file from storage") from exc
+
+
+def put_object_bytes(*, object_key: str, payload: bytes, content_type: str) -> None:
+    client = _s3_client()
+    extra: dict[str, str] = {}
+    if settings.aws_kms_key_id:
+        extra = {
+            "ServerSideEncryption": "aws:kms",
+            "SSEKMSKeyId": settings.aws_kms_key_id,
+        }
+    try:
+        client.put_object(
+            Bucket=settings.s3_bucket_name,
+            Key=object_key,
+            Body=payload,
+            ContentType=content_type,
+            **extra,
+        )
+    except (NoCredentialsError, PartialCredentialsError) as exc:
+        raise StorageConfigurationError(
+            "AWS credentials are not configured for generated documents"
+        ) from exc
+    except (BotoCoreError, ClientError) as exc:
+        raise StorageOperationError("Failed to store generated document") from exc

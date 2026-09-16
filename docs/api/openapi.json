@@ -758,6 +758,819 @@
         "title": "AdminRoleItem",
         "type": "object"
       },
+      "AiChatCreateRequest": {
+        "properties": {
+          "title": {
+            "default": "Case assistant",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "AiChatCreateRequest",
+        "type": "object"
+      },
+      "AiChatMessageCreateRequest": {
+        "properties": {
+          "content": {
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "provider"
+        ],
+        "title": "AiChatMessageCreateRequest",
+        "type": "object"
+      },
+      "AiChatMessageResponse": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AiCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "prompt_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Version"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "openai",
+                  "anthropic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "requested_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Model"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "AiChatMessageResponse",
+        "type": "object"
+      },
+      "AiChatResponse": {
+        "properties": {
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AiChatMessageResponse"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "case_id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AiChatResponse",
+        "type": "object"
+      },
+      "AiCitation": {
+        "properties": {
+          "case_document_id": {
+            "format": "uuid",
+            "title": "Case Document Id",
+            "type": "string"
+          },
+          "document_name": {
+            "title": "Document Name",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "case_document_id",
+          "document_name",
+          "page_number",
+          "excerpt"
+        ],
+        "title": "AiCitation",
+        "type": "object"
+      },
+      "AiFormDraftCreateRequest": {
+        "properties": {
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "source_document_id": {
+            "format": "uuid",
+            "title": "Source Document Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_document_id",
+          "provider"
+        ],
+        "title": "AiFormDraftCreateRequest",
+        "type": "object"
+      },
+      "AiFormDraftDownloadResponse": {
+        "properties": {
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "integer"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "file_name",
+          "download_url",
+          "expires_in_seconds"
+        ],
+        "title": "AiFormDraftDownloadResponse",
+        "type": "object"
+      },
+      "AiFormDraftResponse": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AiCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "integer"
+          },
+          "field_evidence": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AiFormFieldEvidence"
+            },
+            "title": "Field Evidence",
+            "type": "object"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "populated_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Populated Fields",
+            "type": "array"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "source_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Id"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "unresolved_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved Fields",
+            "type": "array"
+          },
+          "unsupported_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Fields",
+            "type": "array"
+          },
+          "warning": {
+            "title": "Warning",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source_document_id",
+          "file_name",
+          "download_url",
+          "expires_in_seconds",
+          "provider",
+          "requested_model",
+          "model",
+          "prompt_version",
+          "finish_reason",
+          "source_sha256",
+          "populated_fields",
+          "unresolved_fields",
+          "unsupported_fields",
+          "field_evidence",
+          "citations",
+          "warning",
+          "created_at"
+        ],
+        "title": "AiFormDraftResponse",
+        "type": "object"
+      },
+      "AiFormDraftReviewRequest": {
+        "properties": {
+          "adobe_validation_completed": {
+            "default": false,
+            "title": "Adobe Validation Completed",
+            "type": "boolean"
+          },
+          "review_note": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Review Note",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "reviewed",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "review_note"
+        ],
+        "title": "AiFormDraftReviewRequest",
+        "type": "object"
+      },
+      "AiFormDraftSummaryResponse": {
+        "properties": {
+          "adobe_validation_completed": {
+            "title": "Adobe Validation Completed",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "source_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Id"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "reviewed",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unresolved_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved Fields",
+            "type": "array"
+          },
+          "unsupported_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "source_document_id",
+          "file_name",
+          "provider",
+          "requested_model",
+          "model",
+          "prompt_version",
+          "source_sha256",
+          "status",
+          "unresolved_fields",
+          "unsupported_fields",
+          "reviewed_by",
+          "reviewed_at",
+          "review_note",
+          "adobe_validation_completed",
+          "created_at"
+        ],
+        "title": "AiFormDraftSummaryResponse",
+        "type": "object"
+      },
+      "AiFormFieldEvidence": {
+        "properties": {
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "sources"
+        ],
+        "title": "AiFormFieldEvidence",
+        "type": "object"
+      },
+      "AiIndexResponse": {
+        "properties": {
+          "queued_documents": {
+            "title": "Queued Documents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued_documents"
+        ],
+        "title": "AiIndexResponse",
+        "type": "object"
+      },
+      "AiProviderConnectRequest": {
+        "properties": {
+          "api_key": {
+            "format": "password",
+            "maxLength": 500,
+            "minLength": 16,
+            "title": "Api Key",
+            "type": "string",
+            "writeOnly": true
+          },
+          "current_password": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "data_processing_acknowledged": {
+            "title": "Data Processing Acknowledged",
+            "type": "boolean"
+          },
+          "mfa_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfa Code",
+            "writeOnly": true
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "selected_model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Model"
+          }
+        },
+        "required": [
+          "provider",
+          "api_key",
+          "data_processing_acknowledged",
+          "current_password"
+        ],
+        "title": "AiProviderConnectRequest",
+        "type": "object"
+      },
+      "AiProviderConnectionResponse": {
+        "properties": {
+          "acknowledgement_version": {
+            "title": "Acknowledgement Version",
+            "type": "string"
+          },
+          "data_processing_acknowledged_at": {
+            "format": "date-time",
+            "title": "Data Processing Acknowledged At",
+            "type": "string"
+          },
+          "key_hint": {
+            "title": "Key Hint",
+            "type": "string"
+          },
+          "last_verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verified At"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "selected_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Model"
+          }
+        },
+        "required": [
+          "provider",
+          "key_hint",
+          "selected_model",
+          "last_verified_at",
+          "data_processing_acknowledged_at",
+          "acknowledgement_version"
+        ],
+        "title": "AiProviderConnectionResponse",
+        "type": "object"
+      },
+      "AiProviderModelsResponse": {
+        "properties": {
+          "form_drafts_enabled": {
+            "title": "Form Drafts Enabled",
+            "type": "boolean"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "recommended_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Model"
+          },
+          "selected_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Model"
+          }
+        },
+        "required": [
+          "provider",
+          "models",
+          "selected_model",
+          "recommended_model",
+          "form_drafts_enabled"
+        ],
+        "title": "AiProviderModelsResponse",
+        "type": "object"
+      },
+      "AiProviderSelectModelRequest": {
+        "properties": {
+          "selected_model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Selected Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selected_model"
+        ],
+        "title": "AiProviderSelectModelRequest",
+        "type": "object"
+      },
       "AuthTokenResponse": {
         "properties": {
           "access_token": {
@@ -5226,6 +6039,770 @@
         "summary": "Remove User Role",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/chats": {
+      "get": {
+        "operationId": "list_chats_api_v1_ai_cases__case_number__chats_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiChatResponse"
+                  },
+                  "title": "Response List Chats Api V1 Ai Cases  Case Number  Chats Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Chats",
+        "tags": [
+          "legal-ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_chat_api_v1_ai_cases__case_number__chats_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiChatCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiChatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Chat",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/form-drafts": {
+      "get": {
+        "operationId": "list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiFormDraftSummaryResponse"
+                  },
+                  "title": "Response List Form Drafts Api V1 Ai Cases  Case Number  Form Drafts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Form Drafts",
+        "tags": [
+          "legal-ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_form_draft_api_v1_ai_cases__case_number__form_drafts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiFormDraftCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiFormDraftResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Form Draft",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}": {
+      "patch": {
+        "operationId": "review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Draft Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiFormDraftReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiFormDraftSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Review Form Draft",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}/download": {
+      "get": {
+        "operationId": "download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Draft Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiFormDraftDownloadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Form Draft",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/index": {
+      "post": {
+        "operationId": "index_case_documents_api_v1_ai_cases__case_number__index_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiIndexResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Index Case Documents",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/chats/{chat_id}": {
+      "delete": {
+        "operationId": "delete_chat_api_v1_ai_chats__chat_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Chat",
+        "tags": [
+          "legal-ai"
+        ]
+      },
+      "get": {
+        "operationId": "get_chat_api_v1_ai_chats__chat_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiChatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Chat",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/chats/{chat_id}/messages": {
+      "post": {
+        "operationId": "send_message_api_v1_ai_chats__chat_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chat_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Chat Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiChatMessageCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiChatMessageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Message",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/providers": {
+      "get": {
+        "operationId": "list_connections_api_v1_ai_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiProviderConnectionResponse"
+                  },
+                  "title": "Response List Connections Api V1 Ai Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Connections",
+        "tags": [
+          "legal-ai"
+        ]
+      },
+      "put": {
+        "operationId": "connect_provider_api_v1_ai_providers_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiProviderConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderConnectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Connect Provider",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/providers/{provider}": {
+      "delete": {
+        "operationId": "disconnect_provider_api_v1_ai_providers__provider__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Disconnect Provider",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/providers/{provider}/model": {
+      "put": {
+        "operationId": "select_model_api_v1_ai_providers__provider__model_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiProviderSelectModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderConnectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Select Model",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/providers/{provider}/models": {
+      "get": {
+        "operationId": "get_models_api_v1_ai_providers__provider__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Models",
+        "tags": [
+          "legal-ai"
         ]
       }
     },

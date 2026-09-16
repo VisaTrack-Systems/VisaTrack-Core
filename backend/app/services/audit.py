@@ -161,10 +161,12 @@ def _json_or_none(value: Optional[dict[str, Any]]) -> Optional[str]:
 
 _SENSITIVE_KEYS = {
     "access_token",
+    "api_key",
     "authorization",
     "cookie",
     "invitation_token",
     "password",
+    "encrypted_api_key",
     "refresh_token",
     "secret",
     "token",

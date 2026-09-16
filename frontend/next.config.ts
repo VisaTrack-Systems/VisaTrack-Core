@@ -1,22 +1,19 @@
 import path from "path";
 import type { NextConfig } from "next";
 
+import { buildContentSecurityPolicy } from "./lib/securityHeaders";
+
 const apiOrigin = new URL(
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 ).origin;
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  "img-src 'self' data: blob: https:",
-  `connect-src 'self' ${apiOrigin}`,
-].join("; ");
+const storageOrigin = process.env.NEXT_PUBLIC_STORAGE_ORIGIN
+  ? new URL(process.env.NEXT_PUBLIC_STORAGE_ORIGIN).origin
+  : "";
+const contentSecurityPolicy = buildContentSecurityPolicy({
+  apiOrigin,
+  storageOrigin,
+  development: process.env.NODE_ENV === "development",
+});
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },

@@ -262,6 +262,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/cases/{case_number}/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Chats */
+        get: operations["list_chats_api_v1_ai_cases__case_number__chats_get"];
+        put?: never;
+        /** Create Chat */
+        post: operations["create_chat_api_v1_ai_cases__case_number__chats_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/form-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Form Drafts */
+        get: operations["list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get"];
+        put?: never;
+        /** Create Form Draft */
+        post: operations["create_form_draft_api_v1_ai_cases__case_number__form_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Review Form Draft */
+        patch: operations["review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Form Draft */
+        get: operations["download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/cases/{case_number}/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Index Case Documents */
+        post: operations["index_case_documents_api_v1_ai_cases__case_number__index_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat */
+        get: operations["get_chat_api_v1_ai_chats__chat_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Chat */
+        delete: operations["delete_chat_api_v1_ai_chats__chat_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/chats/{chat_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_api_v1_ai_chats__chat_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Connections */
+        get: operations["list_connections_api_v1_ai_providers_get"];
+        /** Connect Provider */
+        put: operations["connect_provider_api_v1_ai_providers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect Provider */
+        delete: operations["disconnect_provider_api_v1_ai_providers__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Select Model */
+        put: operations["select_model_api_v1_ai_providers__provider__model_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Models */
+        get: operations["get_models_api_v1_ai_providers__provider__models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/accept-invitation": {
         parameters: {
             query?: never;
@@ -1489,6 +1680,318 @@ export interface components {
             permissions: string[];
             /** Slug */
             slug: string;
+        };
+        /** AiChatCreateRequest */
+        AiChatCreateRequest: {
+            /**
+             * Title
+             * @default Case assistant
+             */
+            title: string;
+        };
+        /** AiChatMessageCreateRequest */
+        AiChatMessageCreateRequest: {
+            /** Content */
+            content: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+        };
+        /** AiChatMessageResponse */
+        AiChatMessageResponse: {
+            /** Citations */
+            citations?: components["schemas"]["AiCitation"][];
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finish Reason */
+            finish_reason?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model */
+            model?: string | null;
+            /** Prompt Version */
+            prompt_version?: string | null;
+            /** Provider */
+            provider?: ("openai" | "anthropic") | null;
+            /** Requested Model */
+            requested_model?: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+        };
+        /** AiChatResponse */
+        AiChatResponse: {
+            /**
+             * Case Id
+             * Format: uuid
+             */
+            case_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Messages */
+            messages?: components["schemas"]["AiChatMessageResponse"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AiCitation */
+        AiCitation: {
+            /**
+             * Case Document Id
+             * Format: uuid
+             */
+            case_document_id: string;
+            /** Document Name */
+            document_name: string;
+            /** Excerpt */
+            excerpt: string;
+            /** Page Number */
+            page_number: number | null;
+            /** Source Id */
+            source_id: string;
+        };
+        /** AiFormDraftCreateRequest */
+        AiFormDraftCreateRequest: {
+            /** Instructions */
+            instructions?: string | null;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /**
+             * Source Document Id
+             * Format: uuid
+             */
+            source_document_id: string;
+        };
+        /** AiFormDraftDownloadResponse */
+        AiFormDraftDownloadResponse: {
+            /** Download Url */
+            download_url: string;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** AiFormDraftResponse */
+        AiFormDraftResponse: {
+            /** Citations */
+            citations: components["schemas"]["AiCitation"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Download Url */
+            download_url: string;
+            /** Expires In Seconds */
+            expires_in_seconds: number;
+            /** Field Evidence */
+            field_evidence: {
+                [key: string]: components["schemas"]["AiFormFieldEvidence"];
+            };
+            /** File Name */
+            file_name: string;
+            /** Finish Reason */
+            finish_reason: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model */
+            model: string;
+            /** Populated Fields */
+            populated_fields: string[];
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Requested Model */
+            requested_model: string;
+            /** Source Document Id */
+            source_document_id: string | null;
+            /** Source Sha256 */
+            source_sha256: string;
+            /** Unresolved Fields */
+            unresolved_fields: string[];
+            /** Unsupported Fields */
+            unsupported_fields: string[];
+            /** Warning */
+            warning: string;
+        };
+        /** AiFormDraftReviewRequest */
+        AiFormDraftReviewRequest: {
+            /**
+             * Adobe Validation Completed
+             * @default false
+             */
+            adobe_validation_completed: boolean;
+            /** Review Note */
+            review_note: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "reviewed" | "superseded";
+        };
+        /** AiFormDraftSummaryResponse */
+        AiFormDraftSummaryResponse: {
+            /** Adobe Validation Completed */
+            adobe_validation_completed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** File Name */
+            file_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Requested Model */
+            requested_model: string;
+            /** Review Note */
+            review_note: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Source Document Id */
+            source_document_id: string | null;
+            /** Source Sha256 */
+            source_sha256: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "reviewed" | "superseded";
+            /** Unresolved Fields */
+            unresolved_fields: string[];
+            /** Unsupported Fields */
+            unsupported_fields: string[];
+        };
+        /** AiFormFieldEvidence */
+        AiFormFieldEvidence: {
+            /** Sources */
+            sources: string[];
+            /** Value */
+            value: string;
+        };
+        /** AiIndexResponse */
+        AiIndexResponse: {
+            /** Queued Documents */
+            queued_documents: number;
+        };
+        /** AiProviderConnectRequest */
+        AiProviderConnectRequest: {
+            /**
+             * Api Key
+             * Format: password
+             */
+            api_key: string;
+            /**
+             * Current Password
+             * Format: password
+             */
+            current_password: string;
+            /** Data Processing Acknowledged */
+            data_processing_acknowledged: boolean;
+            /** Mfa Code */
+            mfa_code?: string | null;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Selected Model */
+            selected_model?: string | null;
+        };
+        /** AiProviderConnectionResponse */
+        AiProviderConnectionResponse: {
+            /** Acknowledgement Version */
+            acknowledgement_version: string;
+            /**
+             * Data Processing Acknowledged At
+             * Format: date-time
+             */
+            data_processing_acknowledged_at: string;
+            /** Key Hint */
+            key_hint: string;
+            /** Last Verified At */
+            last_verified_at: string | null;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Selected Model */
+            selected_model: string | null;
+        };
+        /** AiProviderModelsResponse */
+        AiProviderModelsResponse: {
+            /** Form Drafts Enabled */
+            form_drafts_enabled: boolean;
+            /** Models */
+            models: string[];
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai" | "anthropic";
+            /** Recommended Model */
+            recommended_model: string | null;
+            /** Selected Model */
+            selected_model: string | null;
+        };
+        /** AiProviderSelectModelRequest */
+        AiProviderSelectModelRequest: {
+            /** Selected Model */
+            selected_model: string;
         };
         /** AuthTokenResponse */
         AuthTokenResponse: {
@@ -3298,6 +3801,484 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chats_api_v1_ai_cases__case_number__chats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiChatResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_chat_api_v1_ai_cases__case_number__chats_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiChatCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiChatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_form_draft_api_v1_ai_cases__case_number__form_drafts_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiFormDraftCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiFormDraftReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiFormDraftDownloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    index_case_documents_api_v1_ai_cases__case_number__index_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiIndexResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_api_v1_ai_chats__chat_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiChatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_chat_api_v1_ai_chats__chat_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_v1_ai_chats__chat_id__messages_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiChatMessageCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiChatMessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connections_api_v1_ai_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviderConnectionResponse"][];
+                };
+            };
+        };
+    };
+    connect_provider_api_v1_ai_providers_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiProviderConnectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviderConnectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_provider_api_v1_ai_providers__provider__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_model_api_v1_ai_providers__provider__model_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiProviderSelectModelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviderConnectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_models_api_v1_ai_providers__provider__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviderModelsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

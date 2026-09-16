@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.jobs import claim_next_job, execute_job
 from app.workers.export_audit import export_pending_audit_events
+from app.workers import index_ai_document  # noqa: F401
 from app.workers import purge_document  # noqa: F401
 from app.workers import scan_document  # noqa: F401
 
