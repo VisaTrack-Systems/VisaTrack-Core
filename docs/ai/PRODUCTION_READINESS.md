@@ -27,7 +27,7 @@ date, evidence link, and approval decision.
 ## Security and privacy properties implemented
 
 - AI endpoints require an active session, legal-staff role, and `ai:use`.
-- Production additionally requires an explicit organization allowlist.
+- Production additionally requires explicit organization and trained-user allowlists.
 - Production model discovery is constrained by an exact `provider:model` allowlist.
 - Lawyer access is restricted to assigned/created cases; chats are private to their
   creator. Tenant and case IDs are bound in retrieval queries.
@@ -45,6 +45,8 @@ date, evidence link, and approval decision.
   The model has no tools and cannot mutate cases or submit forms.
 - Every provider attempt is atomically reserved with a hashed idempotency key. Failed
   attempts count toward the hourly limit.
+- Each chat permits one in-flight turn and allocates monotonic message sequence numbers;
+  source IDs are stable document/chunk identifiers rather than per-turn aliases.
 - Form drafting has an independent kill switch and exact-template SHA-256 allowlist.
   Values must occur in cited evidence, choice values must be valid options, all unfilled
   supported fields are returned, and signed/XFA/oversized forms are rejected.
@@ -61,12 +63,21 @@ date, evidence link, and approval decision.
 | Rate-limit race and free failed retries | Fixed: advisory-lock reservation and durable attempt event before completion |
 | Indexing while AI is disabled | Fixed: scan and index workers enforce global and organization flags |
 | Quarantine path mislabeled clean | Fixed: index/form paths require the configured clean prefix in addition to scan state |
+| Mutable quarantine object replaced after AV read | Fixed: scanner promotes the exact inspected bytes, stores a server digest, and consumers verify it |
 | Unrelated chunk disclosure | Fixed: full-text match is now a retrieval predicate, not merely sort priority |
 | Prompt delimiter injection | Reduced: structured/template/document content is JSON encoded with escaped delimiters; no model tools exist |
 | Form values with invented citations | Fixed for direct values: accepted values must occur in each named source; claim-level chat entailment remains an evaluation problem |
 | Missing/invalid form controls | Fixed: all unfilled supported fields and unsupported controls are returned; choice options are enforced |
 | Unapproved or signed form revision | Fixed: separate flag, exact hash allowlist, signature/XFA/size/page/schema checks |
 | Extracted/derived data outliving source purge | Fixed: eligible purge deletes chunks and forms that use the document; relevant holds block purge |
+| Held context omitted from model-selected citations | Fixed: every disclosed chunk is stored separately and legal-hold checks use the complete manifest |
+| Cross-turn citation alias remapping | Fixed: stable document/chunk source IDs and monotonic serialized chat turns |
+| Old worker permanently fails new job type | Fixed: workers claim only handlers registered in their release; stale running jobs are reclaimable |
+| Key cannot be revoked while inference is disabled | Fixed: owner credential listing/deletion uses a non-inference authorization path |
+| Direct S3 upload blocked by CSP | Fixed: deploy-time exact storage origin is added to `connect-src`; bucket CORS remains external |
+| Provider switch reuses another provider's key/approval | Fixed: changing provider clears key, password, MFA, and acknowledgement state |
+| Truncated/actual provider response is invisible | Reduced: incomplete responses fail, while actual model, finish reason, and provider request ID are retained |
+| Draft lost after first presigned URL | Fixed: authorized history and audited fresh-download endpoints; review status has resolution and Adobe gates |
 | Generated S3 orphan after DB failure | Reduced: best-effort compensating deletion; bucket lifecycle remains required for exceptional cleanup failure |
 | BYOK key loss/rotation | Reduced: independent 32-byte key, previous-key decryption window, audited re-encryption script; secret-manager backup remains external |
 | Parser resource exhaustion | Reduced with byte/page/archive/schema bounds; container-level isolation remains required |
@@ -134,15 +145,17 @@ Adobe Acrobat validation, and official filing guidance.
 | Credential encryption and write-only hint | `backend/tests/services/test_ai_credentials.py` |
 | Provider filtering, model ranking, retired pin failure, stateless OpenAI | `backend/tests/services/test_ai_providers.py` |
 | Atomic quota, duplicate request rejection | `backend/tests/api/routes/test_ai.py` |
-| Quarantine/clean-prefix and disabled-index gates | `backend/tests/workers/test_index_ai_document.py` |
-| Scan-to-index feature gate | `backend/tests/workers/test_scan_document.py` |
+| Quarantine/clean-prefix, digest provenance, and disabled-index gates | `backend/tests/workers/test_index_ai_document.py` |
+| Scan-to-index feature gate and exact inspected-byte promotion | `backend/tests/workers/test_scan_document.py` |
+| Mixed-version job claiming and stale-running recovery | `backend/tests/services/test_jobs.py` |
 | Local extraction bounds and DOCX archive limit | `backend/tests/services/test_ai_documents.py` |
 | Retrieval match filter, delimiter escaping, structured-data minimization | `backend/tests/api/routes/test_ai.py` |
 | Citation filtering and unknown-source warning | `backend/tests/api/routes/test_ai.py` |
 | AcroForm, signed form, size, field/choice validation | `backend/tests/services/test_ai_forms.py`, `backend/tests/api/routes/test_ai.py` |
 | Derived artifact/chunk purge and legal hold | `backend/tests/workers/test_purge_document.py` |
 | Explicit frontend provider and idempotency key | `frontend/tests/aiApi.test.ts` |
-| Lawyer warnings, provider disconnect, request binding | `frontend/tests/aiAssistant.test.tsx` |
+| Lawyer warnings, provider switching, emergency disconnect, request binding | `frontend/tests/aiAssistant.test.tsx` |
+| API/storage CSP and development-only eval | `frontend/tests/securityHeaders.test.ts` |
 | Schema/migration validity | CI `alembic upgrade head` and committed OpenAPI check |
 | Dependency vulnerabilities | CI `pip-audit` and `npm audit --omit=dev` |
 | Frontend accessibility smoke tests | CI Playwright accessibility suite |

@@ -46,6 +46,11 @@ exact blank PDF revision first.
    and barcode controls.
 7. Follow current IRCC instructions before filing.
 
+Generated drafts remain in the case's recent-draft history under the approved retention
+policy. Request a fresh short-lived download link when needed. A draft can be marked
+reviewed only when it has no unresolved/unsupported controls and the reviewer attests
+that Adobe validation was completed; otherwise supersede it with corrected work.
+
 VisaTrack rejects unapproved hashes, XFA-only forms, signed/certified files, unsupported
 field types, oversized forms, values absent from their cited source, and invalid choice
 values. It does not guarantee that an accepted PDF is current or filing-ready.

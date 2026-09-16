@@ -117,11 +117,13 @@ text nodes, not raw HTML.
   approval acknowledgement, and last verification time.
 - `ai_chats`: organization/case/creator-bound conversation metadata.
 - `ai_chat_messages`: user/assistant messages, citations, model/provider, and token
-  usage where returned, plus the prompt-policy version used.
+  usage where returned, plus the prompt-policy version and complete source-disclosure
+  manifest used for legal-hold/audit decisions. Monotonic sequence numbers and a
+  single in-flight turn prevent chronology ambiguity.
 - `ai_document_chunks`: page-aware extracted text tied to a clean `case_document`.
 - `ai_form_drafts`: immutable source document reference, generated clean S3 key,
   source hash, populated-field evidence, citations, unresolved fields, model/provider,
-  prompt-policy version, and creator.
+  prompt-policy version, creator, review note/status, and Adobe-validation attestation.
 - `ai_usage_events`: atomic, idempotent request reservations, completion state, model,
   and token counts without prompt content.
 

@@ -7,6 +7,7 @@ AI_PROVIDER_ENCRYPTION_KEY=<independent random secret>
 AI_PROVIDER_ENCRYPTION_KEY_PREVIOUS=
 AI_ENABLED=false
 AI_ENABLED_ORGANIZATION_IDS=<approved organization UUIDs>
+AI_ENABLED_USER_IDS=<approved lawyer/admin UUIDs>
 AI_ALLOWED_MODELS=openai:<approved-model>,anthropic:<approved-model>
 AI_REQUIRE_MFA_FOR_KEYS=true
 AI_FORM_DRAFTS_ENABLED=false
@@ -18,6 +19,7 @@ AI_MAX_HISTORY_MESSAGES=12
 AI_MAX_HISTORY_CHARS=40000
 AI_MAX_REQUESTS_PER_HOUR=60
 AI_MAX_REINDEX_DOCUMENTS=100
+NEXT_PUBLIC_STORAGE_ORIGIN=https://<approved-upload-host>
 ```
 
 `AI_PROVIDER_ENCRYPTION_KEY` must not equal the JWT or MFA keys. Back it up in the
@@ -38,6 +40,8 @@ audit event per re-encrypted connection and never prints plaintext keys.
 Keep `AI_ENABLED=false` through deployment and synthetic-case validation.
 Production startup requires an explicit `AI_ENABLED_ORGANIZATION_IDS` allowlist so a
 pilot cannot expose every tenant accidentally. Use `*` only after broad rollout approval.
+An independent `AI_ENABLED_USER_IDS` allowlist keeps the pilot limited to specifically
+trained users even though the system legal roles contain `ai:use`.
 `AI_ALLOWED_MODELS` limits provider discovery and selection to exact models approved for
 retention, residency, quality, and cost policy; models omitted from the list cannot be
 connected or selected.
@@ -48,6 +52,18 @@ approved hash list.
 
 The existing API and document worker deployments must run the same release. Apply
 Alembic migrations before starting the new worker code.
+
+During a rolling worker deployment, each worker claims only job types registered in its
+own release, so an older worker cannot permanently fail a newer AI job. Running jobs
+older than 15 minutes are reclaimable and AI indexing receives eight bounded attempts.
+Deploy migrations first, deploy workers, verify the new handler is registered, and only
+then enable indexing. Alert on stale recovery; it indicates a crash or parser timeout
+that still requires investigation.
+
+The frontend CSP permits direct presigned uploads only to
+`NEXT_PUBLIC_STORAGE_ORIGIN`. Set it to the exact S3 or approved S3-compatible origin
+and configure that bucket to allow CORS `POST` responses only from approved frontend
+origins. Do not use `https:` or wildcard domains.
 
 ## Provider setup
 
@@ -94,10 +110,23 @@ does not fill unused context capacity with unrelated recent chunks. Monitor fail
 make document text trustworthy; the assistant escapes and delimits it as untrusted
 evidence.
 
+Legacy rows marked `clean` without `scan_completed_at` and a server-computed SHA-256 are
+not eligible for AI. Re-scan them through a controlled backfill before indexing. The
+scanner promotes the exact bytes it inspected rather than copying a mutable upload key;
+indexing and form generation verify the stored digest again.
+
+Dry-run and then queue one approved organization at a time:
+
+```bash
+python scripts/queue_ai_rescan_backfill.py --organization-id <uuid>
+python scripts/queue_ai_rescan_backfill.py --organization-id <uuid> --execute
+```
+
 When a deleted document reaches its approved purge date, the purge worker also deletes
 its extracted chunks and any derived form that used it as template or cited evidence.
 A legal hold on a template or cited document blocks the affected derived-form purge.
-Chat/message retention remains a
+Chat messages retain a complete disclosure manifest separately from display citations;
+chat deletion is blocked when any disclosed document is held. Chat/message retention remains a
 separate matter-record decision and must be included in the approved retention schedule.
 
 ## Usage control and idempotency
@@ -124,9 +153,19 @@ Alert on:
 - unexpected provider/model changes; and
 - abnormal token costs in provider dashboards.
 
+Each completed operation records requested and provider-reported model IDs, finish
+reason, provider request ID, prompt version, and token counts without prompt content.
+Incomplete/token-truncated responses fail rather than appearing as complete legal work.
+Provider `429` responses preserve `Retry-After` for the client.
+
 For a suspected provider-key compromise, revoke the key at the provider, disconnect it
 in VisaTrack, review immutable audit events, and create a replacement key only after
 the provider account is secured.
+
+Provider listing and disconnect remain available to authorized owners while inference
+is disabled. VisaTrack scrubs stored provider ciphertext when a user or organization is
+soft-disabled; provider-side revocation is still required because VisaTrack cannot
+revoke a third-party key after deleting its copy.
 
 For a suspected cross-case disclosure, disable the AI feature at deployment level,
 preserve logs/audit records under incident procedure, revoke affected keys, and perform
@@ -149,6 +188,11 @@ forms may require Adobe JavaScript validation and
 barcode generation that pypdf cannot execute. Lawyers must download the draft, verify
 every field, resolve omissions, and use current Adobe Acrobat Reader and the official
 guide. Never upload a generated draft to IRCC without that review and validation.
+
+Draft history can issue a fresh authenticated short-lived download URL; each issuance is
+audited. Review status requires no unresolved/unsupported controls, a written review
+note, and Adobe-validation attestation. It remains a workflow record, not proof that
+IRCC accepted the file.
 
 ## Rollout and rollback
 
