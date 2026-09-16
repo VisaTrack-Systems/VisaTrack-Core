@@ -21,7 +21,7 @@ class AiProviderConnectRequest(BaseModel):
 
 
 class AiProviderSelectModelRequest(BaseModel):
-    selected_model: str = Field(min_length=1, max_length=200)
+    selected_model: str | None = Field(default=None, max_length=200)
 
 
 class AiProviderConnectionResponse(BaseModel):

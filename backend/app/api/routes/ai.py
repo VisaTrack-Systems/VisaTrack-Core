@@ -42,7 +42,12 @@ from app.services.ai_forms import (
     fill_acroform,
     inspect_acroform,
 )
-from app.services.ai_providers import AiProviderError, complete, list_provider_models
+from app.services.ai_providers import (
+    AiProviderError,
+    complete,
+    list_provider_models,
+    resolve_completion_model,
+)
 from app.services.audit import log_activity
 from app.services.jobs import enqueue_job
 from app.services.mfa import verify_user_mfa
@@ -185,8 +190,8 @@ def connect_provider(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not models:
         raise HTTPException(status_code=400, detail="Provider returned no available models")
-    selected_model = payload.selected_model or models[0]
-    if selected_model not in models:
+    selected_model = (payload.selected_model or "").strip() or None
+    if selected_model and selected_model not in models:
         raise HTTPException(status_code=400, detail="Selected model is not available to this key")
 
     now = datetime.now(timezone.utc)
@@ -231,7 +236,11 @@ def connect_provider(
         action="ai_provider_connected",
         entity_type="ai_provider",
         entity_id=None,
-        new_values={"provider": payload.provider, "model": selected_model},
+        new_values={
+            "provider": payload.provider,
+            "model": selected_model or models[0],
+            "auto_model": selected_model is None,
+        },
         request_id=current_request_id(),
     )
     db.commit()
@@ -286,7 +295,8 @@ def select_model(
         )
     except (AiProviderError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    if payload.selected_model not in models:
+    selected_model = (payload.selected_model or "").strip() or None
+    if selected_model and selected_model not in models:
         raise HTTPException(status_code=400, detail="Selected model is not available to this key")
     row = db.execute(
         text(
@@ -299,7 +309,7 @@ def select_model(
             """
         ),
         {
-            "selected_model": payload.selected_model,
+            "selected_model": selected_model,
             "connection_id": str(connection["id"]),
         },
     ).mappings().one()
@@ -521,13 +531,17 @@ def send_message(
     chat = _owned_chat(chat_id, auth, db)
     _enforce_usage_limit(auth, db)
     connection = _provider_connection(auth, db)
-    model = str(connection["selected_model"] or "")
-    if not model:
-        raise HTTPException(status_code=409, detail="Select an AI model first")
     try:
         api_key = decrypt_provider_key(str(connection["encrypted_api_key"]))
+        _, model = resolve_completion_model(
+            str(connection["provider"]),
+            api_key,
+            connection["selected_model"],
+        )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except AiProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     question = payload.content.strip()
     if not question:
@@ -652,9 +666,17 @@ def create_form_draft(
     case = _case_for_ai(case_number, auth, db)
     _enforce_usage_limit(auth, db)
     connection = _provider_connection(auth, db)
-    model = str(connection["selected_model"] or "")
-    if not model:
-        raise HTTPException(status_code=409, detail="Select an AI model first")
+    try:
+        api_key = decrypt_provider_key(str(connection["encrypted_api_key"]))
+        _, model = resolve_completion_model(
+            str(connection["provider"]),
+            api_key,
+            connection["selected_model"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except AiProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     source = db.execute(
         text(
             """
@@ -719,7 +741,7 @@ def create_form_draft(
     try:
         completion = complete(
             provider=str(connection["provider"]),
-            api_key=decrypt_provider_key(str(connection["encrypted_api_key"])),
+            api_key=api_key,
             model=model,
             system=(
                 "You populate a review draft of a Canadian immigration PDF. "

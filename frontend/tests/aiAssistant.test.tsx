@@ -11,6 +11,7 @@ vi.mock('@/lib/api', () => ({
     provider: 'openai',
     models: ['gpt-test'],
     selected_model: 'gpt-test',
+    recommended_model: 'gpt-test',
   })),
   getAiChat: vi.fn(),
   getCaseDocumentViewUrl: vi.fn(),

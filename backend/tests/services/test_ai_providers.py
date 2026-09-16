@@ -43,6 +43,21 @@ def test_model_ranking_prefers_strong_tier_before_recency():
     )
 
 
+def test_model_ranking_ignores_date_stamps_and_prefers_flagship():
+    assert _model_score("openai", "gpt-5.4-pro", 10) > _model_score(
+        "openai", "gpt-4-0125-preview", 999
+    )
+    assert _model_score("openai", "gpt-5.4", 10) > _model_score(
+        "openai", "gpt-5.4-mini", 999
+    )
+    assert _model_score("anthropic", "claude-opus-4-1", 10) > _model_score(
+        "anthropic", "claude-sonnet-4-5-20250929", 999
+    )
+    assert _model_score("openai", "gpt-5.4", 50) > _model_score(
+        "openai", "gpt-5.4-2025-01-01", 90
+    )
+
+
 def test_model_discovery_recommends_strong_general_model(monkeypatch):
     class Response:
         def raise_for_status(self):
@@ -51,10 +66,12 @@ def test_model_discovery_recommends_strong_general_model(monkeypatch):
         def json(self):
             return {
                 "data": [
-                    {"id": "gpt-main", "created": 100},
-                    {"id": "gpt-mini-new", "created": 300},
-                    {"id": "gpt-pro", "created": 90},
-                    {"id": "gpt-audio", "created": 400},
+                    {"id": "gpt-4-0125-preview", "created": 400},
+                    {"id": "gpt-5.4-mini", "created": 500},
+                    {"id": "gpt-5.4-pro", "created": 90},
+                    {"id": "gpt-5.4", "created": 80},
+                    {"id": "gpt-audio", "created": 600},
+                    {"id": "text-embedding-3-large", "created": 700},
                 ]
             }
 
@@ -75,8 +92,30 @@ def test_model_discovery_recommends_strong_general_model(monkeypatch):
 
     models = ai_providers.list_provider_models("openai", "sk-test")
 
-    assert models[0] == "gpt-pro"
+    assert models[0] == "gpt-5.4-pro"
+    assert models[1] == "gpt-5.4"
     assert "gpt-audio" not in models
+    assert "text-embedding-3-large" not in models
+
+
+def test_resolve_completion_model_uses_recommended_unless_pinned(monkeypatch):
+    monkeypatch.setattr(
+        ai_providers,
+        "list_provider_models",
+        lambda provider, key: ["gpt-5.4-pro", "gpt-5.4", "gpt-5.4-mini"],
+    )
+
+    _, auto = ai_providers.resolve_completion_model("openai", "sk-test", None)
+    _, stale = ai_providers.resolve_completion_model(
+        "openai", "sk-test", "gpt-retired"
+    )
+    _, pinned = ai_providers.resolve_completion_model(
+        "openai", "sk-test", "gpt-5.4-mini"
+    )
+
+    assert auto == "gpt-5.4-pro"
+    assert stale == "gpt-5.4-pro"
+    assert pinned == "gpt-5.4-mini"
 
 
 def test_openai_completion_forces_stateless_request(monkeypatch):

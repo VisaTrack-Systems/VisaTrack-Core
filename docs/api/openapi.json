@@ -1250,15 +1250,18 @@
       "AiProviderSelectModelRequest": {
         "properties": {
           "selected_model": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Selected Model",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Model"
           }
         },
-        "required": [
-          "selected_model"
-        ],
         "title": "AiProviderSelectModelRequest",
         "type": "object"
       },

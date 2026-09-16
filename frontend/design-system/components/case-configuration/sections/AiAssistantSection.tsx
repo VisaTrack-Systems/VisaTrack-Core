@@ -135,11 +135,11 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     setBusy('model');
     setError(null);
     try {
-      const saved = await selectAiProviderModel(provider, selectedModel);
+      const saved = await selectAiProviderModel(provider, selectedModel || null);
       setConnections((current) =>
         current.map((item) => (item.provider === provider ? saved : item))
       );
-      setModels((current) => current ? { ...current, selected_model: selectedModel } : current);
+      setModels((current) => current ? { ...current, selected_model: selectedModel || null } : current);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Could not select model');
     } finally {
@@ -434,6 +434,9 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               onChange={(event) => void changeModel(event.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             >
+              <option value="">
+                Strongest available{models.recommended_model ? ` · ${models.recommended_model}` : ''}
+              </option>
               {models.models.map((model) => (
                 <option key={model} value={model}>
                   {model}{model === models.recommended_model ? ' · Recommended strongest model' : ''}
@@ -441,8 +444,8 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              The strongest current general-purpose model is selected initially. Override it when your firm&apos;s
-              retention eligibility, region, cost, or latency policy requires another model.
+              Chat and form drafts use the strongest general-purpose model currently available to
+              this key unless you pin a specific model for retention, region, cost, or latency policy.
             </p>
           </div>
         ) : null}

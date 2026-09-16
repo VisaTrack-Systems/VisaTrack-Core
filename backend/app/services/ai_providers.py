@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -73,6 +75,14 @@ def list_provider_models(provider: str, api_key: str) -> list[str]:
                     "transcribe",
                     "tts",
                     "codex",
+                    "embed",
+                    "moderation",
+                    "instruct",
+                    "whisper",
+                    "dall-e",
+                    "davinci",
+                    "babbage",
+                    "chatgpt-",
                 )
             )
         ]
@@ -90,6 +100,20 @@ def list_provider_models(provider: str, api_key: str) -> list[str]:
             reverse=True,
         )
     ]
+
+
+def resolve_completion_model(
+    provider: str,
+    api_key: str,
+    selected_model: str | None,
+) -> tuple[list[str], str]:
+    models = list_provider_models(provider, api_key)
+    if not models:
+        raise AiProviderError("Provider returned no available models")
+    pinned = (selected_model or "").strip()
+    if pinned and pinned in models:
+        return models, pinned
+    return models, models[0]
 
 
 def complete(
@@ -183,32 +207,57 @@ def _optional_int(value: Any) -> int | None:
         return None
 
 
-def _model_score(provider: str, model_id: str, created: int) -> tuple[int, int, str]:
-    import re
-
+def _model_score(
+    provider: str, model_id: str, created: int
+) -> tuple[int, int, int, int, int, str]:
     normalized = model_id.lower()
-    version_match = re.search(r"(?<!\d)(\d+)(?:[.-](\d+))?", normalized)
-    generation = (
-        int(version_match.group(1)) * 1000
-        + int(version_match.group(2) or 0) * 10
-        if version_match
-        else 0
-    )
+    generation = _generation(normalized)
+    major = generation // 1000
+    family = _family_tier(provider, normalized)
+    canonical = 1 if _is_canonical_alias(normalized) else 0
+    return major, family, generation, canonical, created, normalized
+
+
+def _generation(model_id: str) -> int:
+    for match in re.finditer(r"(?<!\d)(\d{1,2})(?:[.-](\d{1,2}))?(?!\d)", model_id):
+        major = int(match.group(1))
+        minor = int(match.group(2) or 0)
+        if major >= 20:
+            continue
+        return major * 1000 + minor * 10
+    return 0
+
+
+def _family_tier(provider: str, model_id: str) -> int:
     if provider == "anthropic":
-        tier = generation + (
-            300 if "opus" in normalized else 200 if "sonnet" in normalized else 100
-        )
-        if "haiku" in normalized:
-            tier = generation
-    else:
-        tier = generation + 300
-        if "pro" in normalized:
-            tier += 100
-        if "mini" in normalized:
-            tier -= 150
-        if "nano" in normalized:
-            tier -= 250
-    return tier, created, normalized
+        if "opus" in model_id:
+            return 500
+        if "sonnet" in model_id:
+            return 300
+        if "haiku" in model_id or "instant" in model_id:
+            return 50
+        return 100
+    if "nano" in model_id:
+        return 40
+    if "mini" in model_id:
+        return 80
+    if "max" in model_id:
+        return 480
+    if "pro" in model_id:
+        return 450
+    if re.search(r"(?:^|/)o[1-9]", model_id):
+        return 420
+    if "4o" in model_id:
+        return 360
+    return 300
+
+
+def _is_canonical_alias(model_id: str) -> bool:
+    if "latest" in model_id:
+        return True
+    return not re.search(r"\d{4}-\d{2}-\d{2}", model_id) and not re.search(
+        r"(?:^|[-_])\d{8}(?:[-_]|$)", model_id
+    )
 
 
 def _created_rank(value: Any) -> int:
@@ -216,8 +265,6 @@ def _created_rank(value: Any) -> int:
     if integer is not None:
         return integer
     if isinstance(value, str):
-        from datetime import datetime
-
         try:
             return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
         except ValueError:

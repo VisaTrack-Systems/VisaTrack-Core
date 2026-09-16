@@ -87,7 +87,48 @@ def test_connect_provider_verifies_and_never_returns_key(monkeypatch, make_auth_
     assert not hasattr(result, "api_key")
     insert_params = db.execute.call_args_list[0].args[1]
     assert insert_params["encrypted_api_key"] == "ciphertext"
+    assert insert_params["selected_model"] == "gpt-test"
     assert "sk-secret-value-1234" not in str(result)
+
+
+def test_connect_provider_defaults_to_unpinned_strongest_model(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=["lawyer"])
+    now = datetime.now(timezone.utc)
+    db = MagicMock()
+    db.execute.side_effect = [
+        FakeResult(
+            rows=[
+                {
+                    "provider": "openai",
+                    "key_hint": "…1234",
+                    "selected_model": None,
+                    "last_verified_at": now,
+                    "data_processing_acknowledged_at": now,
+                }
+            ]
+        ),
+        FakeResult(),
+    ]
+    monkeypatch.setattr(
+        ai, "list_provider_models", lambda provider, key: ["gpt-5.4-pro", "gpt-5.4"]
+    )
+    monkeypatch.setattr(ai, "encrypt_provider_key", lambda key: "ciphertext")
+    monkeypatch.setattr(ai, "verify_password", lambda password, hashed: True)
+
+    ai.connect_provider(
+        payload=AiProviderConnectRequest(
+            provider="openai",
+            api_key="sk-secret-value-1234",
+            data_processing_acknowledged=True,
+            current_password="current-password",
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    insert_params = db.execute.call_args_list[0].args[1]
+    assert insert_params["selected_model"] is None
+    assert insert_params["encrypted_api_key"] == "ciphertext"
 
 
 def test_connect_provider_reauthenticates_mfa_user(monkeypatch, make_auth_context):

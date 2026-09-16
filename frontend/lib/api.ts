@@ -1329,7 +1329,7 @@ export async function getAiProviderModels(provider: AiProvider): Promise<AiProvi
 
 export async function selectAiProviderModel(
   provider: AiProvider,
-  selectedModel: string
+  selectedModel: string | null
 ): Promise<AiProviderConnection> {
   return requestJson<AiProviderConnection>(
     `/api/v1/ai/providers/${encodeURIComponent(provider)}/model`,

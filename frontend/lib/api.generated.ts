@@ -1837,7 +1837,7 @@ export interface components {
         /** AiProviderSelectModelRequest */
         AiProviderSelectModelRequest: {
             /** Selected Model */
-            selected_model: string;
+            selected_model?: string | null;
         };
         /** AuthTokenResponse */
         AuthTokenResponse: {

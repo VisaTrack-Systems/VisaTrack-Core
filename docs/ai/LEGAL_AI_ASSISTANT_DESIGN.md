@@ -133,10 +133,11 @@ model, residency, deletion, and re-indexing policy is approved.
 - Anthropic Messages API
 
 Model discovery calls each provider's model-list endpoint using the stored credential.
-The strongest available general-purpose model is recommended and selected initially
-(full-size/pro or Opus tiers ahead of small/fast tiers, then provider recency).
-Lawyers may override it because the technically strongest model may not satisfy the
-firm's ZDR eligibility, processing-region, latency, or cost policy. There is no
+Chat and form-draft requests use the strongest available general-purpose model for that
+key by default (newer major versions first, then Opus/pro/max ahead of Sonnet/mini/haiku,
+then undated aliases ahead of dated snapshots). A lawyer may pin a specific model when
+the technically strongest option is not approved for the firm's ZDR eligibility,
+processing-region, latency, or cost policy. There is no
 arbitrary OpenAI-compatible endpoint in the MVP.
 
 ### Form drafts

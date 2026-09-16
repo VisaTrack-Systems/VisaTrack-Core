@@ -27,11 +27,11 @@ Alembic migrations before starting the new worker code.
 
 Each lawyer or administrator connects their own OpenAI or Anthropic API key from a case
 AI Assistant. VisaTrack verifies the key by listing available models and stores only an
-encrypted credential plus its last four-character hint. VisaTrack initially selects the
-strongest full-size general-purpose model returned for that key. The lawyer must override
-that recommendation when the model is not approved for the firm's retention, residency,
-cost, or latency requirements; “strongest” is a capability recommendation, not a privacy
-approval.
+encrypted credential plus its last four-character hint. Chat and form drafts use the
+strongest full-size general-purpose model currently available to that key unless the
+lawyer pins a different model. The lawyer must pin an override when the recommended
+model is not approved for the firm's retention, residency, cost, or latency
+requirements; “strongest” is a capability ranking, not a privacy approval.
 
 Adding or replacing a provider key requires the current VisaTrack password and an MFA
 or recovery code when MFA is enabled. AI routes additionally require the `ai:use`
