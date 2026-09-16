@@ -23,6 +23,7 @@ def test_start_script_is_executable():
 def test_start_script_binds_assigned_port():
     script = START_SCRIPT.read_text(encoding="utf-8")
 
+    assert 'cd "$(dirname "$0")/.."' in script
     assert 'port="${PORT:-8000}"' in script
     assert '--port "${port}"' in script
     assert "--host 0.0.0.0" in script
@@ -58,3 +59,9 @@ def test_configured_health_check_path_is_served():
     config = json.loads(RAILWAY_CONFIG.read_text(encoding="utf-8"))
 
     assert config["deploy"]["healthcheckPath"] in app.openapi()["paths"]
+
+
+def test_procfile_uses_start_script():
+    procfile = (BACKEND_ROOT / "Procfile").read_text(encoding="utf-8")
+
+    assert "scripts/start.sh" in procfile

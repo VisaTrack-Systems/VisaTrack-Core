@@ -4,6 +4,8 @@
 # health check cannot reach the process on that port.
 set -eu
 
+cd "$(dirname "$0")/.."
+
 port="${PORT:-8000}"
 forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
 

@@ -12,6 +12,19 @@ service reads its configuration from the `railway.json` in its root directory.
 Set the root directory in **Service → Settings → Source**. Without it, Railway builds from
 the repository root, where neither `Dockerfile` nor `railway.json` exists.
 
+`RAILPACK_PYTHON_VERSION` on a service means Railway is using Railpack, not the
+`backend/Dockerfile`. Railpack does not run that image's `CMD`, so it will not pick up
+`${PORT}` unless you set a start command or switch the builder to Dockerfile after setting
+the root directory to `backend`. Until that switch, use:
+
+```text
+sh backend/scripts/start.sh
+```
+
+as the service start command (or `sh scripts/start.sh` once the root directory is
+`backend`). `backend/Procfile` is the same command for Railpack when the root is
+`backend`.
+
 ## Why a health check fails
 
 Railway waits for the health check to return `2xx` on the port the container listens on. A
@@ -51,6 +64,34 @@ Reference the Postgres service instead of pasting credentials:
 
 Optional: `RUN_MIGRATIONS=false` on any replica that must not apply migrations. Keep it
 enabled on exactly one service so schema changes ship with the deployment.
+
+## Typical gap against a live API service
+
+These are already enough for the API to talk to storage, mail, and Postgres. They are not
+enough to boot with `APP_ENV=production`, and they do not bind Railway's port:
+
+| Status | Variables |
+| --- | --- |
+| Present | `DATABASE_URL`, `FRONTEND_ORIGIN`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_KMS_KEY_ID`, `S3_BUCKET_NAME`, `S3_MAX_UPLOAD_BYTES`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`, `BUG_REPORT_TO_EMAIL` |
+| Missing, required for production | `APP_ENV=production`, `AUTH_SECRET_KEY` (32+ random bytes), `MFA_ENCRYPTION_KEY` (different 32+ random bytes), `AUTH_COOKIE_SECURE=true`, `AUDIT_ARCHIVE_BUCKET` |
+| Recommended | `FORWARDED_ALLOW_IPS=*` |
+| Wrong service | `NEXT_PUBLIC_GITHUB_ISSUES_URL` belongs on the frontend, not the API |
+| Builder only | `RAILPACK_PYTHON_VERSION` is not read by the app; drop it after switching to the Dockerfile |
+
+Generate the two auth secrets locally and paste the values into Railway — do not commit them:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+`AUDIT_ARCHIVE_BUCKET` is a second S3 bucket (see `.env.example`'s `visatrack-audit-prod`),
+not the documents bucket. Without it, `APP_ENV=production` refuses to start.
+
+Do not put `AUTH_SECRET_KEY`, `MFA_ENCRYPTION_KEY`, AWS keys, `DATABASE_URL`, or
+`RESEND_API_KEY` in the repository, pull requests, or chat. If any of those values have
+been pasted into a ticket or chat, rotate them in AWS, Supabase, Resend, and Railway
+before the next deploy.
 
 ## Required web variables
 
