@@ -60,6 +60,7 @@ def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
             continue
         field_type = str(details.get("/FT") or "")
         current_value = str(details.get("/V") or "")[:500]
+        field_flags = _optional_positive_int(details.get("/Ff")) or 0
         if field_type == "/Sig" and current_value:
             raise UnsupportedPdfFormError(
                 "Signed PDFs cannot be used as AI form templates"
@@ -67,6 +68,10 @@ def inspect_acroform(payload: bytes) -> dict[str, dict[str, Any]]:
         result[name] = {
             "type": field_type,
             "current_value": current_value,
+            "read_only": bool(field_flags & 1),
+            "required": bool(field_flags & 2),
+            "multi_select": bool(field_flags & (1 << 21)),
+            "max_length": _optional_positive_int(details.get("/MaxLen")),
             "options": _field_options(details.get("/Opt")),
         }
     if not result:
@@ -83,6 +88,14 @@ def _field_options(raw_options: Any) -> list[str]:
         else:
             options.append(str(option)[:200])
     return options[:100]
+
+
+def _optional_positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
 
 
 def fill_acroform(payload: bytes, values: dict[str, str]) -> bytes:

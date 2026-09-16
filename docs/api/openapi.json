@@ -813,6 +813,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -854,6 +865,17 @@
               }
             ],
             "title": "Provider"
+          },
+          "requested_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Model"
           },
           "role": {
             "enum": [
@@ -993,6 +1015,35 @@
         "title": "AiFormDraftCreateRequest",
         "type": "object"
       },
+      "AiFormDraftDownloadResponse": {
+        "properties": {
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "integer"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "file_name",
+          "download_url",
+          "expires_in_seconds"
+        ],
+        "title": "AiFormDraftDownloadResponse",
+        "type": "object"
+      },
       "AiFormDraftResponse": {
         "properties": {
           "citations": {
@@ -1026,6 +1077,17 @@
             "title": "File Name",
             "type": "string"
           },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1052,6 +1114,10 @@
               "anthropic"
             ],
             "title": "Provider",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
             "type": "string"
           },
           "source_document_id": {
@@ -1096,8 +1162,10 @@
           "download_url",
           "expires_in_seconds",
           "provider",
+          "requested_model",
           "model",
           "prompt_version",
+          "finish_reason",
           "source_sha256",
           "populated_fields",
           "unresolved_fields",
@@ -1108,6 +1176,171 @@
           "created_at"
         ],
         "title": "AiFormDraftResponse",
+        "type": "object"
+      },
+      "AiFormDraftReviewRequest": {
+        "properties": {
+          "adobe_validation_completed": {
+            "default": false,
+            "title": "Adobe Validation Completed",
+            "type": "boolean"
+          },
+          "review_note": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Review Note",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "reviewed",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "review_note"
+        ],
+        "title": "AiFormDraftReviewRequest",
+        "type": "object"
+      },
+      "AiFormDraftSummaryResponse": {
+        "properties": {
+          "adobe_validation_completed": {
+            "title": "Adobe Validation Completed",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "requested_model": {
+            "title": "Requested Model",
+            "type": "string"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "source_document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Id"
+          },
+          "source_sha256": {
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "reviewed",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unresolved_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unresolved Fields",
+            "type": "array"
+          },
+          "unsupported_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "source_document_id",
+          "file_name",
+          "provider",
+          "requested_model",
+          "model",
+          "prompt_version",
+          "source_sha256",
+          "status",
+          "unresolved_fields",
+          "unsupported_fields",
+          "reviewed_by",
+          "reviewed_at",
+          "review_note",
+          "adobe_validation_completed",
+          "created_at"
+        ],
+        "title": "AiFormDraftSummaryResponse",
         "type": "object"
       },
       "AiFormFieldEvidence": {
@@ -1147,16 +1380,20 @@
       "AiProviderConnectRequest": {
         "properties": {
           "api_key": {
+            "format": "password",
             "maxLength": 500,
             "minLength": 16,
             "title": "Api Key",
-            "type": "string"
+            "type": "string",
+            "writeOnly": true
           },
           "current_password": {
+            "format": "password",
             "maxLength": 128,
             "minLength": 1,
             "title": "Current Password",
-            "type": "string"
+            "type": "string",
+            "writeOnly": true
           },
           "data_processing_acknowledged": {
             "title": "Data Processing Acknowledged",
@@ -1173,7 +1410,8 @@
                 "type": "null"
               }
             ],
-            "title": "Mfa Code"
+            "title": "Mfa Code",
+            "writeOnly": true
           },
           "provider": {
             "enum": [
@@ -5911,6 +6149,55 @@
       }
     },
     "/api/v1/ai/cases/{case_number}/form-drafts": {
+      "get": {
+        "operationId": "list_form_drafts_api_v1_ai_cases__case_number__form_drafts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiFormDraftSummaryResponse"
+                  },
+                  "title": "Response List Form Drafts Api V1 Ai Cases  Case Number  Form Drafts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Form Drafts",
+        "tags": [
+          "legal-ai"
+        ]
+      },
       "post": {
         "operationId": "create_form_draft_api_v1_ai_cases__case_number__form_drafts_post",
         "parameters": [
@@ -5971,6 +6258,130 @@
           }
         ],
         "summary": "Create Form Draft",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}": {
+      "patch": {
+        "operationId": "review_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Draft Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiFormDraftReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiFormDraftSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Review Form Draft",
+        "tags": [
+          "legal-ai"
+        ]
+      }
+    },
+    "/api/v1/ai/cases/{case_number}/form-drafts/{draft_id}/download": {
+      "get": {
+        "operationId": "download_form_draft_api_v1_ai_cases__case_number__form_drafts__draft_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Draft Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiFormDraftDownloadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Form Draft",
         "tags": [
           "legal-ai"
         ]

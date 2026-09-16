@@ -82,6 +82,11 @@ class Settings:
         for value in os.getenv("AI_ENABLED_ORGANIZATION_IDS", "").split(",")
         if value.strip()
     }
+    ai_enabled_user_ids: set[str] = {
+        value.strip().lower()
+        for value in os.getenv("AI_ENABLED_USER_IDS", "").split(",")
+        if value.strip()
+    }
     ai_allowed_models: set[str] = {
         value.strip()
         for value in os.getenv("AI_ALLOWED_MODELS", "").split(",")
@@ -170,6 +175,11 @@ class Settings:
                 "AI_ALLOWED_MODELS must explicitly list production-approved models"
             )
 
+        if self.ai_enabled and not self.ai_enabled_user_ids:
+            raise RuntimeError(
+                "AI_ENABLED_USER_IDS must explicitly scope production AI access"
+            )
+
         if any(
             ":" not in value
             or value.split(":", 1)[0] not in {"openai", "anthropic"}
@@ -183,6 +193,12 @@ class Settings:
             for value in self.ai_enabled_organization_ids
         ):
             raise RuntimeError("AI_ENABLED_ORGANIZATION_IDS contains an invalid UUID")
+
+        if any(
+            value != "*" and not _is_canonical_uuid(value)
+            for value in self.ai_enabled_user_ids
+        ):
+            raise RuntimeError("AI_ENABLED_USER_IDS contains an invalid UUID")
 
         if self.ai_form_drafts_enabled and not self.ai_enabled:
             raise RuntimeError("AI_FORM_DRAFTS_ENABLED requires AI_ENABLED")
@@ -265,6 +281,15 @@ class Settings:
             for value in self.ai_allowed_models
             if value.startswith(prefix)
         }
+
+    def ai_enabled_for_user(self, user_id: object) -> bool:
+        if not self.ai_enabled:
+            return False
+        return (
+            "*"
+            in self.ai_enabled_user_ids
+            or str(user_id).lower() in self.ai_enabled_user_ids
+        )
 
 
 settings = Settings()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import zipfile
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -63,6 +64,7 @@ def test_clean_scan_only_queues_ai_index_when_feature_enabled(
                     "file_path": "quarantine/org/case/document.pdf",
                     "file_type": "application/pdf",
                     "scan_status": "pending",
+                    "scan_completed_at": None,
                     "organization_id": uuid4(),
                     "client_id": uuid4(),
                 }
@@ -85,7 +87,8 @@ def test_clean_scan_only_queues_ai_index_when_feature_enabled(
     )
     monkeypatch.setattr(scan_document, "download_object", download_pdf)
     monkeypatch.setattr(scan_document, "_scan", lambda path: (True, "clean", "test"))
-    monkeypatch.setattr(scan_document, "copy_object", MagicMock())
+    put_object = MagicMock()
+    monkeypatch.setattr(scan_document, "put_object_bytes", put_object)
     monkeypatch.setattr(scan_document, "delete_object", MagicMock())
     monkeypatch.setattr(scan_document, "log_activity", MagicMock())
     monkeypatch.setattr(scan_document, "enqueue_job", enqueue)
@@ -93,3 +96,6 @@ def test_clean_scan_only_queues_ai_index_when_feature_enabled(
     scan_document.scan_document(db, {"document_id": str(document_id)})
 
     assert enqueue.call_count == expected_jobs
+    assert put_object.call_args.kwargs["payload"] == b"%PDF-1.7\n"
+    clean_update_params = db.execute.call_args_list[2].args[1]
+    assert clean_update_params["file_hash"] == hashlib.sha256(b"%PDF-1.7\n").hexdigest()

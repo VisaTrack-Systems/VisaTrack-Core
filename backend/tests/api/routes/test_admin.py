@@ -416,6 +416,7 @@ def test_delete_user_soft_deletes_user(monkeypatch, make_auth_context, make_user
 
     assert target_user.deleted_at is not None
     assert target_user.status == 'disabled'
+    assert "encrypted_api_key = ''" in str(db.execute.call_args.args[0])
     db.commit.assert_called_once()
 
 
@@ -434,4 +435,5 @@ def test_delete_organization_soft_deletes_org(monkeypatch, make_auth_context):
     admin.delete_organization(organization_id=organization.id, auth=auth, db=db)
 
     assert organization.deleted_at is not None
+    assert "encrypted_api_key = ''" in str(db.execute.call_args_list[0].args[0])
     db.commit.assert_called_once()

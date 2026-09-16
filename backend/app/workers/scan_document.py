@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 import subprocess
 import tempfile
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.services.audit import log_activity
 from app.services.jobs import enqueue_job, register_handler
-from app.services.storage import copy_object, delete_object, download_object
+from app.services.storage import delete_object, download_object, put_object_bytes
 
 
 def _matches_declared_type(path: Path, content_type: str) -> bool:
@@ -83,6 +84,7 @@ def scan_document(db: Session, payload: dict) -> None:
                 cd.file_path,
                 cd.file_type,
                 cd.scan_status,
+                cd.scan_completed_at,
                 c.organization_id,
                 c.client_id
             FROM case_documents cd
@@ -95,7 +97,7 @@ def scan_document(db: Session, payload: dict) -> None:
     ).mappings().first()
     if document is None:
         return
-    if document["scan_status"] == "clean":
+    if document["scan_status"] == "clean" and document["scan_completed_at"] is not None:
         return
 
     db.execute(
@@ -134,12 +136,26 @@ def scan_document(db: Session, payload: dict) -> None:
                 )
                 return
 
-            prefix = f"{settings.s3_quarantine_prefix}/"
-            if not source_key.startswith(prefix):
-                raise RuntimeError("Document is outside the quarantine prefix")
-            clean_key = f"{settings.s3_clean_prefix}/{source_key[len(prefix):]}"
-            copy_object(source_key=source_key, destination_key=clean_key)
-            delete_object(object_key=source_key)
+            quarantine_prefix = f"{settings.s3_quarantine_prefix}/"
+            clean_prefix = f"{settings.s3_clean_prefix}/"
+            if source_key.startswith(quarantine_prefix):
+                clean_key = (
+                    f"{settings.s3_clean_prefix}/"
+                    f"{source_key[len(quarantine_prefix):]}"
+                )
+            elif source_key.startswith(clean_prefix):
+                clean_key = source_key
+            else:
+                raise RuntimeError("Document is outside approved storage prefixes")
+            scanned_bytes = path.read_bytes()
+            scanned_sha256 = hashlib.sha256(scanned_bytes).hexdigest()
+            put_object_bytes(
+                object_key=clean_key,
+                payload=scanned_bytes,
+                content_type=str(document["file_type"]),
+            )
+            if source_key != clean_key:
+                delete_object(object_key=source_key)
             db.execute(
                 text(
                     """
@@ -149,6 +165,7 @@ def scan_document(db: Session, payload: dict) -> None:
                         scan_engine = :scan_engine,
                         scan_signature_version = :scan_signature_version,
                         scan_completed_at = NOW(),
+                        file_hash = :file_hash,
                         scan_failure_reason = NULL,
                         status = 'received',
                         updated_at = NOW()
@@ -159,6 +176,7 @@ def scan_document(db: Session, payload: dict) -> None:
                     "clean_key": clean_key,
                     "scan_engine": "ClamAV",
                     "scan_signature_version": engine_version,
+                    "file_hash": scanned_sha256,
                     "document_id": str(document_id),
                 },
             )
@@ -180,6 +198,7 @@ def scan_document(db: Session, payload: dict) -> None:
                     job_type="index_ai_document",
                     idempotency_key=f"index-ai-document:{document_id}",
                     payload={"document_id": str(document_id)},
+                    max_attempts=8,
                 )
             db.commit()
         except Exception as exc:

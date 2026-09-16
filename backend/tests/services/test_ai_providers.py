@@ -21,6 +21,28 @@ def test_parse_openai_stateless_response():
     assert result.output_tokens == 8
 
 
+def test_parse_openai_records_actual_model_and_rejects_incomplete_output():
+    result = _parse_openai(
+        {
+            "id": "resp_123",
+            "model": "gpt-approved-snapshot",
+            "status": "completed",
+            "output_text": "Answer",
+        }
+    )
+    assert result.actual_model == "gpt-approved-snapshot"
+    assert result.provider_request_id == "resp_123"
+    assert result.finish_reason == "completed"
+
+    with pytest.raises(ai_providers.AiIncompleteResponseError):
+        _parse_openai(
+            {
+                "status": "incomplete",
+                "output_text": "Truncated answer",
+            }
+        )
+
+
 def test_parse_anthropic_text_blocks():
     result = _parse_anthropic(
         {
@@ -33,6 +55,16 @@ def test_parse_anthropic_text_blocks():
         }
     )
     assert result.content == "First\nSecond"
+
+
+def test_parse_anthropic_rejects_token_truncation():
+    with pytest.raises(ai_providers.AiIncompleteResponseError):
+        _parse_anthropic(
+            {
+                "content": [{"type": "text", "text": "Truncated"}],
+                "stop_reason": "max_tokens",
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -209,3 +241,37 @@ def test_completion_maps_retired_model_to_fail_closed_error(monkeypatch):
             system="System",
             messages=[{"role": "user", "content": "Question"}],
         )
+
+
+def test_completion_preserves_provider_retry_after(monkeypatch):
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, **kwargs):
+            request = ai_providers.httpx.Request("POST", url)
+            return ai_providers.httpx.Response(
+                429,
+                request=request,
+                headers={"Retry-After": "45"},
+                json={"error": {"message": "rate limited"}},
+            )
+
+    monkeypatch.setattr(ai_providers.httpx, "Client", Client)
+
+    with pytest.raises(ai_providers.AiProviderRateLimitError) as exc:
+        ai_providers.complete(
+            provider="openai",
+            api_key="sk-test",
+            model="gpt-approved",
+            system="System",
+            messages=[{"role": "user", "content": "Question"}],
+        )
+
+    assert exc.value.retry_after_seconds == 45

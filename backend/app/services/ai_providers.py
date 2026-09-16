@@ -24,11 +24,24 @@ class AiModelUnavailableError(AiProviderError):
     pass
 
 
+class AiIncompleteResponseError(AiProviderError):
+    pass
+
+
+class AiProviderRateLimitError(AiProviderError):
+    def __init__(self, retry_after_seconds: int | None = None):
+        super().__init__("AI provider rate limit reached; try again later")
+        self.retry_after_seconds = retry_after_seconds
+
+
 @dataclass(frozen=True)
 class AiCompletion:
     content: str
     input_tokens: int | None = None
     output_tokens: int | None = None
+    actual_model: str | None = None
+    provider_request_id: str | None = None
+    finish_reason: str | None = None
 
 
 def list_provider_models(provider: str, api_key: str) -> list[str]:
@@ -188,6 +201,9 @@ def _raise_completion_status(response: httpx.Response) -> None:
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
+        if response.status_code == 429:
+            retry_after = _optional_int(response.headers.get("Retry-After"))
+            raise AiProviderRateLimitError(retry_after) from exc
         detail = response.text.casefold()
         if response.status_code in {400, 403, 404} and "model" in detail:
             raise AiModelUnavailableError(
@@ -200,6 +216,9 @@ def _raise_completion_status(response: httpx.Response) -> None:
 def _parse_openai(payload: dict[str, Any]) -> AiCompletion:
     if not isinstance(payload, dict):
         raise AiProviderError("AI provider returned an invalid response")
+    status_value = str(payload.get("status") or "").strip().lower()
+    if status_value and status_value != "completed":
+        raise AiIncompleteResponseError("AI provider returned an incomplete response")
     content = str(payload.get("output_text") or "").strip()
     if not content:
         parts: list[str] = []
@@ -217,12 +236,18 @@ def _parse_openai(payload: dict[str, Any]) -> AiCompletion:
         content=content,
         input_tokens=_optional_int(usage.get("input_tokens")),
         output_tokens=_optional_int(usage.get("output_tokens")),
+        actual_model=str(payload.get("model") or "").strip() or None,
+        provider_request_id=str(payload.get("id") or "").strip() or None,
+        finish_reason=status_value or None,
     )
 
 
 def _parse_anthropic(payload: dict[str, Any]) -> AiCompletion:
     if not isinstance(payload, dict):
         raise AiProviderError("AI provider returned an invalid response")
+    stop_reason = str(payload.get("stop_reason") or "").strip().lower()
+    if stop_reason == "max_tokens":
+        raise AiIncompleteResponseError("AI provider output reached its token limit")
     content = "\n".join(
         str(item.get("text") or "")
         for item in payload.get("content", [])
@@ -235,6 +260,9 @@ def _parse_anthropic(payload: dict[str, Any]) -> AiCompletion:
         content=content,
         input_tokens=_optional_int(usage.get("input_tokens")),
         output_tokens=_optional_int(usage.get("output_tokens")),
+        actual_model=str(payload.get("model") or "").strip() or None,
+        provider_request_id=str(payload.get("id") or "").strip() or None,
+        finish_reason=stop_reason or None,
     )
 
 

@@ -55,6 +55,9 @@ def _production_ai_settings():
     candidate.ai_enabled_organization_ids = {
         '00000000-0000-0000-0000-000000000001'
     }
+    candidate.ai_enabled_user_ids = {
+        '00000000-0000-0000-0000-000000000002'
+    }
     candidate.ai_allowed_models = {'openai:gpt-approved'}
     candidate.ai_provider_encryption_key = 'ai-' + ('k' * 32)
     candidate.ai_provider_encryption_key_previous = ()
@@ -85,6 +88,14 @@ def test_production_ai_requires_explicit_model_allowlist():
     candidate.ai_allowed_models = set()
 
     with pytest.raises(RuntimeError, match='AI_ALLOWED_MODELS'):
+        candidate.validate_security()
+
+
+def test_production_ai_requires_explicit_user_scope():
+    candidate = _production_ai_settings()
+    candidate.ai_enabled_user_ids = set()
+
+    with pytest.raises(RuntimeError, match='AI_ENABLED_USER_IDS'):
         candidate.validate_security()
 
 
