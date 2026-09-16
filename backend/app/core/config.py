@@ -62,6 +62,12 @@ class Settings:
     resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.ca")
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
+    ai_provider_encryption_key: str = os.getenv("AI_PROVIDER_ENCRYPTION_KEY", "")
+    ai_request_timeout_seconds: float = float(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
+    ai_max_document_chars: int = int(os.getenv("AI_MAX_DOCUMENT_CHARS", "500000"))
+    ai_max_context_chunks: int = int(os.getenv("AI_MAX_CONTEXT_CHUNKS", "8"))
+    ai_max_history_messages: int = int(os.getenv("AI_MAX_HISTORY_MESSAGES", "12"))
+    ai_max_requests_per_hour: int = int(os.getenv("AI_MAX_REQUESTS_PER_HOUR", "60"))
 
     def validate_security(self) -> None:
         """Reject unsafe authentication settings outside local development."""
@@ -83,6 +89,14 @@ class Settings:
         if not self.mfa_encryption_key or self.mfa_encryption_key == self.auth_secret_key:
             raise RuntimeError(
                 "MFA_ENCRYPTION_KEY must be configured separately from AUTH_SECRET_KEY"
+            )
+
+        if (
+            not self.ai_provider_encryption_key
+            or self.ai_provider_encryption_key in {self.auth_secret_key, self.mfa_encryption_key}
+        ):
+            raise RuntimeError(
+                "AI_PROVIDER_ENCRYPTION_KEY must be configured independently of authentication keys"
             )
 
         if not self.auth_cookie_secure:

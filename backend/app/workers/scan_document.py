@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.services.audit import log_activity
-from app.services.jobs import register_handler
+from app.services.jobs import enqueue_job, register_handler
 from app.services.storage import copy_object, delete_object, download_object
 
 
@@ -172,6 +172,13 @@ def scan_document(db: Session, payload: dict) -> None:
                 case_id=document["case_id"],
                 client_id=document["client_id"],
                 new_values={"scan_engine": "ClamAV"},
+            )
+            enqueue_job(
+                db,
+                organization_id=document["organization_id"],
+                job_type="index_ai_document",
+                idempotency_key=f"index-ai-document:{document_id}",
+                payload={"document_id": str(document_id)},
             )
             db.commit()
         except Exception as exc:

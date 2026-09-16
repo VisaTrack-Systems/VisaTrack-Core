@@ -14,6 +14,8 @@ and never grant access.
 | Grant/revoke `super_admin` | denied | denied | denied | allowed with audit event |
 | Apply/release legal hold | denied | denied | own organization | permitted platform scope |
 | View trust/financial records | explicitly related/visible only | assigned scope | own organization | permitted platform scope |
+| Use case AI/chat | denied | assigned/created case + own provider key | own organization + own provider key | permitted platform scope + own provider key |
+| Generate AI PDF draft | denied | assigned/created case + clean source PDF | own organization + clean source PDF | clean source PDF |
 
 ## Mandatory policy rules
 
@@ -26,6 +28,8 @@ and never grant access.
 6. Disabled/deleted/locked users and revoked/expired sessions fail before policy checks.
 7. Sensitive writes emit an immutable audit event with actor, tenant, action, target,
    result, and correlation ID.
+8. AI conversations are private to their creator, use only the selected case, and cannot
+   call mutation or submission tools.
 
 ## Required negative tests
 

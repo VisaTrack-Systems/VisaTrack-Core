@@ -26,6 +26,7 @@ import {
 import { SidebarNav } from './case-configuration/SidebarNav';
 import { CaseDetailsSection } from './case-configuration/sections/CaseDetailsSection';
 import { DocumentsSection } from './case-configuration/sections/DocumentsSection';
+import { AiAssistantSection } from './case-configuration/sections/AiAssistantSection';
 import { RemindersSection } from './case-configuration/sections/RemindersSection';
 import { MilestonesSection } from './case-configuration/sections/MilestonesSection';
 import { OverviewSection } from './case-configuration/sections/OverviewSection';
@@ -881,6 +882,15 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
 
     if (activeSection === 'payments') {
       return <PaymentsSection workspace={workspace} />;
+    }
+
+    if (activeSection === 'ai-assistant') {
+      return (
+        <AiAssistantSection
+          workspace={workspace}
+          onWorkspaceRefresh={() => refreshWorkspace(workspace.case.case_number)}
+        />
+      );
     }
 
     if (activeSection === 'reminders') {

@@ -10,6 +10,7 @@ export type SectionType =
   | 'details'
   | 'documents'
   | 'milestones'
+  | 'ai-assistant'
   | 'payments'
   | 'reminders'
   | 'permissions';

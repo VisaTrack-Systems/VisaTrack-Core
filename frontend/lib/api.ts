@@ -508,6 +508,62 @@ export type CaseDocumentViewResponse = {
   expires_in_seconds: number;
 };
 
+export type AiProvider = 'openai' | 'anthropic';
+
+export type AiProviderConnection = {
+  provider: AiProvider;
+  key_hint: string;
+  selected_model: string | null;
+  last_verified_at: string | null;
+  data_processing_acknowledged_at: string;
+};
+
+export type AiProviderModels = {
+  provider: AiProvider;
+  models: string[];
+  selected_model: string | null;
+  recommended_model: string | null;
+};
+
+export type AiCitation = {
+  source_id: string;
+  case_document_id: string;
+  document_name: string;
+  page_number: number | null;
+  excerpt: string;
+};
+
+export type AiChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations: AiCitation[];
+  provider: AiProvider | null;
+  model: string | null;
+  created_at: string;
+};
+
+export type AiChat = {
+  id: string;
+  case_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: AiChatMessage[];
+};
+
+export type AiFormDraft = {
+  id: string;
+  source_document_id: string | null;
+  file_name: string;
+  download_url: string;
+  expires_in_seconds: number;
+  populated_fields: string[];
+  unresolved_fields: string[];
+  warning: string;
+  created_at: string;
+};
+
 export type AuthLoginInput = {
   organization_slug: string;
   email: string;
@@ -1208,6 +1264,107 @@ export async function acknowledgeCaseReminder(
   return requestJson<CaseWorkspace['reminders'][number]>(
     `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/acknowledge`,
     { method: 'POST' }
+  );
+}
+
+export async function listAiProviderConnections(): Promise<AiProviderConnection[]> {
+  return requestJson<AiProviderConnection[]>('/api/v1/ai/providers');
+}
+
+export async function connectAiProvider(input: {
+  provider: AiProvider;
+  api_key: string;
+  selected_model?: string | null;
+  data_processing_acknowledged: boolean;
+}): Promise<AiProviderConnection> {
+  return requestJson<AiProviderConnection>('/api/v1/ai/providers', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAiProviderModels(provider: AiProvider): Promise<AiProviderModels> {
+  return requestJson<AiProviderModels>(
+    `/api/v1/ai/providers/${encodeURIComponent(provider)}/models`
+  );
+}
+
+export async function selectAiProviderModel(
+  provider: AiProvider,
+  selectedModel: string
+): Promise<AiProviderConnection> {
+  return requestJson<AiProviderConnection>(
+    `/api/v1/ai/providers/${encodeURIComponent(provider)}/model`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ selected_model: selectedModel }),
+    }
+  );
+}
+
+export async function disconnectAiProvider(provider: AiProvider): Promise<void> {
+  return requestVoid(`/api/v1/ai/providers/${encodeURIComponent(provider)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function indexCaseForAi(caseNumber: string): Promise<{ queued_documents: number }> {
+  return requestJson<{ queued_documents: number }>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/index`,
+    { method: 'POST' }
+  );
+}
+
+export async function listCaseAiChats(caseNumber: string): Promise<AiChat[]> {
+  return requestJson<AiChat[]>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/chats`
+  );
+}
+
+export async function createCaseAiChat(caseNumber: string, title: string): Promise<AiChat> {
+  return requestJson<AiChat>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/chats`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }
+  );
+}
+
+export async function getAiChat(chatId: string): Promise<AiChat> {
+  return requestJson<AiChat>(`/api/v1/ai/chats/${encodeURIComponent(chatId)}`);
+}
+
+export async function deleteAiChat(chatId: string): Promise<void> {
+  return requestVoid(`/api/v1/ai/chats/${encodeURIComponent(chatId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function sendAiChatMessage(chatId: string, content: string): Promise<AiChatMessage> {
+  return requestJson<AiChatMessage>(
+    `/api/v1/ai/chats/${encodeURIComponent(chatId)}/messages`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }
+  );
+}
+
+export async function createAiFormDraft(
+  caseNumber: string,
+  sourceDocumentId: string,
+  instructions?: string | null
+): Promise<AiFormDraft> {
+  return requestJson<AiFormDraft>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        source_document_id: sourceDocumentId,
+        instructions: instructions ?? null,
+      }),
+    }
   );
 }
 

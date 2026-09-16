@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  Bot,
   BellRing,
   CheckCircle,
   DollarSign,
@@ -30,6 +31,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
     { id: 'details', label: 'Case Details', icon: FileText },
     { id: 'documents', label: 'Document Requests', icon: FileCheck },
     { id: 'milestones', label: 'Milestones', icon: CheckCircle },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Bot },
     { id: 'payments', label: 'Payments & Invoices', icon: DollarSign },
     { id: 'reminders', label: 'Reminders', icon: BellRing },
     { id: 'permissions', label: 'Sharing / Permissions', icon: Settings },
