@@ -7,6 +7,7 @@ from typing import Any
 
 from pypdf import PdfReader, PdfWriter
 from pypdf.annotations import FreeText
+from pypdf.generic import NameObject, NumberObject
 
 SUPPORTED_FIELD_TYPES = {"/Tx", "/Ch"}
 MAX_FORM_BYTES = 15 * 1024 * 1024
@@ -117,6 +118,7 @@ def fill_acroform(payload: bytes, values: dict[str, str]) -> bytes:
                 safe_values,
                 auto_regenerate=True,
             )
+            _restore_widget_constraints(page, fields)
             page_width = float(page.mediabox.width)
             page_height = float(page.mediabox.height)
             writer.add_annotation(
@@ -135,3 +137,17 @@ def fill_acroform(payload: bytes, values: dict[str, str]) -> bytes:
         return output.getvalue()
     except Exception as exc:
         raise UnsupportedPdfFormError("The PDF form could not be populated safely") from exc
+
+
+def _restore_widget_constraints(page: Any, fields: dict[str, dict[str, Any]]) -> None:
+    for reference in page.get("/Annots") or []:
+        field = reference.get_object()
+        while field.get("/Parent"):
+            field = field["/Parent"].get_object()
+        name = str(field.get("/T") or "")
+        details = fields.get(name)
+        if not details:
+            continue
+        max_length = details.get("max_length")
+        if max_length:
+            field[NameObject("/MaxLen")] = NumberObject(int(max_length))

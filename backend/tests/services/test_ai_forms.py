@@ -58,6 +58,9 @@ def test_named_acroform_field_is_filled_in_review_copy():
     )
     source = BytesIO()
     writer.write(source)
+    source_fields = inspect_acroform(source.getvalue())
+    assert source_fields["ClientName"]["required"] is True
+    assert source_fields["ClientName"]["max_length"] == 100
 
     draft = fill_acroform(source.getvalue(), {"ClientName": "Jane Doe", "Unknown": "ignored"})
 

@@ -92,6 +92,7 @@ def require_ai_credential_access(
 def require_ai_access(
     auth: AuthContext = Depends(require_ai_credential_access),
 ) -> AuthContext:
+    require_ai_credential_access(auth)
     if not settings.ai_enabled:
         raise HTTPException(status_code=503, detail="AI assistant is not enabled")
     if not settings.ai_enabled_for_organization(auth.organization_id):
