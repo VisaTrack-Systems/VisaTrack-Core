@@ -38,6 +38,28 @@ import { LawyerDashboard } from './components/LawyerDashboard';
 import { LegalAiWorkspace } from './components/LegalAiWorkspace';
 
 type AppView = 'login' | 'copilot' | 'lawyer' | 'client' | 'admin' | 'active-cases' | 'case-config';
+const APP_VIEWS = new Set<AppView>([
+  'login',
+  'copilot',
+  'lawyer',
+  'client',
+  'admin',
+  'active-cases',
+  'case-config',
+]);
+
+function requestedWorkspaceLocation(): {
+  view: AppView | null;
+  caseNumber: string | null;
+} {
+  if (typeof window === 'undefined') return { view: null, caseNumber: null };
+  const params = new URL(window.location.href).searchParams;
+  const rawView = params.get('view') as AppView | null;
+  return {
+    view: rawView && APP_VIEWS.has(rawView) ? rawView : null,
+    caseNumber: params.get('case'),
+  };
+}
 
 function getDefaultViewForUser(user: CurrentUser | null): AppView {
   if (!user) {
@@ -121,8 +143,18 @@ export default function App() {
       try {
         const user = await getCurrentUser();
         if (!ignore) {
+          const requested = requestedWorkspaceLocation();
+          const nextView =
+            requested.view &&
+            canAccessView(user, requested.view) &&
+            (requested.view !== 'case-config' || requested.caseNumber)
+              ? requested.view
+              : getDefaultViewForUser(user);
           setCurrentUser(user);
-          setCurrentView(getDefaultViewForUser(user));
+          setCurrentView(nextView);
+          setSelectedCaseId(
+            nextView === 'case-config' ? requested.caseNumber : null
+          );
         }
       } catch {
         clearAccessToken();
@@ -143,6 +175,23 @@ export default function App() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || authLoading) return;
+    const url = new URL(window.location.href);
+    if (!currentUser || currentView === 'login') {
+      url.searchParams.delete('view');
+      url.searchParams.delete('case');
+    } else {
+      url.searchParams.set('view', currentView);
+      if (currentView === 'case-config' && selectedCaseId) {
+        url.searchParams.set('case', selectedCaseId);
+      } else {
+        url.searchParams.delete('case');
+      }
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [authLoading, currentUser, currentView, selectedCaseId]);
 
   useEffect(() => {
     if (canAccessView(currentUser, currentView)) {
