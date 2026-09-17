@@ -90,7 +90,7 @@ describe('LegalAiWorkspace', () => {
     await screen.findByTestId('matter-copilot');
     await userEvent.click(
       screen.getByRole('button', {
-        name: new RegExp(mockCaseWorkspaceSecondary.case.client_name, 'i'),
+        name: new RegExp(mockCaseWorkspaceSecondary.case.case_number, 'i'),
       })
     );
 
