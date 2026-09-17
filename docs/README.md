@@ -11,6 +11,8 @@ This directory contains project documentation and design artifacts.
 - Design rationale
 - Research notes
 - Future planning documents
+- Product design:
+  - [`product/CHAT_FIRST_COUNSEL_WORKSPACE.md`](product/CHAT_FIRST_COUNSEL_WORKSPACE.md)
 - Legal AI:
   - [`ai/LEGAL_AI_ASSISTANT_DESIGN.md`](ai/LEGAL_AI_ASSISTANT_DESIGN.md)
   - [`ai/OPERATIONS.md`](ai/OPERATIONS.md)
