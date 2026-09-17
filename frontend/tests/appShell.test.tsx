@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,13 +82,17 @@ describe('chat-first application shell', () => {
     expect(
       await screen.findByRole('heading', { name: 'Counsel workspace' })
     ).toBeInTheDocument();
-    expect(window.location.search).toBe('?view=copilot');
+    await waitFor(() => {
+      expect(window.location.search).toBe('?view=copilot');
+    });
 
     await userEvent.click(screen.getByRole('button', { name: 'Open all matters' }));
     expect(
       await screen.findByRole('heading', { name: 'All matters view' })
     ).toBeInTheDocument();
-    expect(window.location.search).toBe('?view=active-cases');
+    await waitFor(() => {
+      expect(window.location.search).toBe('?view=active-cases');
+    });
   });
 
   it('restores an authorized case deep link after session hydration', async () => {
@@ -106,9 +110,11 @@ describe('chat-first application shell', () => {
         name: 'Case workspace C-2026-001',
       })
     ).toBeInTheDocument();
-    expect(window.location.search).toBe(
-      '?view=case-config&case=C-2026-001'
-    );
+    await waitFor(() => {
+      expect(window.location.search).toBe(
+        '?view=case-config&case=C-2026-001'
+      );
+    });
   });
 
   it('keeps clients in the non-AI portal', async () => {
@@ -120,6 +126,8 @@ describe('chat-first application shell', () => {
       await screen.findByRole('heading', { name: 'Client portal view' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Counsel workspace')).not.toBeInTheDocument();
-    expect(window.location.search).toBe('?view=client');
+    await waitFor(() => {
+      expect(window.location.search).toBe('?view=client');
+    });
   });
 });
