@@ -10,16 +10,19 @@ type AppointmentsPanelProps = {
 
 export function AppointmentsPanel({ upcomingAppointments }: AppointmentsPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Upcoming dates</h2>
       </div>
       <div className="p-6 space-y-4">
+        {upcomingAppointments.length === 0 ? (
+          <p className="text-sm text-slate-500">No upcoming dates are currently listed.</p>
+        ) : null}
         {upcomingAppointments.map((appointment, index) => (
           <div key={`${appointment.title}-${index}`} className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <div className="bg-red-100 p-2 rounded">
-                <Calendar className="w-5 h-5 text-red-600" />
+              <div className="rounded-lg bg-[#eef0ff] p-2">
+                <Calendar className="w-5 h-5 text-[#5661ce]" />
               </div>
               <div className="flex-1">
                 <p className="font-medium text-gray-900 text-sm">{appointment.title}</p>

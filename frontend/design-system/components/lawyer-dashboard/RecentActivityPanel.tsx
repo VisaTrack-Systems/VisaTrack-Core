@@ -1,6 +1,6 @@
 /** RecentActivityPanel: recentactivitypanel implementation. */
 
-import { AlertCircle, BellRing, FileText, TrendingUp } from 'lucide-react';
+import { AlertCircle, BellRing, Briefcase, FileText, TrendingUp } from 'lucide-react';
 
 import type { ActivityItem } from './types';
 
@@ -11,9 +11,9 @@ type RecentActivityPanelProps = {
 
 export function RecentActivityPanel({ activityItems, isLoading = false }: RecentActivityPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Recently created matters</h2>
       </div>
       <div className="divide-y divide-gray-200">
         {isLoading ? (
@@ -26,7 +26,9 @@ export function RecentActivityPanel({ activityItems, isLoading = false }: Recent
               <div className="flex items-start gap-4">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    activity.type === 'document'
+                    activity.type === 'case'
+                      ? 'bg-indigo-100'
+                      : activity.type === 'document'
                       ? 'bg-blue-100'
                       : activity.type === 'reminder'
                         ? 'bg-purple-100'
@@ -35,6 +37,7 @@ export function RecentActivityPanel({ activityItems, isLoading = false }: Recent
                           : 'bg-red-100'
                   }`}
                 >
+                  {activity.type === 'case' && <Briefcase className="w-5 h-5 text-[#5661ce]" />}
                   {activity.type === 'document' && <FileText className="w-5 h-5 text-blue-600" />}
                   {activity.type === 'reminder' && <BellRing className="w-5 h-5 text-purple-600" />}
                   {activity.type === 'payment' && <TrendingUp className="w-5 h-5 text-green-600" />}

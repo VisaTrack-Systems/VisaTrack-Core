@@ -1,6 +1,6 @@
 /** CasesTable: casestable implementation. */
 
-import { Calendar, Clock, DollarSign, FileText } from 'lucide-react';
+import { Calendar, Clock, FileText } from 'lucide-react';
 
 import type { UiCase } from './types';
 import { priorityColor, statusColor } from './utils';
@@ -22,7 +22,6 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Priority</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Milestone</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Deadline</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Outstanding</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Progress</th>
             </tr>
           </thead>
@@ -57,25 +56,6 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
                   <div className="flex items-center gap-1.5 text-sm text-gray-900">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     {case_.nextDeadline}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    {case_.outstandingDocs > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs text-yellow-700">
-                        <FileText className="w-3 h-3" />
-                        {case_.outstandingDocs} docs
-                      </span>
-                    )}
-                    {case_.outstandingPayments > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs text-red-700">
-                        <DollarSign className="w-3 h-3" />
-                        {case_.outstandingPayments} payment{case_.outstandingPayments > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {case_.outstandingDocs === 0 && case_.outstandingPayments === 0 && (
-                      <span className="text-xs text-green-600">All clear</span>
-                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4">

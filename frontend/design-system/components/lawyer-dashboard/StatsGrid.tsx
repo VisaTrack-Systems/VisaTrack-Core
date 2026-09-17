@@ -41,10 +41,10 @@ export function StatsGrid({ stats, isLoading = false }: StatsGridProps) {
       color: 'text-[#3289a8]',
     },
     {
-      label: 'Upcoming Milestones',
+      label: 'Target Dates Set',
       value: String(stats.upcomingMilestones),
       icon: Clock,
-      trend: 'Needs follow-up',
+      trend: 'Cases with a filing target',
       color: 'text-[#c08a32]',
     },
     {
