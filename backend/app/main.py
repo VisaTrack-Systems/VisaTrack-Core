@@ -7,9 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.middleware.error_envelope import ErrorEnvelopeMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+
+# Added innermost first: CORS wraps request logging, which wraps the error
+# envelope, so a 500 is logged with its correlation id and stays readable
+# cross-origin.
+app.add_middleware(ErrorEnvelopeMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 app.add_middleware(
