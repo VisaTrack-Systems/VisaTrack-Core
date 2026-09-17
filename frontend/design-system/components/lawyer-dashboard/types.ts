@@ -15,7 +15,7 @@ export type ActivityItem = {
   client: string;
   detail: string;
   time: string;
-  type: 'document' | 'reminder' | 'payment' | 'milestone';
+  type: 'case' | 'document' | 'reminder' | 'payment' | 'milestone';
 };
 
 export type DashboardStats = {

@@ -6,11 +6,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3f5fa;
+  --foreground: #172033;
   --form-background: #ffffff;
-  --form-foreground: #111827;
-  --form-placeholder: #6b7280;
+  --form-foreground: #172033;
+  --form-placeholder: #7b8498;
+  --vt-ink: #10182b;
+  --vt-indigo: #5b67d8;
+  --vt-indigo-soft: #eef0ff;
+  --vt-mint: #35c9b0;
+  --vt-paper: #ffffff;
+  --vt-line: #dfe3ec;
 }
 
 @theme inline {
@@ -25,6 +31,23 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   color-scheme: light;
+  min-height: 100vh;
+  letter-spacing: -0.005em;
+}
+
+::selection {
+  background: #cdd2ff;
+  color: #172033;
+}
+
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--vt-indigo);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

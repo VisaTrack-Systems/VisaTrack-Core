@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 test('sign-in screen has no serious accessibility violations', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enter workspace' })).toBeVisible();
   await expect(page.getByLabel('Organization slug')).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
   await expect(page.getByLabel('Password')).toBeVisible();

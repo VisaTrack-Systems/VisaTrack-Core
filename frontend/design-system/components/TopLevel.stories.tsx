@@ -8,6 +8,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { CaseConfiguration } from './CaseConfiguration';
 import { ClientDashboard } from './ClientDashboard';
 import { LawyerDashboard } from './LawyerDashboard';
+import { LegalAiWorkspace } from './LegalAiWorkspace';
 import { NewCaseDialog } from './NewCaseDialog';
 import { PortalAuthGate } from './PortalAuthGate';
 import { ProfileSettingsDialog } from './ProfileSettingsDialog';
@@ -48,6 +49,46 @@ export const LawyerDashboardPage: Story = {
     mockApi: [jsonRoute('GET', '/api/v1/lawyer/cases', mockLawyerCases)],
   },
   render: () => <LawyerDashboard onViewActiveCases={async () => {}} onCreateCase={async () => {}} />,
+};
+
+export const CounselAiWorkspacePage: Story = {
+  parameters: {
+    layout: 'fullscreen',
+    mockApi: [
+      jsonRoute('GET', '/api/v1/lawyer/cases', mockLawyerCases),
+      jsonRoute('GET', '/api/v1/ai/capabilities', {
+        chat_enabled: true,
+        form_drafts_enabled: false,
+        credential_management_allowed: true,
+        reason: null,
+      }),
+      jsonRoute('GET', '/api/v1/cases/by-number/C-2026-001/workspace', mockCaseWorkspace),
+      jsonRoute('GET', '/api/v1/ai/providers', []),
+      jsonRoute('GET', '/api/v1/ai/cases/C-2026-001/chats', []),
+      jsonRoute('GET', '/api/v1/ai/cases/C-2026-001/form-drafts', []),
+    ],
+  },
+  render: () => (
+    <LegalAiWorkspace
+      currentUser={mockCurrentUserLawyer}
+      onOpenMatter={() => {}}
+      onOpenDashboard={() => {}}
+      onOpenCases={() => {}}
+      onCreateCase={() => {}}
+      onOpenProfile={() => {}}
+      onSignOut={() => {}}
+      onSwitchRole={() => {}}
+      switchingRole={false}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: /good day, avery/i })
+    ).toBeInTheDocument();
+    await expect(await canvas.findByText('Matter copilot')).toBeInTheDocument();
+    await expect(canvas.getByText('Professional safeguards')).toBeInTheDocument();
+  },
 };
 
 export const ActiveCasesPage: Story = {

@@ -21,10 +21,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "VisaTrack",
+    default: "VisaTrack Counsel AI",
     template: "%s | VisaTrack",
   },
-  description: "Secure immigration case and document management.",
+  description: "Case-grounded AI workspace and immigration practice management.",
 };
 
 export default function RootLayout({

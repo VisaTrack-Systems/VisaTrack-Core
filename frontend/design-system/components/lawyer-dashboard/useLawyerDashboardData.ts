@@ -100,12 +100,12 @@ export function useLawyerDashboardData(): LawyerDashboardData {
 
   const derivedActivity = useMemo<ActivityItem[]>(
     () =>
-      cases.slice(0, 4).map((entry, index) => ({
-        action: 'Case updated',
+      cases.slice(0, 4).map((entry) => ({
+        action: 'Matter created',
         client: entry.clientName,
         detail: `${entry.caseType} (${entry.id})`,
         time: entry.lastUpdate,
-        type: (['document', 'reminder', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
+        type: 'case',
       })),
     [cases]
   );

@@ -33,9 +33,21 @@ import {
 type AiAssistantSectionProps = {
   workspace: CaseWorkspace;
   onWorkspaceRefresh: () => Promise<void>;
+  workspaceMode?: boolean;
 };
 
-export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistantSectionProps) {
+const STARTER_PROMPTS = [
+  'Summarize the strongest facts in this matter and cite the record.',
+  'What information is missing before the next filing milestone?',
+  'Compare the client profile with the submitted identity documents.',
+  'Create a lawyer review checklist for this matter.',
+];
+
+export function AiAssistantSection({
+  workspace,
+  onWorkspaceRefresh,
+  workspaceMode = false,
+}: AiAssistantSectionProps) {
   const caseNumber = workspace.case.case_number;
   const [connections, setConnections] = useState<AiProviderConnection[]>([]);
   const [provider, setProvider] = useState<AiProvider>('openai');
@@ -459,19 +471,26 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
   };
 
   return (
-    <div className="space-y-6" aria-busy={busy !== null}>
-      <div>
+    <div
+      className={workspaceMode ? 'flex flex-col gap-4' : 'space-y-6'}
+      aria-busy={busy !== null}
+    >
+      <div className={workspaceMode ? 'order-1' : undefined}>
         <div className="flex items-center gap-2">
-          <Bot className="h-6 w-6 text-red-700" />
-          <h2 className="text-2xl font-bold text-gray-900">Case AI Assistant</h2>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eef0ff] text-[#5661ce]">
+            <Bot className="h-5 w-5" />
+          </span>
+          <h2 className={`${workspaceMode ? 'text-xl' : 'text-2xl'} font-semibold tracking-tight text-slate-900`}>
+            Matter copilot
+          </h2>
         </div>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2 text-sm leading-6 text-slate-600">
           Ask questions grounded in this client&apos;s structured case data and locally indexed,
           malware-clean documents.
         </p>
       </div>
 
-      <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+      <div className={`order-2 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950`}>
         <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
         <p>
           AI output may be incomplete or wrong. Verify citations and source records. No chat
@@ -479,10 +498,10 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         </p>
       </div>
 
-      {error ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      {notice ? <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800">{notice}</p> : null}
+      {error ? <p role="alert" className="order-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+      {notice ? <p role="status" className="order-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p> : null}
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-provider-heading">
+      <section className={`${workspaceMode ? 'order-5' : ''} rounded-2xl border border-slate-200 bg-slate-50/70 p-5`} aria-labelledby="ai-provider-heading">
         <h3 id="ai-provider-heading" className="flex items-center gap-2 font-semibold text-gray-900">
           <KeyRound className="h-4 w-4" /> Your model provider
         </h3>
@@ -633,17 +652,17 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         ) : null}
       </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-chat-heading">
+      <section className={`${workspaceMode ? 'order-4' : ''} overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm`} aria-labelledby="ai-chat-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 id="ai-chat-heading" className="font-semibold text-gray-900">Case chat</h3>
-            <p className="text-xs text-gray-600">Sources show which case documents were retrieved.</p>
+            <h3 id="ai-chat-heading" className="font-semibold text-slate-900">Ask the matter</h3>
+            <p className="mt-0.5 text-xs text-slate-500">Answers stay scoped to this matter and identify retrieved sources.</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void refreshIndex()} disabled={busy !== null} className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
-              <RefreshCw className="h-4 w-4" /> {busy === 'index' ? 'Queueing…' : 'Refresh document index'}
+            <button type="button" onClick={() => void refreshIndex()} disabled={busy !== null} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <RefreshCw className="h-4 w-4" /> {busy === 'index' ? 'Queueing…' : 'Refresh sources'}
             </button>
-            <button type="button" onClick={() => void newChat()} disabled={busy !== null || !connected} className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+            <button type="button" onClick={() => void newChat()} disabled={busy !== null || !connected} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
               New chat
             </button>
             {chat ? (
@@ -654,20 +673,41 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
           </div>
         </div>
         {chats.length > 0 ? (
-          <label className="mt-4 block text-sm text-gray-700">
+          <label className="mt-4 block text-xs font-medium text-slate-600">
             Conversation
             <select
               value={chat?.id ?? ''}
               onChange={(event) => void openChat(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
             >
               <option value="" disabled>Select a chat</option>
               {chats.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
             </select>
           </label>
         ) : null}
+        {!chat?.messages.length ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-5">
+            <p className="text-sm font-medium text-slate-800">Start with a focused request</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              The assistant can organize and compare the matter record. It cannot act as counsel or file on your behalf.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => setQuestion(prompt)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-xs leading-5 text-slate-600 hover:border-[#aeb5ef] hover:text-[#4651b5]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div
-          className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-red-500"
+          className={`${chat?.messages.length ? 'mt-5 min-h-32' : 'mt-3'} max-h-[34rem] space-y-4 overflow-y-auto rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#6674e8]`}
+          role="log"
           aria-label="Conversation transcript"
           tabIndex={0}
         >
@@ -675,7 +715,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             <article
               key={message.id}
               aria-label={message.role === 'user' ? 'Your message' : 'AI assistant response'}
-              className={`rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-blue-200 bg-blue-50'}`}
+              className={`rounded-2xl p-4 text-sm leading-6 ${message.role === 'user' ? 'ml-8 bg-[#eef0ff] text-slate-800' : 'mr-8 border border-slate-200 bg-white text-slate-800 shadow-sm'}`}
             >
               <p className="whitespace-pre-wrap text-gray-900">{message.content}</p>
               {message.role === 'assistant' && message.provider && message.model ? (
@@ -710,7 +750,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             </article>
           ))}
         </div>
-        <form onSubmit={ask} className="mt-4 flex gap-2">
+        <form onSubmit={ask} className="mt-4 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_12px_35px_-18px_rgba(33,45,80,0.45)] focus-within:border-[#8f99e7]">
           <label htmlFor="ai-question" className="sr-only">Ask about this case</label>
           <textarea
             id="ai-question"
@@ -720,15 +760,21 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="What passport expiry date is supported by the submitted documents?"
-            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2"
+            className="min-h-24 w-full resize-none border-0 bg-transparent px-3 py-2 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400"
           />
-          <button type="submit" disabled={busy !== null || !connected} className="self-end rounded-lg bg-red-600 p-3 text-white disabled:opacity-50" aria-label="Send question">
-            <Send className="h-5 w-5" />
-          </button>
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-2 pt-2">
+            <p className="text-[11px] text-slate-600">
+              {connected ? `${provider} · ${models?.selected_model ?? 'approved model'}` : 'Connect an approved provider to begin'}
+            </p>
+            <button type="submit" disabled={busy !== null || !connected} className="flex items-center gap-2 rounded-xl bg-[#5b67d8] px-4 py-2 text-sm font-medium text-white hover:bg-[#4f5bc8] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send question">
+              <Send className="h-4 w-4" />
+              {busy === 'message' ? 'Working…' : 'Send'}
+            </button>
+          </div>
         </form>
       </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-form-heading">
+      <section className={`${workspaceMode ? 'order-6' : ''} rounded-2xl border border-slate-200 bg-slate-50/70 p-5`} aria-labelledby="ai-form-heading">
         <h3 id="ai-form-heading" className="flex items-center gap-2 font-semibold text-gray-900">
           <FileOutput className="h-4 w-4" /> Create PDF form review draft
         </h3>

@@ -1,6 +1,6 @@
 /** CasesTable: casestable implementation. */
 
-import { Calendar, Clock, DollarSign, FileText } from 'lucide-react';
+import { Calendar, Clock, FileText } from 'lucide-react';
 
 import type { UiCase } from './types';
 import { priorityColor, statusColor } from './utils';
@@ -12,7 +12,7 @@ type CasesTableProps = {
 
 export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -22,7 +22,6 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Priority</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Milestone</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Deadline</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Outstanding</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Progress</th>
             </tr>
           </thead>
@@ -60,28 +59,9 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    {case_.outstandingDocs > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs text-yellow-700">
-                        <FileText className="w-3 h-3" />
-                        {case_.outstandingDocs} docs
-                      </span>
-                    )}
-                    {case_.outstandingPayments > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs text-red-700">
-                        <DollarSign className="w-3 h-3" />
-                        {case_.outstandingPayments} payment{case_.outstandingPayments > 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {case_.outstandingDocs === 0 && case_.outstandingPayments === 0 && (
-                      <span className="text-xs text-green-600">All clear</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[80px]">
-                      <div className="bg-red-600 h-2 rounded-full" style={{ width: `${case_.completionPercent}%` }} />
+                      <div className="h-2 rounded-full bg-gradient-to-r from-[#6674e8] to-[#35c9b0]" style={{ width: `${case_.completionPercent}%` }} />
                     </div>
                     <span className="text-sm font-medium text-gray-700 min-w-[40px]">{case_.completionPercent}%</span>
                   </div>

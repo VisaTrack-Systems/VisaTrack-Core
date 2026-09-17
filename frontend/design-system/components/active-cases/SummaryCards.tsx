@@ -1,6 +1,6 @@
 /** SummaryCards: summarycards implementation. */
 
-import { AlertCircle, Clock, DollarSign, FileText } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, FileText } from 'lucide-react';
 
 import type { UiCase } from './types';
 
@@ -11,16 +11,16 @@ type SummaryCardsProps = {
 export function SummaryCards({ cases }: SummaryCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600">Total Cases</p>
             <p className="text-2xl font-bold text-gray-900">{cases.length}</p>
           </div>
-          <FileText className="w-8 h-8 text-blue-600" />
+          <FileText className="w-8 h-8 text-[#5b67d8]" />
         </div>
       </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600">High Priority</p>
@@ -31,22 +31,22 @@ export function SummaryCards({ cases }: SummaryCardsProps) {
           <AlertCircle className="w-8 h-8 text-red-600" />
         </div>
       </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Outstanding Docs</p>
-            <p className="text-2xl font-bold text-gray-900">{cases.reduce((sum, c) => sum + c.outstandingDocs, 0)}</p>
+            <p className="text-sm text-gray-600">Target Dates Set</p>
+            <p className="text-2xl font-bold text-gray-900">{cases.filter((c) => c.nextDeadline !== 'Not set').length}</p>
           </div>
-          <Clock className="w-8 h-8 text-yellow-600" />
+          <CalendarClock className="w-8 h-8 text-amber-600" />
         </div>
       </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Unpaid Invoices</p>
-            <p className="text-2xl font-bold text-gray-900">{cases.reduce((sum, c) => sum + c.outstandingPayments, 0)}</p>
+            <p className="text-sm text-gray-600">Closed Matters</p>
+            <p className="text-2xl font-bold text-gray-900">{cases.filter((c) => c.status.toLowerCase() === 'closed').length}</p>
           </div>
-          <DollarSign className="w-8 h-8 text-green-600" />
+          <CheckCircle2 className="w-8 h-8 text-emerald-600" />
         </div>
       </div>
     </div>

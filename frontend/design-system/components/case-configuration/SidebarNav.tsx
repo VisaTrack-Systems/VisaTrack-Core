@@ -38,8 +38,8 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen sticky top-0">
-      <div className="p-6 border-b border-gray-200">
+    <div className="sticky top-0 min-h-screen w-64 border-r border-slate-200 bg-white">
+      <div className="border-b border-slate-100 p-6">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
@@ -61,7 +61,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
             aria-current={activeSection === section.id ? 'page' : undefined}
             onClick={() => onSectionChange(section.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
-              activeSection === section.id ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-50'
+              activeSection === section.id ? 'bg-[#eef0ff] text-[#4c57bd]' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <section.icon className="w-5 h-5" />
