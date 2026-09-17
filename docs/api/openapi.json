@@ -758,6 +758,40 @@
         "title": "AdminRoleItem",
         "type": "object"
       },
+      "AiCapabilitiesResponse": {
+        "properties": {
+          "chat_enabled": {
+            "title": "Chat Enabled",
+            "type": "boolean"
+          },
+          "credential_management_allowed": {
+            "title": "Credential Management Allowed",
+            "type": "boolean"
+          },
+          "form_drafts_enabled": {
+            "title": "Form Drafts Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "chat_enabled",
+          "form_drafts_enabled",
+          "credential_management_allowed"
+        ],
+        "title": "AiCapabilitiesResponse",
+        "type": "object"
+      },
       "AiChatCreateRequest": {
         "properties": {
           "title": {
@@ -6039,6 +6073,32 @@
         "summary": "Remove User Role",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/api/v1/ai/capabilities": {
+      "get": {
+        "operationId": "get_ai_capabilities_api_v1_ai_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCapabilitiesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Ai Capabilities",
+        "tags": [
+          "legal-ai"
         ]
       }
     },

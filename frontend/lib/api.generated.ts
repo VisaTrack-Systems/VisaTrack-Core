@@ -262,6 +262,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Capabilities */
+        get: operations["get_ai_capabilities_api_v1_ai_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/cases/{case_number}/chats": {
         parameters: {
             query?: never;
@@ -1680,6 +1697,17 @@ export interface components {
             permissions: string[];
             /** Slug */
             slug: string;
+        };
+        /** AiCapabilitiesResponse */
+        AiCapabilitiesResponse: {
+            /** Chat Enabled */
+            chat_enabled: boolean;
+            /** Credential Management Allowed */
+            credential_management_allowed: boolean;
+            /** Form Drafts Enabled */
+            form_drafts_enabled: boolean;
+            /** Reason */
+            reason?: string | null;
         };
         /** AiChatCreateRequest */
         AiChatCreateRequest: {
@@ -3809,6 +3837,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_capabilities_api_v1_ai_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCapabilitiesResponse"];
                 };
             };
         };

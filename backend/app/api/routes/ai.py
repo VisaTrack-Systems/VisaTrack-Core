@@ -19,6 +19,7 @@ from app.core.security import verify_password
 from app.db.deps import get_db
 from app.middleware.request_context import current_request_id
 from app.schemas.ai import (
+    AiCapabilitiesResponse,
     AiChatCreateRequest,
     AiChatMessageCreateRequest,
     AiChatMessageResponse,
@@ -167,6 +168,33 @@ def _provider_connection(auth: AuthContext, db: Session, provider: str | None = 
     if provider is None and len(rows) > 1:
         raise HTTPException(status_code=409, detail="Choose an AI provider for this request")
     return rows[0]
+
+
+@router.get("/capabilities", response_model=AiCapabilitiesResponse)
+def get_ai_capabilities(
+    auth: AuthContext = Depends(get_auth_context),
+) -> AiCapabilitiesResponse:
+    credential_management_allowed = (
+        auth.active_role in _AI_ROLES
+        and ("*" in auth.permissions or "ai:use" in auth.permissions)
+    )
+    reason: str | None = None
+    if not credential_management_allowed:
+        reason = "Your active role does not include legal AI access."
+    elif not settings.ai_enabled:
+        reason = "Your firm has not enabled the AI workspace."
+    elif not settings.ai_enabled_for_organization(auth.organization_id):
+        reason = "The AI workspace is not enabled for this organization."
+    elif settings.ai_enabled_user_ids and not settings.ai_enabled_for_user(auth.user_id):
+        reason = "The AI workspace is limited to approved pilot users."
+
+    chat_enabled = reason is None
+    return AiCapabilitiesResponse(
+        chat_enabled=chat_enabled,
+        form_drafts_enabled=chat_enabled and settings.ai_form_drafts_enabled,
+        credential_management_allowed=credential_management_allowed,
+        reason=reason,
+    )
 
 
 @router.get("/providers", response_model=list[AiProviderConnectionResponse])

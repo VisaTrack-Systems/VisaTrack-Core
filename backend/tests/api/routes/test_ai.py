@@ -65,6 +65,31 @@ def test_ai_access_fails_closed_when_feature_is_disabled(monkeypatch, make_auth_
     assert exc.value.status_code == 503
 
 
+def test_ai_capabilities_explain_disabled_and_enabled_states(
+    monkeypatch, make_auth_context
+):
+    auth = make_auth_context(roles=["lawyer"], permissions={"ai:use"})
+    monkeypatch.setattr(ai.settings, "ai_enabled", False)
+
+    disabled = ai.get_ai_capabilities(auth)
+    assert disabled.chat_enabled is False
+    assert "not enabled" in str(disabled.reason)
+
+    monkeypatch.setattr(ai.settings, "ai_enabled", True)
+    monkeypatch.setattr(
+        ai.settings,
+        "ai_enabled_organization_ids",
+        {str(auth.organization_id)},
+    )
+    monkeypatch.setattr(ai.settings, "ai_enabled_user_ids", {str(auth.user_id)})
+    monkeypatch.setattr(ai.settings, "ai_form_drafts_enabled", True)
+
+    enabled = ai.get_ai_capabilities(auth)
+    assert enabled.chat_enabled is True
+    assert enabled.form_drafts_enabled is True
+    assert enabled.reason is None
+
+
 def test_credential_owner_can_revoke_key_while_inference_is_disabled(
     monkeypatch, make_auth_context
 ):

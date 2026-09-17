@@ -11,6 +11,13 @@ from pydantic import BaseModel, Field
 AiProvider = Literal["openai", "anthropic"]
 
 
+class AiCapabilitiesResponse(BaseModel):
+    chat_enabled: bool
+    form_drafts_enabled: bool
+    credential_management_allowed: bool
+    reason: str | None = None
+
+
 class AiProviderConnectRequest(BaseModel):
     provider: AiProvider
     api_key: str = Field(

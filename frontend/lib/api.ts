@@ -510,6 +510,13 @@ export type CaseDocumentViewResponse = {
 
 export type AiProvider = 'openai' | 'anthropic';
 
+export type AiCapabilities = {
+  chat_enabled: boolean;
+  form_drafts_enabled: boolean;
+  credential_management_allowed: boolean;
+  reason: string | null;
+};
+
 export type AiProviderConnection = {
   provider: AiProvider;
   key_hint: string;
@@ -1343,6 +1350,10 @@ export async function acknowledgeCaseReminder(
 
 export async function listAiProviderConnections(): Promise<AiProviderConnection[]> {
   return requestJson<AiProviderConnection[]>('/api/v1/ai/providers');
+}
+
+export async function getAiCapabilities(): Promise<AiCapabilities> {
+  return requestJson<AiCapabilities>('/api/v1/ai/capabilities');
 }
 
 export async function connectAiProvider(input: {
