@@ -208,7 +208,7 @@ export function LegalAiWorkspace({
 
       <div className="mt-5 flex min-h-0 flex-1 flex-col border-t border-white/10 px-3 pt-4">
         <div className="flex items-center justify-between px-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             Matter context
           </p>
           <button
@@ -251,12 +251,12 @@ export function LegalAiWorkspace({
                 }}
                 className={`w-full rounded-xl px-3 py-2.5 text-left transition ${
                   selected
-                    ? 'bg-[#6674e8] text-white shadow-lg shadow-indigo-950/25'
+                    ? 'bg-[#4f5bc8] text-white shadow-lg shadow-indigo-950/25'
                     : 'text-slate-300 hover:bg-white/8 hover:text-white'
                 }`}
               >
                 <span className="block truncate text-sm font-medium">{item.client_name}</span>
-                <span className={`mt-0.5 block truncate text-[11px] ${selected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                <span className={`mt-0.5 block truncate text-[11px] ${selected ? 'font-medium text-white' : 'text-slate-400'}`}>
                   {item.case_number} · {item.case_type}
                 </span>
               </button>
@@ -478,7 +478,7 @@ export function LegalAiWorkspace({
                 <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
                         Matter snapshot
                       </p>
                       <h2 className="mt-2 text-lg font-semibold text-slate-900">

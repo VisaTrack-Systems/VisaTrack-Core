@@ -707,6 +707,7 @@ export function AiAssistantSection({
         ) : null}
         <div
           className={`${chat?.messages.length ? 'mt-5 min-h-32' : 'mt-3'} max-h-[34rem] space-y-4 overflow-y-auto rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#6674e8]`}
+          role="log"
           aria-label="Conversation transcript"
           tabIndex={0}
         >
@@ -762,7 +763,7 @@ export function AiAssistantSection({
             className="min-h-24 w-full resize-none border-0 bg-transparent px-3 py-2 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400"
           />
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-2 pt-2">
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-slate-600">
               {connected ? `${provider} · ${models?.selected_model ?? 'approved model'}` : 'Connect an approved provider to begin'}
             </p>
             <button type="submit" disabled={busy !== null || !connected} className="flex items-center gap-2 rounded-xl bg-[#5b67d8] px-4 py-2 text-sm font-medium text-white hover:bg-[#4f5bc8] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send question">
