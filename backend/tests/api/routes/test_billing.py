@@ -174,6 +174,8 @@ def test_checkout_uses_stripe_hosted_page_and_idempotency(monkeypatch, make_auth
 
     assert result.checkout_url.startswith("https://checkout.stripe.com/")
     assert create_checkout.call_args.kwargs["amount_minor"] == 12550
+    checkout_update = str(db.execute.call_args_list[3].args[0])
+    assert "AND status = 'pending'" in checkout_update
     assert db.commit.call_count == 1
 
 

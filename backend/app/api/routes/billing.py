@@ -314,6 +314,7 @@ def create_checkout_session(
                 status = 'processing',
                 updated_at = NOW()
             WHERE id = :payment_id
+              AND status = 'pending'
             """
         ),
         {
