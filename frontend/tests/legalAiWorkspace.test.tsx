@@ -149,4 +149,22 @@ describe('LegalAiWorkspace', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Browse matters' }));
     expect(callbacks.onOpenCases).toHaveBeenCalled();
   });
+
+  it('offers matter creation when the legal team has no matters yet', async () => {
+    vi.mocked(getLawyerCases).mockResolvedValue([]);
+
+    render(
+      <LegalAiWorkspace
+        currentUser={mockCurrentUserLawyer}
+        {...callbacks}
+        switchingRole={false}
+      />
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Start with a matter' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create matter' }));
+    expect(callbacks.onCreateCase).toHaveBeenCalled();
+  });
 });

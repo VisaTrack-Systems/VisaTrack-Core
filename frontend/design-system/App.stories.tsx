@@ -5,6 +5,8 @@ import type { Meta, StoryObj } from '@storybook/react';
 import App from './App';
 import {
   mockCaseWorkspace,
+  mockClientCases,
+  mockCurrentUserClient,
   mockCurrentUserLawyer,
   mockLawyerCases,
 } from './storybook/fixtures';
@@ -41,6 +43,16 @@ export const AuthenticatedCounselWorkspace: Story = {
       jsonRoute('GET', '/api/v1/ai/providers', []),
       jsonRoute('GET', '/api/v1/ai/cases/C-2026-001/chats', []),
       jsonRoute('GET', '/api/v1/ai/cases/C-2026-001/form-drafts', []),
+    ],
+  },
+};
+
+export const AuthenticatedClientPortal: Story = {
+  parameters: {
+    mockApi: [
+      jsonRoute('GET', '/api/v1/auth/me', mockCurrentUserClient),
+      jsonRoute('GET', '/api/v1/client/cases', mockClientCases),
+      jsonRoute('GET', '/api/v1/cases/by-number/C-2026-001/workspace', mockCaseWorkspace),
     ],
   },
 };
