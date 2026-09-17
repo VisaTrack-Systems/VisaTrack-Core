@@ -18,6 +18,26 @@ Pitch statement:
 This is product and engineering language—not a claim that AI output is legal advice or
 that the system is compliant merely because controls exist.
 
+## Industry-pattern alignment
+
+The redesign follows observable patterns in current legal products without claiming
+feature parity:
+
+- [Harvey Spaces](https://www.harvey.ai/platform/spaces) keeps AI, documents, work
+  product, permissions, and teams inside a governed matter/project context.
+- [Harvey Vault](https://www.harvey.ai/platform/vault) emphasizes persistent source
+  navigation and cited document analysis.
+- [Thomson Reuters CoCounsel Legal](https://legal.thomsonreuters.com/en/products/cocounsel-legal)
+  connects a plain-language request to research, document analysis, drafting, and cited
+  work product.
+- [Clio Manage AI](https://www.clio.com/ca/features/legal-ai-software/) integrates AI
+  into matter, scheduling, billing, and client workflows while retaining human review.
+
+VisaTrack's current differentiator is narrower and immigration-practice-specific:
+case-scoped evidence chat sits beside forms, document intake, client collaboration,
+milestones, retainers, invoices, and payments. It does not yet provide authoritative
+legal-research databases or autonomous workflow agents.
+
 ## Design principles
 
 1. **Conversation first, evidence always.** The primary legal-team screen opens on the
