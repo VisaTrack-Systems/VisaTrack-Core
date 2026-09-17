@@ -143,5 +143,13 @@ export const Appointments: Story = {
 };
 
 export const BillingSummary: Story = {
-  render: () => <BillingSummaryPanel billingInfo={mockBillingInfo} />,
+  render: () => (
+    <BillingSummaryPanel
+      billingInfo={mockBillingInfo}
+      canPay
+      paying={false}
+      error={null}
+      onPay={async () => {}}
+    />
+  ),
 };

@@ -11,6 +11,11 @@ This directory contains project documentation and design artifacts.
 - Design rationale
 - Research notes
 - Future planning documents
+- Legal AI:
+  - [`ai/LEGAL_AI_ASSISTANT_DESIGN.md`](ai/LEGAL_AI_ASSISTANT_DESIGN.md)
+  - [`ai/OPERATIONS.md`](ai/OPERATIONS.md)
+  - [`ai/PRODUCTION_READINESS.md`](ai/PRODUCTION_READINESS.md)
+  - [`ai/LAWYER_USER_GUIDE.md`](ai/LAWYER_USER_GUIDE.md)
 
 ---
 

@@ -56,6 +56,7 @@ def test_audit_redaction_removes_nested_credentials():
         'token': 'plain-token',
         'nested': {'password': 'plain-password'},
         'items': [{'refresh_token': 'plain-refresh'}],
+        'api_key': 'provider-secret',
     }
 
     assert audit._redact(value) == {
@@ -63,4 +64,5 @@ def test_audit_redaction_removes_nested_credentials():
         'token': '[REDACTED]',
         'nested': {'password': '[REDACTED]'},
         'items': [{'refresh_token': '[REDACTED]'}],
+        'api_key': '[REDACTED]',
     }

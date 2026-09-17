@@ -38,14 +38,16 @@ INSERT INTO roles (organization_id, name, slug, description, is_system, permissi
     "payments:view", "payments:create",
     "reminders:create", "reminders:view",
     "reports:view",
-    "settings:view", "settings:edit"
+    "settings:view", "settings:edit",
+    "ai:use"
 ]'),
 (NULL, 'Lawyer', 'lawyer', 'Can manage assigned cases and clients', TRUE, '[
     "cases:view", "cases:create", "cases:edit", "cases:assign",
     "clients:view", "clients:create", "clients:edit",
     "documents:view", "documents:upload", "documents:approve",
     "payments:view", "payments:create",
-    "reminders:create", "reminders:view"
+    "reminders:create", "reminders:view",
+    "ai:use"
 ]'),
 (NULL, 'Paralegal', 'paralegal', 'Can assist with cases but limited approval rights', TRUE, '[
     "cases:view", "cases:edit",
