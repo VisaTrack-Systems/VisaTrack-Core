@@ -34,6 +34,7 @@ SYSTEM_ROLE_DEFINITIONS: dict[str, tuple[str, list[str]]] = {
             "reports:view",
             "settings:view",
             "settings:edit",
+            "ai:use",
         ],
     ),
     "lawyer": (
@@ -51,6 +52,7 @@ SYSTEM_ROLE_DEFINITIONS: dict[str, tuple[str, list[str]]] = {
             "documents:approve",
             "reminders:create",
             "reminders:view",
+            "ai:use",
         ],
     ),
     "client": (

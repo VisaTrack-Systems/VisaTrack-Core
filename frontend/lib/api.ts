@@ -508,6 +508,102 @@ export type CaseDocumentViewResponse = {
   expires_in_seconds: number;
 };
 
+export type AiProvider = 'openai' | 'anthropic';
+
+export type AiProviderConnection = {
+  provider: AiProvider;
+  key_hint: string;
+  selected_model: string | null;
+  last_verified_at: string | null;
+  data_processing_acknowledged_at: string;
+  acknowledgement_version: string;
+};
+
+export type AiProviderModels = {
+  provider: AiProvider;
+  models: string[];
+  selected_model: string | null;
+  recommended_model: string | null;
+  form_drafts_enabled: boolean;
+};
+
+export type AiCitation = {
+  source_id: string;
+  case_document_id: string;
+  document_name: string;
+  page_number: number | null;
+  excerpt: string;
+};
+
+export type AiChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  citations: AiCitation[];
+  provider: AiProvider | null;
+  requested_model: string | null;
+  model: string | null;
+  prompt_version: string | null;
+  finish_reason: string | null;
+  created_at: string;
+};
+
+export type AiChat = {
+  id: string;
+  case_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: AiChatMessage[];
+};
+
+export type AiFormDraft = {
+  id: string;
+  source_document_id: string | null;
+  file_name: string;
+  download_url: string;
+  expires_in_seconds: number;
+  provider: AiProvider;
+  requested_model: string;
+  model: string;
+  prompt_version: string;
+  finish_reason: string | null;
+  source_sha256: string;
+  populated_fields: string[];
+  unresolved_fields: string[];
+  unsupported_fields: string[];
+  field_evidence: Record<string, { value: string; sources: string[] }>;
+  citations: AiCitation[];
+  warning: string;
+  created_at: string;
+};
+
+export type AiFormDraftSummary = {
+  id: string;
+  source_document_id: string | null;
+  file_name: string;
+  provider: AiProvider;
+  requested_model: string;
+  model: string;
+  prompt_version: string;
+  source_sha256: string;
+  status: 'draft' | 'reviewed' | 'superseded';
+  unresolved_fields: string[];
+  unsupported_fields: string[];
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  adobe_validation_completed: boolean;
+  created_at: string;
+};
+
+export type AiFormDraftDownload = {
+  id: string;
+  file_name: string;
+  download_url: string;
+  expires_in_seconds: number;
+};
+
 export type InvoiceCreateInput = {
   due_date: string;
   tax_rate: number;
@@ -1242,6 +1338,151 @@ export async function acknowledgeCaseReminder(
   return requestJson<CaseWorkspace['reminders'][number]>(
     `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/reminders/${encodeURIComponent(reminderId)}/acknowledge`,
     { method: 'POST' }
+  );
+}
+
+export async function listAiProviderConnections(): Promise<AiProviderConnection[]> {
+  return requestJson<AiProviderConnection[]>('/api/v1/ai/providers');
+}
+
+export async function connectAiProvider(input: {
+  provider: AiProvider;
+  api_key: string;
+  selected_model?: string | null;
+  data_processing_acknowledged: boolean;
+  current_password: string;
+  mfa_code?: string | null;
+}): Promise<AiProviderConnection> {
+  return requestJson<AiProviderConnection>('/api/v1/ai/providers', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAiProviderModels(provider: AiProvider): Promise<AiProviderModels> {
+  return requestJson<AiProviderModels>(
+    `/api/v1/ai/providers/${encodeURIComponent(provider)}/models`
+  );
+}
+
+export async function selectAiProviderModel(
+  provider: AiProvider,
+  selectedModel: string
+): Promise<AiProviderConnection> {
+  return requestJson<AiProviderConnection>(
+    `/api/v1/ai/providers/${encodeURIComponent(provider)}/model`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ selected_model: selectedModel }),
+    }
+  );
+}
+
+export async function disconnectAiProvider(provider: AiProvider): Promise<void> {
+  return requestVoid(`/api/v1/ai/providers/${encodeURIComponent(provider)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function indexCaseForAi(caseNumber: string): Promise<{ queued_documents: number }> {
+  return requestJson<{ queued_documents: number }>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/index`,
+    { method: 'POST' }
+  );
+}
+
+export async function listCaseAiChats(caseNumber: string): Promise<AiChat[]> {
+  return requestJson<AiChat[]>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/chats`
+  );
+}
+
+export async function createCaseAiChat(caseNumber: string, title: string): Promise<AiChat> {
+  return requestJson<AiChat>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/chats`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }
+  );
+}
+
+export async function getAiChat(chatId: string): Promise<AiChat> {
+  return requestJson<AiChat>(`/api/v1/ai/chats/${encodeURIComponent(chatId)}`);
+}
+
+export async function deleteAiChat(chatId: string): Promise<void> {
+  return requestVoid(`/api/v1/ai/chats/${encodeURIComponent(chatId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function sendAiChatMessage(
+  chatId: string,
+  content: string,
+  provider: AiProvider,
+  idempotencyKey = crypto.randomUUID()
+): Promise<AiChatMessage> {
+  return requestJson<AiChatMessage>(
+    `/api/v1/ai/chats/${encodeURIComponent(chatId)}/messages`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ content, provider }),
+    }
+  );
+}
+
+export async function createAiFormDraft(
+  caseNumber: string,
+  sourceDocumentId: string,
+  provider: AiProvider,
+  instructions?: string | null,
+  idempotencyKey = crypto.randomUUID()
+): Promise<AiFormDraft> {
+  return requestJson<AiFormDraft>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        source_document_id: sourceDocumentId,
+        provider,
+        instructions: instructions ?? null,
+      }),
+    }
+  );
+}
+
+export async function listAiFormDrafts(
+  caseNumber: string
+): Promise<AiFormDraftSummary[]> {
+  return requestJson<AiFormDraftSummary[]>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts`
+  );
+}
+
+export async function downloadAiFormDraft(
+  caseNumber: string,
+  draftId: string
+): Promise<AiFormDraftDownload> {
+  return requestJson<AiFormDraftDownload>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts/${encodeURIComponent(draftId)}/download`
+  );
+}
+
+export async function reviewAiFormDraft(
+  caseNumber: string,
+  draftId: string,
+  input: {
+    status: 'reviewed' | 'superseded';
+    review_note: string;
+    adobe_validation_completed: boolean;
+  }
+): Promise<AiFormDraftSummary> {
+  return requestJson<AiFormDraftSummary>(
+    `/api/v1/ai/cases/${encodeURIComponent(caseNumber)}/form-drafts/${encodeURIComponent(draftId)}`,
+    { method: 'PATCH', body: JSON.stringify(input) }
   );
 }
 

@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  Bot,
   BellRing,
   CheckCircle,
   DollarSign,
@@ -30,6 +31,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
     { id: 'details', label: 'Case Details', icon: FileText },
     { id: 'documents', label: 'Document Requests', icon: FileCheck },
     { id: 'milestones', label: 'Milestones', icon: CheckCircle },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: Bot },
     { id: 'payments', label: 'Payments & Invoices', icon: DollarSign },
     { id: 'reminders', label: 'Reminders', icon: BellRing },
     { id: 'permissions', label: 'Sharing / Permissions', icon: Settings },
@@ -56,6 +58,7 @@ export function SidebarNav({ activeSection, caseId, onBack, onSectionChange, wor
         {sections.map((section) => (
           <button
             key={section.id}
+            aria-current={activeSection === section.id ? 'page' : undefined}
             onClick={() => onSectionChange(section.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
               activeSection === section.id ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-50'

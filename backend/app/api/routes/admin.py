@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import String, and_, cast, func, select
+from sqlalchemy import String, and_, cast, func, select, text
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_permissions, require_roles
@@ -363,6 +363,20 @@ def delete_organization(
     now = datetime.now(timezone.utc)
     organization.deleted_at = now
     db.add(organization)
+    db.execute(
+        text(
+            """
+            UPDATE ai_provider_connections
+            SET is_active = FALSE,
+                encrypted_api_key = '',
+                key_hint = 'offboarded',
+                selected_model = NULL,
+                updated_at = NOW()
+            WHERE organization_id = :organization_id AND is_active = TRUE
+            """
+        ),
+        {"organization_id": str(organization.id)},
+    )
 
     log_activity(
         db,
@@ -977,6 +991,20 @@ def delete_user(
     db.add(user)
     user.token_version = int(user.token_version or 0) + 1
     revoke_all_user_sessions(db, user.id, reason="account_disabled")
+    db.execute(
+        text(
+            """
+            UPDATE ai_provider_connections
+            SET is_active = FALSE,
+                encrypted_api_key = '',
+                key_hint = 'offboarded',
+                selected_model = NULL,
+                updated_at = NOW()
+            WHERE user_id = :user_id AND is_active = TRUE
+            """
+        ),
+        {"user_id": str(user.id)},
+    )
 
     log_activity(
         db,

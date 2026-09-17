@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.background_job import BackgroundJob
@@ -57,12 +57,26 @@ def enqueue_job(
 
 
 def claim_next_job(db: Session) -> BackgroundJob | None:
+    supported_types = tuple(sorted(_handlers))
+    if not supported_types:
+        return None
     now = datetime.now(timezone.utc)
+    stale_before = now - timedelta(minutes=15)
     job = db.scalar(
         select(BackgroundJob)
         .where(
-            BackgroundJob.status.in_(("pending", "retry")),
-            BackgroundJob.scheduled_at <= now,
+            BackgroundJob.job_type.in_(supported_types),
+            BackgroundJob.attempts < BackgroundJob.max_attempts,
+            or_(
+                and_(
+                    BackgroundJob.status.in_(("pending", "retry")),
+                    BackgroundJob.scheduled_at <= now,
+                ),
+                and_(
+                    BackgroundJob.status == "running",
+                    BackgroundJob.started_at <= stale_before,
+                ),
+            ),
         )
         .order_by(BackgroundJob.created_at)
         .with_for_update(skip_locked=True)
@@ -70,9 +84,12 @@ def claim_next_job(db: Session) -> BackgroundJob | None:
     )
     if job is None:
         return None
+    recovered_stale_job = job.status == "running"
     job.status = "running"
     job.attempts = int(job.attempts or 0) + 1
     job.started_at = now
+    if recovered_stale_job:
+        job.last_error = "Recovered stale running job"
     db.add(job)
     db.commit()
     return job
