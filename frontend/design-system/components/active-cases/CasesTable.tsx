@@ -12,7 +12,7 @@ type CasesTableProps = {
 
 export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -81,7 +81,7 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[80px]">
-                      <div className="bg-red-600 h-2 rounded-full" style={{ width: `${case_.completionPercent}%` }} />
+                      <div className="h-2 rounded-full bg-gradient-to-r from-[#6674e8] to-[#35c9b0]" style={{ width: `${case_.completionPercent}%` }} />
                     </div>
                     <span className="text-sm font-medium text-gray-700 min-w-[40px]">{case_.completionPercent}%</span>
                   </div>

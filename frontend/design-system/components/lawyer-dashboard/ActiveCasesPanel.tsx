@@ -59,8 +59,8 @@ export function ActiveCasesPanel({
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      <div className="p-6 border-b border-gray-200">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="p-6 border-b border-slate-100">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Active Cases</h2>
           <button
@@ -78,14 +78,14 @@ export function ActiveCasesPanel({
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input
             ref={searchInputRef}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-[#8f99e7] focus:outline-none focus:ring-2 focus:ring-indigo-100"
             placeholder="Search by client, case type, or case #"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
           <select
             ref={filterSelectRef}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-[#8f99e7] focus:outline-none focus:ring-2 focus:ring-indigo-100"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
@@ -137,7 +137,7 @@ export function ActiveCasesPanel({
         )}
       </div>
       <div className="p-4 border-t border-gray-200">
-        <button className="text-sm text-red-600 hover:text-red-700 font-medium" onClick={onViewActiveCases}>
+        <button className="text-sm text-[#5661ce] hover:text-[#414ba8] font-medium" onClick={onViewActiveCases}>
           View all cases →
         </button>
       </div>

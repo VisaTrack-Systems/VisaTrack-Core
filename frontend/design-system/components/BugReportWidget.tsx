@@ -352,7 +352,7 @@ export function BugReportWidget() {
         type="button"
         aria-label="Report a bug"
         onClick={openModal}
-        className={`fixed bottom-5 right-5 z-[95] inline-flex items-center gap-2 rounded-full border border-red-500 bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-700 ${
+        className={`fixed bottom-5 right-5 z-[95] inline-flex items-center gap-2 rounded-full border border-indigo-400 bg-[#5b67d8] px-4 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#4f5bc8] ${
           isUiHiddenForCapture ? "hidden" : ""
         }`}
       >
@@ -439,7 +439,7 @@ export function BugReportWidget() {
                   onChange={(event) => setTitle(event.target.value)}
                   minLength={3}
                   placeholder="Short summary of the bug"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#8f99e7] focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 />
               </div>
 
@@ -454,7 +454,7 @@ export function BugReportWidget() {
                   minLength={5}
                   rows={6}
                   placeholder="What did you expect, what happened, and steps to reproduce?"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#8f99e7] focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 />
               </div>
 
@@ -505,7 +505,7 @@ export function BugReportWidget() {
                 type="button"
                 onClick={() => void submitReport()}
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#5b67d8] px-4 py-2 text-sm font-medium text-white hover:bg-[#4f5bc8] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {channel === "email" ? <Mail className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                 {isSubmitting

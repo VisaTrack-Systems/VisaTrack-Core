@@ -56,11 +56,19 @@ describe('AiAssistantSection', () => {
   it('explains provider approval, citations, and form review boundaries', async () => {
     render(<AiAssistantSection workspace={mockCaseWorkspace} onWorkspaceRefresh={async () => {}} />);
 
-    expect(await screen.findByRole('heading', { name: 'Case AI Assistant' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Matter copilot' })).toBeInTheDocument();
     expect(screen.getByText(/AI output may be incomplete or wrong/)).toBeInTheDocument();
     expect(screen.getByText(/firm approved this provider/)).toBeInTheDocument();
     expect(screen.getByText(/Supports standard AcroForm PDFs only/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: /summarize the strongest facts/i,
+      })
+    );
+    expect(screen.getByLabelText('Ask about this case')).toHaveValue(
+      'Summarize the strongest facts in this matter and cite the record.'
+    );
   });
 
   it('clears provider-specific secrets and approval when provider changes', async () => {

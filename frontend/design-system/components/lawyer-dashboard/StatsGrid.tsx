@@ -31,35 +31,35 @@ export function StatsGrid({ stats, isLoading = false }: StatsGridProps) {
       value: String(stats.activeCases),
       icon: FileText,
       trend: 'Live from database',
-      color: 'text-red-600',
+      color: 'text-[#5b67d8]',
     },
     {
       label: 'Total Users',
       value: String(stats.totalUsers),
       icon: Users,
       trend: 'Clients in your roster',
-      color: 'text-blue-600',
+      color: 'text-[#3289a8]',
     },
     {
       label: 'Upcoming Milestones',
       value: String(stats.upcomingMilestones),
       icon: Clock,
       trend: 'Needs follow-up',
-      color: 'text-yellow-600',
+      color: 'text-[#c08a32]',
     },
     {
       label: 'Completed Cases',
       value: String(stats.completedCases),
       icon: TrendingUp,
       trend: 'Marked approved/closed',
-      color: 'text-green-600',
+      color: 'text-[#199a87]',
     },
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       {cards.map((stat) => (
-        <div key={stat.label} className="bg-white rounded-lg shadow-sm p-6">
+        <div key={stat.label} className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <stat.icon className={`w-8 h-8 ${stat.color}`} />
           </div>

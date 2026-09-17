@@ -43,7 +43,7 @@ export function ClientDashboard() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 p-10 text-gray-600">Loading client dashboard...</div>;
+    return <div className="min-h-screen bg-[#f3f5fa] p-10 text-slate-600">Loading client dashboard...</div>;
   }
 
   if (error) {
@@ -85,13 +85,14 @@ export function ClientDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-[#f3f5fa]">
+      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Welcome back, {firstName}</h1>
-              <p className="text-sm text-gray-500 mt-1">Here&apos;s the latest on your immigration case.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#199a87]">Client workspace</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Welcome back, {firstName}</h1>
+              <p className="text-sm text-slate-500 mt-1">Your matter status, documents, reminders, and payments in one place.</p>
             </div>
             {clientCases.length > 1 ? (
               <div className="w-72">

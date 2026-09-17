@@ -35,8 +35,9 @@ import { NewCaseDialog, type NewCaseDialogSubmitPayload } from './components/New
 import { PortalAuthGate } from './components/PortalAuthGate';
 import { ProfileSettingsDialog } from './components/ProfileSettingsDialog';
 import { LawyerDashboard } from './components/LawyerDashboard';
+import { LegalAiWorkspace } from './components/LegalAiWorkspace';
 
-type AppView = 'login' | 'lawyer' | 'client' | 'admin' | 'active-cases' | 'case-config';
+type AppView = 'login' | 'copilot' | 'lawyer' | 'client' | 'admin' | 'active-cases' | 'case-config';
 
 function getDefaultViewForUser(user: CurrentUser | null): AppView {
   if (!user) {
@@ -44,11 +45,11 @@ function getDefaultViewForUser(user: CurrentUser | null): AppView {
   }
 
   if (user.active_role === 'org_admin' || user.active_role === 'admin' || user.active_role === 'super_admin') {
-    return 'admin';
+    return 'copilot';
   }
 
   if (user.active_role === 'lawyer') {
-    return 'lawyer';
+    return 'copilot';
   }
 
   if (user.active_role === 'client') {
@@ -71,6 +72,10 @@ function canAccessView(user: CurrentUser | null, view: AppView): boolean {
     user.active_role === 'org_admin' || user.active_role === 'admin' || user.active_role === 'super_admin';
   const isLawyer = user.active_role === 'lawyer';
   const isClient = user.active_role === 'client';
+
+  if (view === 'copilot') {
+    return isLawyer || isAdmin;
+  }
 
   if (view === 'admin') {
     return isAdmin;
@@ -180,6 +185,15 @@ export default function App() {
 
   const handleViewActiveCases = () => {
     setCurrentView('active-cases');
+  };
+
+  const handleOpenPracticeDashboard = () => {
+    const activeRole = currentUser?.active_role;
+    setCurrentView(
+      activeRole === 'org_admin' || activeRole === 'admin' || activeRole === 'super_admin'
+        ? 'admin'
+        : 'lawyer'
+    );
   };
 
   const loadLawyerClients = async () => {
@@ -359,14 +373,14 @@ export default function App() {
   };
 
   const renderDashboardHeader = () => (
-    <header className="bg-black text-white sticky top-0 z-50">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#10182b] text-white shadow-lg shadow-slate-950/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center gap-2">
             <FileText className="w-6 h-6" />
             <div>
-              <h1 className="font-semibold text-lg">VisaTrack</h1>
-              <p className="text-xs text-gray-400">Immigration Case Management</p>
+              <h1 className="font-semibold text-lg">VisaTrack Counsel AI</h1>
+              <p className="text-xs text-slate-400">AI workspace & immigration practice</p>
             </div>
           </div>
 
@@ -408,6 +422,15 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
+                {currentUser.active_role !== 'client' ? (
+                  <button
+                    onClick={() => setCurrentView('copilot')}
+                    className="hidden text-xs border border-indigo-300/30 bg-indigo-400/10 hover:bg-indigo-400/20 px-3 py-2 rounded-lg items-center gap-1 sm:flex"
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    AI Workspace
+                  </button>
+                ) : null}
                 <button
                   onClick={handleOpenProfileDialog}
                   className="text-xs border border-gray-700 hover:border-gray-500 px-3 py-2 rounded-lg flex items-center gap-1"
@@ -428,6 +451,63 @@ export default function App() {
       </div>
     </header>
   );
+
+  if (currentView === 'copilot' && currentUser) {
+    return (
+      <>
+        <LegalAiWorkspace
+          currentUser={currentUser}
+          onOpenMatter={handleSelectCase}
+          onOpenDashboard={handleOpenPracticeDashboard}
+          onOpenCases={handleViewActiveCases}
+          onCreateCase={handleOpenNewCaseDialog}
+          onOpenProfile={handleOpenProfileDialog}
+          onSignOut={handleLogout}
+          onSwitchRole={(role) => {
+            void handleSwitchRole(role);
+          }}
+          switchingRole={switchingRole}
+        />
+        {isNewCaseDialogOpen ? (
+          <NewCaseDialog
+            isOpen
+            clients={lawyerClients}
+            loadingClients={loadingLawyerClients}
+            submitting={creatingNewCase}
+            errorMessage={newCaseError}
+            onClose={handleCloseNewCaseDialog}
+            onSubmit={handleSubmitNewCase}
+          />
+        ) : null}
+        {lawyerInvitationUrl ? (
+          <InvitationLinkDialog
+            invitationUrl={lawyerInvitationUrl}
+            recipientName={lawyerInvitedUserName}
+            defaultEmail={lawyerInvitedUserEmail}
+            organizationName={lawyerInvitedOrgName}
+            onClose={() => {
+              setLawyerInvitationUrl(null);
+              setLawyerInvitedUserName(null);
+              setLawyerInvitedUserEmail('');
+              setLawyerInvitedOrgName(undefined);
+            }}
+          />
+        ) : null}
+        {isProfileDialogOpen ? (
+          <ProfileSettingsDialog
+            key={profileSettings ? profileSettings.id : 'profile-settings-loading'}
+            isOpen
+            settings={profileSettings}
+            loading={loadingProfileSettings}
+            submitting={savingProfileSettings}
+            errorMessage={profileSettingsError}
+            onClose={handleCloseProfileDialog}
+            onSubmit={handleSubmitProfileSettings}
+          />
+        ) : null}
+      </>
+    );
+  }
 
   if (currentView === 'login') {
     return (

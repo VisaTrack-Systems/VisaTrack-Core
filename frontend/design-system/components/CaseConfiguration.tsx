@@ -998,7 +998,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[#f3f5fa]">
       <SidebarNav
         activeSection={activeSection}
         caseId={caseId}
@@ -1008,7 +1008,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       />
 
       <div className="flex-1">
-        <div className="max-w-6xl mx-auto px-8 py-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           {notice ? (
             <div
               className={`mb-4 rounded-lg border px-4 py-3 text-sm ${

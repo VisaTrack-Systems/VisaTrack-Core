@@ -26,7 +26,7 @@ function NavItem({
       onClick={() => onNavigate(section)}
       className={`w-full flex items-center gap-2 rounded-lg text-sm transition-colors ${
         indent ? 'pl-7 pr-3 py-1.5' : 'px-3 py-2'
-      } ${isActive ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      } ${isActive ? 'bg-[#eef0ff] text-[#4c57bd] font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
     >
       {icon}
       {label}
@@ -44,7 +44,7 @@ export function AdminSidebar({
   isSuperAdmin: boolean;
 }) {
   return (
-    <aside className="w-56 shrink-0 bg-white border-r border-gray-200">
+    <aside className="w-56 shrink-0 border-r border-slate-200 bg-white">
       <nav className="p-3 space-y-0.5">
         {/* Organization */}
         <div className="pt-2">

@@ -32,7 +32,7 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f3f5fa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <button
@@ -43,8 +43,9 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Active Cases</h1>
-          <p className="text-gray-600">Manage and configure all your immigration cases</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#5661ce]">Matter operations</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 mb-2">All matters</h1>
+          <p className="text-slate-600">Search, prioritize, and open every immigration matter.</p>
         </div>
 
         <FilterBar

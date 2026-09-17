@@ -323,7 +323,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   // ── render guards ───────────────────────────────────────────────────────────
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 p-10 text-gray-600">Loading admin dashboard...</div>;
+    return <div className="min-h-screen bg-[#f3f5fa] p-10 text-slate-600">Loading admin dashboard...</div>;
   }
 
   if (error) {
@@ -362,7 +362,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   // ── layout ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[#f3f5fa]">
       <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} isSuperAdmin={isSuperAdmin} />
 
       <div className="flex-1 min-w-0">

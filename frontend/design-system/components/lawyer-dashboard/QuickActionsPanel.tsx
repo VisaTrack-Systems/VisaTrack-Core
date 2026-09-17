@@ -12,25 +12,25 @@ export function QuickActionsPanel({
   onViewActiveCases,
 }: QuickActionsPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
       <div className="space-y-3">
         <button
-          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+          className="w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-[#b8bef0] hover:bg-[#f7f7ff] transition-colors text-left"
           onClick={() => {
             void onCreateCase?.();
           }}
           type="button"
         >
-          <FilePlus2 className="w-5 h-5 text-gray-600" />
+          <FilePlus2 className="w-5 h-5 text-[#5661ce]" />
           <span className="text-sm font-medium text-gray-900">Create New Case</span>
         </button>
         <button
-          className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+          className="w-full flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-[#b8bef0] hover:bg-[#f7f7ff] transition-colors text-left"
           onClick={onViewActiveCases}
           type="button"
         >
-          <FolderOpen className="w-5 h-5 text-gray-600" />
+          <FolderOpen className="w-5 h-5 text-[#199a87]" />
           <span className="text-sm font-medium text-gray-900">View Active Cases</span>
         </button>
       </div>
