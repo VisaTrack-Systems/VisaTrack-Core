@@ -501,6 +501,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/cases/{case_number}/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Invoice */
+        post: operations["create_invoice_api_v1_billing_cases__case_number__invoices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/invoices/{invoice_id}/checkout-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Checkout Session */
+        post: operations["create_checkout_session_api_v1_billing_invoices__invoice_id__checkout_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/stripe/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stripe Webhook */
+        post: operations["stripe_webhook_api_v1_billing_stripe_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases": {
         parameters: {
             query?: never;
@@ -2062,6 +2113,21 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** CheckoutSessionResponse */
+        CheckoutSessionResponse: {
+            /** Checkout Url */
+            checkout_url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Payment Id
+             * Format: uuid
+             */
+            payment_id: string;
+        };
         /** ClientCaseListItem */
         ClientCaseListItem: {
             /** Case Number */
@@ -2276,6 +2342,75 @@ export interface components {
              * Format: uuid
              */
             invited_user_id: string;
+        };
+        /** InvoiceCreateRequest */
+        InvoiceCreateRequest: {
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /** Items */
+            items: components["schemas"]["InvoiceLineItemCreate"][];
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Tax Rate
+             * @default 0
+             */
+            tax_rate: number | string;
+            /** Terms */
+            terms?: string | null;
+        };
+        /** InvoiceLineItemCreate */
+        InvoiceLineItemCreate: {
+            /** Category */
+            category?: string | null;
+            /** Description */
+            description: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number | string;
+            /** Unit Price */
+            unit_price: number | string;
+        };
+        /** InvoiceResponse */
+        InvoiceResponse: {
+            /** Amount Due */
+            amount_due: string;
+            /** Amount Paid */
+            amount_paid: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Status */
+            status: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax Amount */
+            tax_amount: string;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Total Amount */
+            total_amount: string;
         };
         /** LawyerCaseCreateRequest */
         LawyerCaseCreateRequest: {
@@ -2535,6 +2670,14 @@ export interface components {
             last_seen_at: string;
             /** User Agent */
             user_agent: string | null;
+        };
+        /** StripeWebhookResponse */
+        StripeWebhookResponse: {
+            /**
+             * Received
+             * @default true
+             */
+            received: boolean;
         };
         /** SwitchActiveRoleRequest */
         SwitchActiveRoleRequest: {
@@ -3574,6 +3717,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerifyInvitationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invoice_api_v1_billing_cases__case_number__invoices_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_checkout_session_api_v1_billing_invoices__invoice_id__checkout_session_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stripe_webhook_api_v1_billing_stripe_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Stripe-Signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StripeWebhookResponse"];
                 };
             };
             /** @description Validation Error */
