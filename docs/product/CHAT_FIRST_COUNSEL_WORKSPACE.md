@@ -132,6 +132,9 @@ accent is replaced by indigo and mint.
    returns to the AI workspace.
 7. Practice overview, all matters, new matter, profile, sign-out, and active-role
    switching remain available in the workspace shell.
+8. The current authorized view and case number are mirrored to non-sensitive query
+   parameters so a refresh or shared internal link can restore context. Secrets and
+   chat content never enter the URL.
 
 ## Existing-functionality preservation matrix
 
