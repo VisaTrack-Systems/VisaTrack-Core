@@ -34,7 +34,12 @@ never answered there. The three causes to rule out, in order:
 1. **Wrong port.** Railway assigns the port through `PORT`. The API start script
    ([backend/scripts/start.sh](../../backend/scripts/start.sh)) binds `${PORT:-8000}`, and
    the web service binds `${PORT:-3000}`. A hard-coded port makes every health check time
-   out even though the container is running.
+   out even though the container is running. `failed with service unavailable` means the
+   proxy could not open a connection at all: set `PORT` explicitly and make the domain's
+   target port under **Settings → Networking** match it, so both sides agree on one number
+   instead of relying on port detection. A start command left over in
+   **Settings → Deploy** also overrides the image `CMD`, so clear it or point it at
+   `sh scripts/start.sh`.
 2. **The process exited.** `Settings.validate_security()` refuses to start outside
    `development`, `local`, and `test` when required variables are missing, and lists all of
    them in one error. Check the deploy logs for `Invalid configuration for APP_ENV=`.
@@ -60,6 +65,7 @@ Reference the Postgres service instead of pasting credentials:
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | credentials for those buckets |
 | `RESEND_API_KEY` | transactional email key |
 | `FORWARDED_ALLOW_IPS` | `*` so audit logs record the client IP from Railway's proxy instead of the proxy itself |
+| `HOST` | leave unset for IPv4. Railway's private network is IPv6-only, so a service reached only over private networking needs `HOST=::`. Python binds IPv6 sockets with `IPV6_V6ONLY`, so `::` serves IPv6 exclusively and drops public IPv4 traffic |
 
 ### Migrations on boot
 
