@@ -25,11 +25,16 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const parsedAmount = Number(amount);
+  const parsedTaxPercent = Number(taxPercent);
+  const previewFees = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : 0;
+  const previewTaxRate = Number.isFinite(parsedTaxPercent) && parsedTaxPercent > 0 ? parsedTaxPercent : 0;
+  const previewTax = previewFees * (previewTaxRate / 100);
+  const previewTotal = previewFees + previewTax;
+
   const submitInvoice = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    const parsedAmount = Number(amount);
-    const parsedTaxPercent = Number(taxPercent);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError('Enter an amount greater than zero.');
       return;
@@ -72,8 +77,9 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Payments & Invoices</h2>
-        <p className="text-gray-600">
+        <p className="text-gray-800">
           Bill the client for a retainer installment, professional fees, or disbursements.
+          The total below is what the client pays. VisaTrack does not add a checkout fee.
           Card entry is handled by Stripe Checkout.
         </p>
       </div>
@@ -153,6 +159,12 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
             />
           </div>
         </div>
+        <div className="rounded-lg border border-gray-300 bg-gray-50 p-4 text-sm text-gray-900">
+          <p className="font-semibold">Client will be charged</p>
+          <p className="mt-2">Professional fees: {formatMoney(previewFees)}</p>
+          <p>Tax ({previewTaxRate}%): {formatMoney(previewTax)}</p>
+          <p className="font-semibold">Total: {formatMoney(previewTotal)}</p>
+        </div>
         <button
           type="submit"
           disabled={submitting}
@@ -175,6 +187,8 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
                 <tr>
                   <th className="px-4 py-3">Invoice</th>
                   <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3">Fees</th>
+                  <th className="px-4 py-3">Tax</th>
                   <th className="px-4 py-3">Due</th>
                   <th className="px-4 py-3">Paid</th>
                   <th className="px-4 py-3">Outstanding</th>
@@ -186,6 +200,8 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
                   <tr key={item.id}>
                     <td className="px-4 py-3 font-medium">{item.invoice_number}</td>
                     <td className="px-4 py-3">{item.description}</td>
+                    <td className="px-4 py-3">{formatMoney(item.subtotal ?? item.amount)}</td>
+                    <td className="px-4 py-3">{formatMoney(item.tax_amount ?? 0)}</td>
                     <td className="px-4 py-3">{item.due_date ?? '—'}</td>
                     <td className="px-4 py-3">{formatMoney(item.amount_paid)}</td>
                     <td className="px-4 py-3">{formatMoney(item.amount_due)}</td>

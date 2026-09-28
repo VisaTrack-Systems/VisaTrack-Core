@@ -4,6 +4,10 @@ import { ChevronRight } from 'lucide-react';
 
 import type { BillingInfo } from './types';
 
+function formatCad(amount: number): string {
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(amount);
+}
+
 type BillingSummaryPanelProps = {
   billingInfo: BillingInfo;
   canPay: boolean;
@@ -26,17 +30,28 @@ export function BillingSummaryPanel({
       </div>
       <div className="p-6 space-y-4">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Total Fees</span>
-          <span className="font-semibold text-gray-900">${billingInfo.totalFees.toLocaleString()}</span>
+          <span className="text-sm text-gray-800">Professional fees</span>
+          <span className="font-semibold text-gray-900">{formatCad(billingInfo.feesBeforeTax ?? billingInfo.totalFees)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">Paid</span>
-          <span className="font-semibold text-green-600">${billingInfo.paid.toLocaleString()}</span>
+          <span className="text-sm text-gray-800">Tax</span>
+          <span className="font-semibold text-gray-900">{formatCad(billingInfo.tax ?? 0)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-800">Total</span>
+          <span className="font-semibold text-gray-900">{formatCad(billingInfo.totalFees)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-800">Paid</span>
+          <span className="font-semibold text-green-800">{formatCad(billingInfo.paid)}</span>
         </div>
         <div className="flex justify-between items-center pb-4 border-b border-gray-200">
-          <span className="text-sm text-gray-600">Remaining</span>
-          <span className="font-semibold text-red-600">${billingInfo.remaining.toLocaleString()}</span>
+          <span className="text-sm text-gray-800">Remaining</span>
+          <span className="font-semibold text-red-800">{formatCad(billingInfo.remaining)}</span>
         </div>
+        <p className="text-sm text-gray-800">
+          These amounts are the invoice totals. VisaTrack does not add a checkout fee.
+        </p>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <p className="text-xs font-medium text-yellow-800 mb-1">Next Payment</p>
           <p className="text-sm text-yellow-900">{billingInfo.nextPayment}</p>
@@ -51,8 +66,8 @@ export function BillingSummaryPanel({
           {paying ? 'Opening secure checkout…' : canPay ? 'Make Payment' : 'No payment due'}
           <ChevronRight className="w-4 h-4" />
         </button>
-        <p className="text-xs text-gray-500 text-center">Secure card entry is hosted by Stripe.</p>
-        <p className="text-xs text-gray-500 text-center">{billingInfo.paymentMethod}</p>
+        <p className="text-sm text-gray-800 text-center">Secure card entry is hosted by Stripe. The card form charges the remaining total shown above.</p>
+        <p className="text-sm text-gray-800 text-center">{billingInfo.paymentMethod}</p>
       </div>
     </div>
   );

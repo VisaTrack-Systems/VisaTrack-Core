@@ -301,7 +301,7 @@ export function AdminSettingsGeneral() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
-                <span className="text-xs text-gray-400">No logo</span>
+                <span className="text-xs text-gray-700">No logo</span>
               </div>
               <div>
                 <button type="button" disabled className="border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -369,9 +369,10 @@ export function AdminSettingsGeneral() {
           <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-100">
             <div>
               <p className="text-sm font-medium text-gray-900">Invitation email</p>
-              <p className="text-xs text-gray-500">
-                Sent when a user is invited to the organization.
-                {isCustom && <span className="ml-1 text-blue-600">Custom template active.</span>}
+              <p className="text-xs text-gray-700">
+                Sent when a user is invited to the organization. Every email adds the business
+                address and an unsubscribe link automatically.
+                {isCustom && <span className="ml-1 text-blue-800">Custom template active.</span>}
               </p>
               {loadError ? <p className="text-xs text-red-600 mt-0.5">{loadError}</p> : null}
             </div>

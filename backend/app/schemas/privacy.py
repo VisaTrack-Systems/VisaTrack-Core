@@ -24,3 +24,24 @@ class PrivacyRequestResponse(BaseModel):
 class PrivacyRequestReview(BaseModel):
     status: Literal["in_review", "blocked_legal_hold", "completed", "denied"]
     resolution_note: str = Field(min_length=3, max_length=5000)
+
+
+class PublicDeletionRequest(BaseModel):
+    organization_slug: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=3, max_length=255)
+    details: Optional[str] = Field(default=None, max_length=2000)
+    confirm_deletion: Literal[True]
+
+
+class PublicDeletionResponse(BaseModel):
+    status: Literal["accepted"]
+    message: str
+
+
+class UnsubscribeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    token: str = Field(min_length=32, max_length=128)
+
+
+class UnsubscribeResponse(BaseModel):
+    status: Literal["unsubscribed"]

@@ -1284,6 +1284,26 @@ export interface paths {
         patch: operations["review_privacy_request_api_v1_privacy_admin_requests__request_id__patch"];
         trace?: never;
     };
+    "/api/v1/privacy/deletion-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Account Deletion
+         * @description Record a deletion request without revealing whether the account exists.
+         */
+        post: operations["request_account_deletion_api_v1_privacy_deletion_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/requests": {
         parameters: {
             query?: never;
@@ -1296,6 +1316,23 @@ export interface paths {
         put?: never;
         /** Create Privacy Request */
         post: operations["create_privacy_request_api_v1_privacy_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsubscribe From Emails */
+        post: operations["unsubscribe_from_emails_api_v1_privacy_unsubscribe_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1376,6 +1413,12 @@ export interface components {
     schemas: {
         /** AcceptInvitationRequest */
         AcceptInvitationRequest: {
+            /** Accepted Privacy */
+            accepted_privacy: boolean;
+            /** Accepted Terms */
+            accepted_terms: boolean;
+            /** Age Or Guardian Consent */
+            age_or_guardian_consent: boolean;
             /** Password */
             password: string;
             /** Token */
@@ -2018,8 +2061,6 @@ export interface components {
             reported_at_utc: string;
             /** Screenshot Captured At */
             screenshot_captured_at?: string | null;
-            /** User Agent */
-            user_agent?: string | null;
         };
         /** BugReportScreenshot */
         BugReportScreenshot: {
@@ -2449,6 +2490,11 @@ export interface components {
         };
         /** CaseWorkspaceBillingSummary */
         CaseWorkspaceBillingSummary: {
+            /**
+             * Fees Before Tax
+             * @default 0
+             */
+            fees_before_tax: number;
             /** Next Payment */
             next_payment: string | null;
             /** Paid */
@@ -2457,6 +2503,11 @@ export interface components {
             payment_method: string | null;
             /** Remaining */
             remaining: number;
+            /**
+             * Tax
+             * @default 0
+             */
+            tax: number;
             /** Total Fees */
             total_fees: number;
         };
@@ -2588,6 +2639,16 @@ export interface components {
             paid_date: string | null;
             /** Status */
             status: string;
+            /**
+             * Subtotal
+             * @default 0
+             */
+            subtotal: number;
+            /**
+             * Tax Amount
+             * @default 0
+             */
+            tax_amount: number;
         };
         /** CaseWorkspaceReminder */
         CaseWorkspaceReminder: {
@@ -3129,6 +3190,30 @@ export interface components {
              */
             status: "in_review" | "blocked_legal_hold" | "completed" | "denied";
         };
+        /** PublicDeletionRequest */
+        PublicDeletionRequest: {
+            /**
+             * Confirm Deletion
+             * @constant
+             */
+            confirm_deletion: true;
+            /** Details */
+            details?: string | null;
+            /** Email */
+            email: string;
+            /** Organization Slug */
+            organization_slug: string;
+        };
+        /** PublicDeletionResponse */
+        PublicDeletionResponse: {
+            /** Message */
+            message: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "accepted";
+        };
         /** ResendInvitationResponse */
         ResendInvitationResponse: {
             /** Invitation Url */
@@ -3203,6 +3288,21 @@ export interface components {
              */
             token_type: string;
         };
+        /** UnsubscribeRequest */
+        UnsubscribeRequest: {
+            /** Email */
+            email: string;
+            /** Token */
+            token: string;
+        };
+        /** UnsubscribeResponse */
+        UnsubscribeResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "unsubscribed";
+        };
         /** UpdateCurrentUserSettingsRequest */
         UpdateCurrentUserSettingsRequest: {
             /** Avatar Url */
@@ -3247,10 +3347,6 @@ export interface components {
         };
         /** ValidationError */
         ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
             /** Location */
             loc: (string | number)[];
             /** Message */
@@ -6021,6 +6117,39 @@ export interface operations {
             };
         };
     };
+    request_account_deletion_api_v1_privacy_deletion_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicDeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDeletionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_own_privacy_requests_api_v1_privacy_requests_get: {
         parameters: {
             query?: never;
@@ -6061,6 +6190,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrivacyRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsubscribe_from_emails_api_v1_privacy_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnsubscribeResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,9 +1,10 @@
 /** ProfileSettingsDialog: Modal dialog for user profile and account settings management. Allows profile updates, password changes, and preference configuration. */
 
+import Link from 'next/link';
 import { X } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
-import type { CurrentUserSettings, UpdateCurrentUserSettingsInput } from '@/lib/api';
+import { createPrivacyRequest, type CurrentUserSettings, type UpdateCurrentUserSettingsInput } from '@/lib/api';
 import { DialogPanel } from './DialogPanel';
 import { MfaSettings } from './MfaSettings';
 
@@ -116,8 +117,9 @@ export function ProfileSettingsDialog({
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label htmlFor="profile-first-name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
               <input
+                id="profile-first-name"
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -126,8 +128,9 @@ export function ProfileSettingsDialog({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label htmlFor="profile-last-name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
               <input
+                id="profile-last-name"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -139,8 +142,9 @@ export function ProfileSettingsDialog({
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
+                id="profile-email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -153,15 +157,17 @@ export function ProfileSettingsDialog({
               </p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
               <input
+                id="profile-phone"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
                 disabled={loading || submitting}
                 placeholder="+1 555 123 4567"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-sm text-gray-800">
+                Used only if your firm needs to call you about a case. Leave it blank to keep email as the only contact.
                 Phone verified: {settings?.phone_verified ? 'Yes' : 'No'}
               </p>
             </div>
@@ -169,8 +175,9 @@ export function ProfileSettingsDialog({
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+              <label htmlFor="profile-timezone" className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
               <input
+                id="profile-timezone"
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -180,8 +187,9 @@ export function ProfileSettingsDialog({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Locale</label>
+              <label htmlFor="profile-locale" className="block text-sm font-medium text-gray-700 mb-1">Locale</label>
               <input
+                id="profile-locale"
                 value={locale}
                 onChange={(event) => setLocale(event.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
@@ -214,11 +222,84 @@ export function ProfileSettingsDialog({
           </div>
         </form>
         {settings ? (
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 space-y-6">
             <MfaSettings initiallyEnabled={settings.mfa_enabled} />
+            <DataDeletionPanel />
           </div>
         ) : null}
       </DialogPanel>
     </div>
+  );
+}
+
+function DataDeletionPanel() {
+  const [details, setDetails] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage(null);
+    setError(null);
+    if (!confirmed) {
+      setError('Confirm that you want your account data deleted.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await createPrivacyRequest({
+        request_type: 'deletion',
+        details: details.trim() || null,
+      });
+      setMessage(`Deletion request ${result.id} is ${result.status}.`);
+      setConfirmed(false);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to submit the deletion request.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="rounded-lg border border-gray-300 p-4 space-y-3">
+      <h3 className="text-base font-semibold text-gray-900">Delete my data</h3>
+      <p className="text-sm text-gray-800">
+        Ask VisaTrack to delete the personal information on this account. A legal hold can delay deletion.
+        You can also use the{' '}
+        <Link className="text-blue-800 underline" href="/privacy/deletion">public deletion request</Link>.
+      </p>
+      {error ? <p role="alert" className="text-sm text-red-800">{error}</p> : null}
+      {message ? <p role="status" className="text-sm text-gray-900">{message}</p> : null}
+      <label htmlFor="profile-deletion-details" className="block text-sm font-medium text-gray-700">
+        Details (optional)
+      </label>
+      <textarea
+        id="profile-deletion-details"
+        value={details}
+        onChange={(event) => setDetails(event.target.value)}
+        rows={3}
+        maxLength={5000}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+      />
+      <label htmlFor="profile-deletion-confirm" className="flex items-start gap-3 text-sm text-gray-900">
+        <input
+          id="profile-deletion-confirm"
+          type="checkbox"
+          checked={confirmed}
+          onChange={(event) => setConfirmed(event.target.checked)}
+          className="mt-1"
+        />
+        <span>I want my VisaTrack personal information deleted.</span>
+      </label>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-lg border-2 border-gray-900 bg-white px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-60"
+      >
+        {submitting ? 'Submitting…' : 'Request deletion'}
+      </button>
+    </form>
   );
 }

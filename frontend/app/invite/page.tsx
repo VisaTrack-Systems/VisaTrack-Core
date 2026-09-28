@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LegalFooter } from "@/components/compliance/LegalFooter";
 import { acceptInvitation, verifyInvitation, type VerifyInvitationResult } from "@/lib/api";
 
 type PageState =
@@ -22,6 +24,8 @@ function InviteForm() {
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [ageConsent, setAgeConsent] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,12 +55,20 @@ function InviteForm() {
       setFieldError("Passwords do not match.");
       return;
     }
+    if (!acceptedTerms || !ageConsent) {
+      setFieldError("Accept the terms, privacy policy, and age or guardian confirmation to continue.");
+      return;
+    }
 
     setFieldError(null);
     setState({ kind: "submitting", info });
 
     try {
-      const result = await acceptInvitation(token, password);
+      const result = await acceptInvitation(token, password, {
+        accepted_terms: true,
+        accepted_privacy: true,
+        age_or_guardian_consent: true,
+      });
       setState({ kind: "success", email: result.email });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to accept invitation.";
@@ -123,22 +135,22 @@ function InviteForm() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-sm p-8">
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-sm p-8 mt-10">
         <h1 className="text-xl font-semibold text-gray-900 mb-1">Set up your account</h1>
-        <p className="text-sm text-gray-500 mb-6">Invitation expires {expiresAt}</p>
+        <p className="text-sm text-gray-700 mb-6">Invitation expires {expiresAt}</p>
 
         <div className="mb-6 space-y-1 text-sm">
           <p>
-            <span className="text-gray-500">Name: </span>
+            <span className="text-gray-700">Name: </span>
             <span className="text-gray-900 font-medium">{info.full_name}</span>
           </p>
           <p>
-            <span className="text-gray-500">Email: </span>
+            <span className="text-gray-700">Email: </span>
             <span className="text-gray-900 font-medium">{info.email}</span>
           </p>
           <p>
-            <span className="text-gray-500">Organization slug: </span>
+            <span className="text-gray-700">Organization slug: </span>
             <span className="text-gray-900 font-semibold">{info.organization_slug}</span>
           </p>
         </div>
@@ -182,8 +194,43 @@ function InviteForm() {
             />
           </div>
 
+          <label htmlFor="accept-terms" className="flex items-start gap-3 text-sm leading-6 text-gray-900">
+            <input
+              id="accept-terms"
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(event) => setAcceptedTerms(event.target.checked)}
+              className="mt-1"
+              disabled={isSubmitting}
+            />
+            <span>
+              I agree to the{" "}
+              <Link className="text-blue-800 underline" href="/legal/terms">terms of service</Link>
+              {" "}and{" "}
+              <Link className="text-blue-800 underline" href="/legal/privacy">privacy policy</Link>.
+            </span>
+          </label>
+          <label htmlFor="age-consent" className="flex items-start gap-3 text-sm leading-6 text-gray-900">
+            <input
+              id="age-consent"
+              type="checkbox"
+              checked={ageConsent}
+              onChange={(event) => setAgeConsent(event.target.checked)}
+              className="mt-1"
+              disabled={isSubmitting}
+            />
+            <span>
+              I am 18 or older. If this account will include information about anyone under 18, I am
+              their parent or legal guardian and I consent to that collection.
+            </span>
+          </label>
+          <p className="text-sm text-gray-800">
+            This step only sets your password and records these consents. We already have the name
+            and email your firm entered.
+          </p>
+
           {fieldError ? (
-            <p className="text-sm text-red-600">{fieldError}</p>
+            <p role="alert" className="text-sm text-red-800">{fieldError}</p>
           ) : null}
 
           <button
@@ -194,6 +241,9 @@ function InviteForm() {
             {isSubmitting ? "Activating account…" : "Activate account"}
           </button>
         </form>
+      </div>
+      <div className="mt-10">
+        <LegalFooter />
       </div>
     </div>
   );

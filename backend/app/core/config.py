@@ -86,6 +86,11 @@ class Settings:
     resend_from_email: str = os.getenv("RESEND_FROM_EMAIL", "noreply@visatrack.ca")
     resend_from_name: str = os.getenv("RESEND_FROM_NAME", "VisaTrack")
     bug_report_to_email: str = os.getenv("BUG_REPORT_TO_EMAIL", "visatrack.support@gmail.com")
+    business_legal_name: str = os.getenv("BUSINESS_LEGAL_NAME", "VisaTrack Systems")
+    business_address: str = os.getenv("BUSINESS_ADDRESS", "Ottawa, Ontario, Canada")
+    business_contact_email: str = os.getenv(
+        "BUSINESS_CONTACT_EMAIL", "visatrack.support@gmail.com"
+    )
     ai_provider_encryption_key: str = os.getenv("AI_PROVIDER_ENCRYPTION_KEY", "")
     ai_provider_encryption_key_previous: tuple[str, ...] = tuple(
         key.strip()

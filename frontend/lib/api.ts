@@ -346,6 +346,8 @@ export type CaseWorkspace = {
     id: string;
     description: string;
     amount: number;
+    subtotal?: number;
+    tax_amount?: number;
     amount_paid: number;
     amount_due: number;
     status: string;
@@ -370,6 +372,8 @@ export type CaseWorkspace = {
   }>;
   billing_summary: {
     total_fees: number;
+    fees_before_tax?: number;
+    tax?: number;
     paid: number;
     remaining: number;
     next_payment: string | null;
@@ -721,7 +725,6 @@ export type SubmitBugReportInput = {
     path: string;
     origin: string;
     reported_at_utc: string;
-    user_agent: string;
     screenshot_captured_at: string | null;
   };
   screenshot?: {
@@ -1046,6 +1049,46 @@ export async function submitBugReport(input: SubmitBugReportInput): Promise<void
   });
 }
 
+export async function createPrivacyRequest(input: {
+  request_type: 'access' | 'correction' | 'deletion';
+  details?: string | null;
+}): Promise<{ id: string; status: string; due_at: string }> {
+  return requestJson('/api/v1/privacy/requests', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function submitPublicDeletionRequest(input: {
+  organization_slug: string;
+  email: string;
+  details?: string | null;
+  confirm_deletion: true;
+}): Promise<{ status: string; message: string }> {
+  return requestJson(
+    '/api/v1/privacy/deletion-requests',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    { includeAuth: false }
+  );
+}
+
+export async function unsubscribeFromEmails(input: {
+  email: string;
+  token: string;
+}): Promise<{ status: string }> {
+  return requestJson(
+    '/api/v1/privacy/unsubscribe',
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+    { includeAuth: false }
+  );
+}
+
 export async function getCases(limit = 10): Promise<CaseListItem[]> {
   return requestJson<CaseListItem[]>(`/api/v1/cases?limit=${limit}`);
 }
@@ -1163,12 +1206,20 @@ export async function verifyInvitation(token: string): Promise<VerifyInvitationR
   );
 }
 
-export async function acceptInvitation(token: string, password: string): Promise<AcceptInvitationResult> {
+export async function acceptInvitation(
+  token: string,
+  password: string,
+  consents: {
+    accepted_terms: boolean;
+    accepted_privacy: boolean;
+    age_or_guardian_consent: boolean;
+  }
+): Promise<AcceptInvitationResult> {
   return requestJson<AcceptInvitationResult>(
     '/api/v1/auth/accept-invitation',
     {
       method: 'POST',
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ token, password, ...consents }),
     },
     { includeAuth: false }
   );

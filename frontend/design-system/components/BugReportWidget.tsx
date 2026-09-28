@@ -269,7 +269,6 @@ export function BugReportWidget() {
 
   const buildReportBody = (summary: string, description: string): string => {
     const now = new Date().toISOString();
-    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
     const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
 
     return [
@@ -283,7 +282,6 @@ export function BugReportWidget() {
       `- URL path: ${pathWithQuery}`,
       `- Site origin: ${origin}`,
       `- Reported at (UTC): ${now}`,
-      `- Browser: ${userAgent}`,
       `- Screenshot captured: ${screenshotCapturedAt ? `Yes (${screenshotCapturedAt})` : "No"}`,
     ].join("\n");
   };
@@ -319,7 +317,6 @@ export function BugReportWidget() {
     }
 
     const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
-    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
     const reportedAtUtc = new Date().toISOString();
 
     setIsSubmitting(true);
@@ -332,7 +329,6 @@ export function BugReportWidget() {
           path: pathWithQuery,
           origin,
           reported_at_utc: reportedAtUtc,
-          user_agent: userAgent,
           screenshot_captured_at: screenshotCapturedAt,
         },
         screenshot: screenshotAttachment,

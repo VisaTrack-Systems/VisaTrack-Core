@@ -6,6 +6,11 @@ import logging
 import resend
 
 from app.core.config import settings
+from app.services.email_compliance import (
+    compliance_html_footer,
+    compliance_plain_footer,
+    unsubscribe_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +84,7 @@ def send_invitation_email(
         .replace("{recipient_name}", recipient_name)
         .replace("{organization_name}", organization_name)
         .replace("{invitation_url}", invitation_url)
+        + compliance_plain_footer(to_email)
     )
 
     # Resolved subject line.
@@ -137,7 +143,7 @@ def send_invitation_email(
         Click the button below to set your password and activate your account.
       </p>
       {button_html}
-      <p style="margin:0 0 16px;color:#6b7280;font-size:13px;line-height:1.6;">
+      <p style="margin:0 0 16px;color:#374151;font-size:13px;line-height:1.6;">
         This link expires in 72 hours. If you did not expect this invitation,
         you can safely ignore this email.
       </p>
@@ -155,6 +161,7 @@ def send_invitation_email(
     {banner_html}
     <div style="padding:28px 28px 32px;">
       {body_html}
+      {compliance_html_footer(to_email)}
     </div>
   </div>
 </body>
@@ -167,6 +174,7 @@ def send_invitation_email(
         "text": plain,
         "html": html,
         "click_tracking": False,
+        "headers": {"List-Unsubscribe": f"<{unsubscribe_url(to_email)}>"},
     })
 
     logger.info("Invitation email sent to %s via Resend", to_email)
@@ -180,15 +188,11 @@ def send_bug_report_email(
     path: str,
     origin: str | None,
     reported_at_utc: str,
-    user_agent: str | None,
     screenshot_captured_at: str | None,
     screenshot_filename: str | None,
     screenshot_content_type: str | None,
     screenshot_base64_content: str | None,
     delivery_channel: str,
-    sender_ip: str | None,
-    referrer: str | None,
-    browser_language: str | None,
 ) -> None:
     """Send a bug report email via Resend."""
     if not settings.resend_api_key:
@@ -212,10 +216,7 @@ def send_bug_report_email(
         f"- Channel selected: {delivery_channel}\n"
         f"- Screenshot captured at (UTC): {screenshot_captured_at or 'not provided'}\n"
         f"- Screenshot attached: {'yes' if screenshot_base64_content else 'no'}\n"
-        f"- User-Agent: {user_agent or 'unknown'}\n"
-        f"- Referrer: {referrer or 'unknown'}\n"
-        f"- Browser language: {browser_language or 'unknown'}\n"
-        f"- Sender IP: {sender_ip or 'unknown'}\n"
+        + compliance_plain_footer(to_email)
     )
 
     escaped_title = html_lib.escape(report_title)
@@ -226,10 +227,6 @@ def send_bug_report_email(
     escaped_channel = html_lib.escape(delivery_channel)
     escaped_screenshot = html_lib.escape(screenshot_captured_at or "not provided")
     escaped_screenshot_attached = "yes" if screenshot_base64_content else "no"
-    escaped_user_agent = html_lib.escape(user_agent or "unknown")
-    escaped_referrer = html_lib.escape(referrer or "unknown")
-    escaped_browser_language = html_lib.escape(browser_language or "unknown")
-    escaped_sender_ip = html_lib.escape(sender_ip or "unknown")
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -248,17 +245,14 @@ def send_bug_report_email(
 
       <h3 style="margin:20px 0 8px;color:#111827;font-size:16px;">Context</h3>
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-        <tr><td style="padding:6px 0;color:#6b7280;">Path</td><td style="padding:6px 0;color:#111827;">{escaped_path}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Origin</td><td style="padding:6px 0;color:#111827;">{escaped_origin}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Reported at (UTC)</td><td style="padding:6px 0;color:#111827;">{escaped_reported_at}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Channel selected</td><td style="padding:6px 0;color:#111827;">{escaped_channel}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Screenshot captured</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Screenshot attached</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot_attached}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">User-Agent</td><td style="padding:6px 0;color:#111827;">{escaped_user_agent}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Referrer</td><td style="padding:6px 0;color:#111827;">{escaped_referrer}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Browser language</td><td style="padding:6px 0;color:#111827;">{escaped_browser_language}</td></tr>
-        <tr><td style="padding:6px 0;color:#6b7280;">Sender IP</td><td style="padding:6px 0;color:#111827;">{escaped_sender_ip}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Path</td><td style="padding:6px 0;color:#111827;">{escaped_path}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Origin</td><td style="padding:6px 0;color:#111827;">{escaped_origin}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Reported at (UTC)</td><td style="padding:6px 0;color:#111827;">{escaped_reported_at}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Channel selected</td><td style="padding:6px 0;color:#111827;">{escaped_channel}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Screenshot captured</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot}</td></tr>
+        <tr><td style="padding:6px 0;color:#374151;">Screenshot attached</td><td style="padding:6px 0;color:#111827;">{escaped_screenshot_attached}</td></tr>
       </table>
+      {compliance_html_footer(to_email)}
     </div>
   </div>
 </body>
@@ -271,6 +265,7 @@ def send_bug_report_email(
         "text": plain_text,
         "html": html,
         "click_tracking": False,
+        "headers": {"List-Unsubscribe": f"<{unsubscribe_url(to_email)}>"},
     }
 
     if screenshot_base64_content and screenshot_filename:

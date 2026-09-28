@@ -6,7 +6,8 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.routes import privacy
-from app.schemas.privacy import PrivacyRequestCreate, PrivacyRequestReview
+from app.schemas.privacy import PrivacyRequestCreate, PrivacyRequestReview, PublicDeletionRequest, UnsubscribeRequest
+from app.services.email_compliance import unsubscribe_token
 from tests.support import row
 
 
@@ -77,3 +78,54 @@ def test_deletion_completion_is_blocked_by_legal_hold(monkeypatch, make_auth_con
 
     assert exc.value.status_code == 409
     db.commit.assert_not_called()
+
+
+def test_public_deletion_request_does_not_reveal_unknown_accounts(monkeypatch):
+    db = MagicMock()
+    db.scalar.return_value = None
+    monkeypatch.setattr(privacy, "log_activity", lambda *args, **kwargs: None)
+
+    result = privacy.request_account_deletion(
+        payload=PublicDeletionRequest(
+            organization_slug="acme-law",
+            email="missing@example.com",
+            confirm_deletion=True,
+        ),
+        db=db,
+    )
+
+    assert result.status == "accepted"
+    db.commit.assert_not_called()
+
+
+def test_unsubscribe_rejects_a_bad_token():
+    with pytest.raises(HTTPException) as exc:
+        privacy.unsubscribe_from_emails(
+            payload=UnsubscribeRequest(email="person@example.com", token="a" * 64),
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_unsubscribe_clears_email_preferences():
+    email = "person@example.com"
+    user = row(id=uuid4(), email=email)
+    profile = row(
+        user_id=user.id,
+        notification_prefs={"email_case_updates": True, "email_documents": True},
+    )
+    db = MagicMock()
+    db.scalars.return_value.all.return_value = [user]
+    db.scalar.return_value = profile
+
+    result = privacy.unsubscribe_from_emails(
+        payload=UnsubscribeRequest(email=email, token=unsubscribe_token(email)),
+        db=db,
+    )
+
+    assert result.status == "unsubscribed"
+    assert profile.notification_prefs["email_case_updates"] is False
+    assert profile.notification_prefs["email_documents"] is False
+    assert profile.notification_prefs["email_payments"] is False
+    db.commit.assert_called_once()

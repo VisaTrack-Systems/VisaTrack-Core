@@ -712,10 +712,27 @@ def accept_invitation(
     user.updated_at = now
     invitation.accepted_at = now
 
+    consent_record = {
+        "terms": True,
+        "privacy": True,
+        "age_or_guardian": True,
+        "accepted_at": now.isoformat(),
+    }
     profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
     if profile is None:
         profile_user_type = "client" if invitation.role_slug == "client" else "lawyer"
-        db.add(UserProfile(user_id=user.id, user_type=profile_user_type))
+        db.add(
+            UserProfile(
+                user_id=user.id,
+                user_type=profile_user_type,
+                custom_fields={"consents": consent_record},
+            )
+        )
+    else:
+        custom_fields = dict(profile.custom_fields or {})
+        custom_fields["consents"] = consent_record
+        profile.custom_fields = custom_fields
+        db.add(profile)
 
     db.add(user)
     db.add(invitation)

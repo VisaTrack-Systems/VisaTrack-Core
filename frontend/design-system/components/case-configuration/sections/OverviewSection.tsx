@@ -141,7 +141,7 @@ export function OverviewSection({
             <div className="text-xs text-gray-600">In Progress</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-gray-400">{milestoneStats.notStarted}</div>
+            <div className="text-2xl font-bold text-gray-700">{milestoneStats.notStarted}</div>
             <div className="text-xs text-gray-600">Not Started</div>
           </div>
         </div>
