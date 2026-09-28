@@ -50,7 +50,7 @@ export function AdminSidebar({
         <div className="pt-2">
           <div className="px-3 pb-1.5 flex items-center gap-1.5">
             <Building2 className="w-3 h-3 text-gray-400" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Organization</span>
+            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Organization</span>
           </div>
           <NavItem section="home" label="Home" icon={<LayoutDashboard className="w-4 h-4" />} indent activeSection={activeSection} onNavigate={onNavigate} />
           {!isSuperAdmin && (
@@ -64,7 +64,7 @@ export function AdminSidebar({
           <div className="pt-4">
             <div className="px-3 pb-1.5 flex items-center gap-1.5">
               <Settings className="w-3 h-3 text-gray-400" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Settings</span>
+              <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Settings</span>
             </div>
             <NavItem section="settings-general" label="General" icon={<Settings className="w-4 h-4" />} indent activeSection={activeSection} onNavigate={onNavigate} />
             <NavItem section="settings-billing" label="Billing & Plan" icon={<CreditCard className="w-4 h-4" />} indent activeSection={activeSection} onNavigate={onNavigate} />

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class LoginRequest(BaseModel):
@@ -110,6 +110,21 @@ class SessionResponse(BaseModel):
 class AcceptInvitationRequest(BaseModel):
     token: str = Field(min_length=16, max_length=512)
     password: str = Field(min_length=8, max_length=128)
+    accepted_terms: bool
+    accepted_privacy: bool
+    age_or_guardian_consent: bool
+
+    @model_validator(mode="after")
+    def require_explicit_consents(self) -> "AcceptInvitationRequest":
+        if not (
+            self.accepted_terms
+            and self.accepted_privacy
+            and self.age_or_guardian_consent
+        ):
+            raise ValueError(
+                "Accept the terms, privacy policy, and age or guardian confirmation"
+            )
+        return self
 
 
 class VerifyInvitationRequest(BaseModel):

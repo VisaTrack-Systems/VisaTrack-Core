@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 
+import { LegalFooter } from '@/components/compliance/LegalFooter';
 import type { AuthLoginInput, CurrentUser } from '@/lib/api';
 
 type PortalAuthGateProps = {
@@ -92,11 +93,15 @@ export function PortalAuthGate({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex flex-1 items-center justify-center p-6">
       <form className="w-full max-w-lg bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4" onSubmit={handleSubmit}>
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">{portalTitle} Sign In</h2>
-          <p className="text-sm text-gray-600 mt-1">Use credentials issued by your organization admin.</p>
+          <p className="text-sm text-gray-800 mt-1">
+            Use credentials issued by your organization admin. VisaTrack tracks case documents and
+            status. It does not provide legal advice, publish reviews, or guarantee an application result.
+          </p>
         </div>
 
         {error ? (
@@ -168,6 +173,8 @@ export function PortalAuthGate({
           {submitting ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
+      </div>
+      <LegalFooter />
     </div>
   );
 }

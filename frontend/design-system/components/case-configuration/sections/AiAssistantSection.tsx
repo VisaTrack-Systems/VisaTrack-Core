@@ -637,7 +637,10 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 id="ai-chat-heading" className="font-semibold text-gray-900">Case chat</h3>
-            <p className="text-xs text-gray-600">Sources show which case documents were retrieved.</p>
+            <p className="text-sm text-gray-800">
+              Sources show which case documents were retrieved. Answers are drafts for lawyer
+              review. They are not legal advice and they do not predict or guarantee an immigration decision.
+            </p>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => void refreshIndex()} disabled={busy !== null} className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
@@ -732,8 +735,9 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         <h3 id="ai-form-heading" className="flex items-center gap-2 font-semibold text-gray-900">
           <FileOutput className="h-4 w-4" /> Create PDF form review draft
         </h3>
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-sm text-gray-800">
           Supports standard AcroForm PDFs only. IRCC XFA/barcode forms still require Adobe Acrobat Reader.
+          A generated draft is not a claim that the form is current or ready to file.
         </p>
         {models && !models.form_drafts_enabled ? (
           <p role="status" className="mt-2 text-sm text-amber-800">

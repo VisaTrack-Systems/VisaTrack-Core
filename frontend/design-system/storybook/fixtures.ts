@@ -562,6 +562,8 @@ export const mockDashboardAppointments: DashboardAppointment[] = [
 
 export const mockBillingInfo: BillingInfo = {
   totalFees: 4700,
+  feesBeforeTax: 4159.29,
+  tax: 540.71,
   paid: 3900,
   remaining: 800,
   nextPayment: 'Due Mar 8, 2026',

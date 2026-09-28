@@ -1963,6 +1963,8 @@ def get_case_workspace_by_number(
                 i.id,
                 i.invoice_number,
                 i.status,
+                i.subtotal,
+                i.tax_amount,
                 i.total_amount,
                 i.amount_paid,
                 i.amount_due,
@@ -1984,6 +1986,8 @@ def get_case_workspace_by_number(
             id=str(payment_row["id"]),
             description=payment_row["description"],
             amount=_to_float(payment_row["total_amount"]),
+            subtotal=_to_float(payment_row["subtotal"]),
+            tax_amount=_to_float(payment_row["tax_amount"]),
             amount_paid=_to_float(payment_row["amount_paid"]),
             amount_due=_to_float(payment_row["amount_due"]),
             status=payment_row["status"],
@@ -2052,6 +2056,8 @@ def get_case_workspace_by_number(
         text(
             """
             SELECT
+                COALESCE(SUM(subtotal), 0) AS fees_before_tax,
+                COALESCE(SUM(tax_amount), 0) AS tax,
                 COALESCE(SUM(total_amount), 0) AS total_fees,
                 COALESCE(SUM(amount_paid), 0) AS total_paid,
                 COALESCE(SUM(amount_due), 0) AS total_remaining,
@@ -2145,6 +2151,8 @@ def get_case_workspace_by_number(
 
     billing_summary = CaseWorkspaceBillingSummary(
         total_fees=_to_float(billing_row["total_fees"]) if billing_row else 0,
+        fees_before_tax=_to_float(billing_row.get("fees_before_tax", 0)) if billing_row else 0,
+        tax=_to_float(billing_row.get("tax", 0)) if billing_row else 0,
         paid=_to_float(billing_row["total_paid"]) if billing_row else 0,
         remaining=_to_float(billing_row["total_remaining"]) if billing_row else 0,
         next_payment=billing_row["next_payment_due"] if billing_row else None,
@@ -2195,6 +2203,8 @@ def get_case_workspace_by_number(
             payment_items = []
             billing_summary = CaseWorkspaceBillingSummary(
                 total_fees=0,
+                fees_before_tax=0,
+                tax=0,
                 paid=0,
                 remaining=0,
                 next_payment=None,

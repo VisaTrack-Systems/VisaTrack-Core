@@ -12,7 +12,6 @@ class BugReportContext(BaseModel):
     path: str = Field(min_length=1, max_length=2048)
     origin: str | None = Field(default=None, max_length=512)
     reported_at_utc: datetime
-    user_agent: str | None = Field(default=None, max_length=2048)
     screenshot_captured_at: datetime | None = None
 
 

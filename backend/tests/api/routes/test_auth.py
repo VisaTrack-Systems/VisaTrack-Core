@@ -245,7 +245,13 @@ def test_accept_invitation_activates_user_and_creates_profile(monkeypatch, make_
     monkeypatch.setattr(auth, 'hash_password', lambda password: 'hashed-password')
 
     result = auth.accept_invitation(
-        payload=AcceptInvitationRequest(token='a' * 16, password='Password123'),
+        payload=AcceptInvitationRequest(
+            token='a' * 16,
+            password='Password123',
+            accepted_terms=True,
+            accepted_privacy=True,
+            age_or_guardian_consent=True,
+        ),
         db=db,
     )
 
@@ -281,3 +287,16 @@ def test_verify_invitation_returns_organization_slug(monkeypatch, make_user):
     assert result.full_name == 'Invitee User'
     assert str(result.organization_id) == str(organization_id)
     assert result.organization_slug == 'acme-law'
+
+
+def test_accept_invitation_requires_unchecked_consents_to_be_given():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AcceptInvitationRequest(
+            token='a' * 16,
+            password='Password123',
+            accepted_terms=False,
+            accepted_privacy=True,
+            age_or_guardian_consent=True,
+        )

@@ -6,6 +6,7 @@ import {
   Settings,
   Shield,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import {
@@ -366,8 +367,11 @@ export default function App() {
             <FileText className="w-6 h-6" />
             <div>
               <h1 className="font-semibold text-lg">VisaTrack</h1>
-              <p className="text-xs text-gray-400">Immigration Case Management</p>
+              <p className="text-xs text-gray-300">Immigration Case Management</p>
             </div>
+            <Link href="/legal/privacy" className="text-xs text-gray-100 underline underline-offset-2">
+              Privacy
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">

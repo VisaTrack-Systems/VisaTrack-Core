@@ -564,6 +564,8 @@ export function useClientDashboardData(): ClientDashboardData {
 
     return {
       totalFees: workspace.billing_summary.total_fees,
+      feesBeforeTax: workspace.billing_summary.fees_before_tax ?? workspace.billing_summary.total_fees,
+      tax: workspace.billing_summary.tax ?? 0,
       paid: workspace.billing_summary.paid,
       remaining: workspace.billing_summary.remaining,
       nextPayment: workspace.billing_summary.next_payment

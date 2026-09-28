@@ -42,6 +42,8 @@ export type DashboardAppointment = {
 
 export type BillingInfo = {
   totalFees: number;
+  feesBeforeTax?: number;
+  tax?: number;
   paid: number;
   remaining: number;
   nextPayment: string;

@@ -6,9 +6,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import { CookieConsent } from "../components/compliance/CookieConsent";
 import { BugReportWidget } from "../design-system/components/BugReportWidget";
 import "./globals.css";
 
+// Geist is SIL Open Font License and is self-hosted by next/font at build time.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -48,6 +50,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <BugReportWidget />
         </Suspense>
+        <CookieConsent />
       </body>
     </html>
   );

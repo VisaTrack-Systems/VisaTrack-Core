@@ -108,6 +108,7 @@ describe('ClientDashboard permission behavior', () => {
 
     expect(await screen.findByRole('heading', { name: 'Billing Summary' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Make Payment/ })).toBeEnabled();
-    expect(screen.getByText('Secure card entry is hosted by Stripe.')).toBeInTheDocument();
+    expect(screen.getByText(/Secure card entry is hosted by Stripe/)).toBeInTheDocument();
+    expect(screen.getByText(/does not add a checkout fee/)).toBeInTheDocument();
   });
 });

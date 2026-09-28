@@ -113,6 +113,8 @@ class CaseWorkspacePaymentItem(BaseModel):
     id: str
     description: str
     amount: float
+    subtotal: float = 0
+    tax_amount: float = 0
     amount_paid: float
     amount_due: float
     status: str
@@ -140,6 +142,8 @@ class CaseWorkspaceAppointment(BaseModel):
 
 class CaseWorkspaceBillingSummary(BaseModel):
     total_fees: float
+    fees_before_tax: float = 0
+    tax: float = 0
     paid: float
     remaining: float
     next_payment: Optional[date]

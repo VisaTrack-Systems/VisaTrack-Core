@@ -14,10 +14,19 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const ownedMark =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">' +
+      '<rect width="640" height="360" fill="#111827"/>' +
+      '<text x="48" y="200" fill="#ffffff" font-family="Arial,sans-serif" font-size="72">VisaTrack</text>' +
+      '</svg>'
+  );
+
 export const Default: Story = {
   args: {
-    src: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=800&q=80',
-    alt: 'Office workspace',
+    src: ownedMark,
+    alt: 'VisaTrack wordmark',
     className: 'w-full max-w-xl rounded-xl',
   },
 };

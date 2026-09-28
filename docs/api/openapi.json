@@ -3,6 +3,18 @@
     "schemas": {
       "AcceptInvitationRequest": {
         "properties": {
+          "accepted_privacy": {
+            "title": "Accepted Privacy",
+            "type": "boolean"
+          },
+          "accepted_terms": {
+            "title": "Accepted Terms",
+            "type": "boolean"
+          },
+          "age_or_guardian_consent": {
+            "title": "Age Or Guardian Consent",
+            "type": "boolean"
+          },
           "password": {
             "maxLength": 128,
             "minLength": 8,
@@ -18,7 +30,10 @@
         },
         "required": [
           "token",
-          "password"
+          "password",
+          "accepted_terms",
+          "accepted_privacy",
+          "age_or_guardian_consent"
         ],
         "title": "AcceptInvitationRequest",
         "type": "object"
@@ -1630,18 +1645,6 @@
               }
             ],
             "title": "Screenshot Captured At"
-          },
-          "user_agent": {
-            "anyOf": [
-              {
-                "maxLength": 2048,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Agent"
           }
         },
         "required": [
@@ -2872,6 +2875,11 @@
       },
       "CaseWorkspaceBillingSummary": {
         "properties": {
+          "fees_before_tax": {
+            "default": 0,
+            "title": "Fees Before Tax",
+            "type": "number"
+          },
           "next_payment": {
             "anyOf": [
               {
@@ -2901,6 +2909,11 @@
           },
           "remaining": {
             "title": "Remaining",
+            "type": "number"
+          },
+          "tax": {
+            "default": 0,
+            "title": "Tax",
             "type": "number"
           },
           "total_fees": {
@@ -3359,6 +3372,16 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "subtotal": {
+            "default": 0,
+            "title": "Subtotal",
+            "type": "number"
+          },
+          "tax_amount": {
+            "default": 0,
+            "title": "Tax Amount",
+            "type": "number"
           }
         },
         "required": [
@@ -4805,6 +4828,65 @@
         "title": "PrivacyRequestReview",
         "type": "object"
       },
+      "PublicDeletionRequest": {
+        "properties": {
+          "confirm_deletion": {
+            "const": true,
+            "title": "Confirm Deletion",
+            "type": "boolean"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "email": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "organization_slug": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Organization Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_slug",
+          "email",
+          "confirm_deletion"
+        ],
+        "title": "PublicDeletionRequest",
+        "type": "object"
+      },
+      "PublicDeletionResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "status": {
+            "const": "accepted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "PublicDeletionResponse",
+        "type": "object"
+      },
       "ResendInvitationResponse": {
         "properties": {
           "invitation_url": {
@@ -4973,6 +5055,42 @@
           "roles"
         ],
         "title": "SwitchActiveRoleResponse",
+        "type": "object"
+      },
+      "UnsubscribeRequest": {
+        "properties": {
+          "email": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "token"
+        ],
+        "title": "UnsubscribeRequest",
+        "type": "object"
+      },
+      "UnsubscribeResponse": {
+        "properties": {
+          "status": {
+            "const": "unsubscribed",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "UnsubscribeResponse",
         "type": "object"
       },
       "UpdateCurrentUserSettingsRequest": {
@@ -9543,6 +9661,48 @@
         ]
       }
     },
+    "/api/v1/privacy/deletion-requests": {
+      "post": {
+        "description": "Record a deletion request without revealing whether the account exists.",
+        "operationId": "request_account_deletion_api_v1_privacy_deletion_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicDeletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Account Deletion",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
     "/api/v1/privacy/requests": {
       "get": {
         "operationId": "list_own_privacy_requests_api_v1_privacy_requests_get",
@@ -9612,6 +9772,47 @@
           }
         ],
         "summary": "Create Privacy Request",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/unsubscribe": {
+      "post": {
+        "operationId": "unsubscribe_from_emails_api_v1_privacy_unsubscribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsubscribeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unsubscribe From Emails",
         "tags": [
           "privacy"
         ]

@@ -27,6 +27,11 @@ body {
   color-scheme: light;
 }
 
+:focus-visible {
+  outline: 2px solid #1e3a8a;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
