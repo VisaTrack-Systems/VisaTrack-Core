@@ -143,16 +143,15 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (canAccessView(currentUser, currentView)) {
-      return;
-    }
-
+  // If the current view is no longer allowed (e.g. after a role switch), fall back to the
+  // user's default view. Adjusting state during render avoids an extra effect-driven render;
+  // the fallback is always accessible, so this settles after one update.
+  if (!canAccessView(currentUser, currentView)) {
     const fallbackView = getDefaultViewForUser(currentUser);
     if (fallbackView !== currentView) {
       setCurrentView(fallbackView);
     }
-  }, [currentUser, currentView]);
+  }
 
   const handleLogin = async (credentials: AuthLoginInput) => {
     await login(credentials);

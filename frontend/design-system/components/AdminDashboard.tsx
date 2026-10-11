@@ -134,11 +134,11 @@ export function AdminDashboard({
     requestedSection === 'case-history' || requestedSection === 'settings-general' || requestedSection === 'settings-billing';
   const activeSection: AdminSection = isSuperAdmin && isRestrictedSection ? 'home' : requestedSection;
 
-  useEffect(() => {
-    if (!userForm.organization_id && organizations.length > 0) {
-      setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
-    }
-  }, [organizations, userForm.organization_id]);
+  // Default the Create User form to the first organization once organizations load.
+  // Adjusted during render (not in an effect) so the form never renders without it.
+  if (!userForm.organization_id && organizations.length > 0) {
+    setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
+  }
 
   // ── Members layout: single observer on the stable grid container ────────────
   // The grid container width never changes when we switch grid-cols — it is
