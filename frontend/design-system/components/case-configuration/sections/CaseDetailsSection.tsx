@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { CaseWorkspace } from '@/lib/api';
 
 import { formatDate, formatDateInput } from '../utils';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 type CaseDetailsUpdate = {
   case_type: string;
@@ -87,11 +88,11 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Case Details</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Case Details</h2>
         <p className="text-gray-600">Configure case information and settings</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-gray-900">Basic Information</h3>
         </div>
@@ -102,7 +103,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <input
               type="text"
               value={draft.case_type}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               onChange={(event) => setDraft((previous) => ({ ...previous, case_type: event.target.value }))}
             />
           </div>
@@ -112,7 +113,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <input
               type="text"
               value={workspace.case.primary_lawyer_name ?? 'Unassigned'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               readOnly
             />
           </div>
@@ -121,7 +122,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
             <select
               value={draft.priority}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+              className={fieldClasses}
               onChange={(event) => setDraft((previous) => ({ ...previous, priority: event.target.value }))}
             >
               <option value="low">Low</option>
@@ -135,7 +136,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               value={draft.status}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 bg-white"
+              className={fieldClasses}
               onChange={(event) => setDraft((previous) => ({ ...previous, status: event.target.value }))}
             >
               <option value="intake">Intake</option>
@@ -150,7 +151,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <input
               type="text"
               value={formatDate(workspace.case.start_date)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               readOnly
             />
           </div>
@@ -160,7 +161,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
             <input
               type="date"
               value={draft.target_filing_date}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               onChange={(event) => setDraft((previous) => ({ ...previous, target_filing_date: event.target.value }))}
             />
           </div>
@@ -174,7 +175,7 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
           <textarea
             rows={3}
             value={draft.description}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            className={fieldClasses}
             onChange={(event) => setDraft((previous) => ({ ...previous, description: event.target.value }))}
           />
         </div>
@@ -187,21 +188,21 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
           <textarea
             rows={3}
             value={draft.internal_notes}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            className={fieldClasses}
             onChange={(event) => setDraft((previous) => ({ ...previous, internal_notes: event.target.value }))}
           />
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
           <button
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={buttonClasses('secondary')}
             onClick={handleReset}
             disabled={saving}
           >
             Reset
           </button>
           <button
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={buttonClasses('primary')}
             onClick={() => {
               void handleSave();
             }}

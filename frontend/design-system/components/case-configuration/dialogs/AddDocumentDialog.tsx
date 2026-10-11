@@ -6,6 +6,7 @@ import type { CaseWorkspace } from '@/lib/api';
 
 import type { NewDocumentInput } from '../types';
 import { CaseConfigDialog } from './CaseConfigDialog';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 type AddDocumentDialogProps = {
   workspace: CaseWorkspace;
@@ -70,7 +71,7 @@ export function AddDocumentDialog({
           <select
             value={suiteId}
             onChange={(event) => setSuiteId(event.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+            className={fieldClasses}
           >
             {suiteOptions.map((suiteOption) => (
               <option key={suiteOption.id} value={suiteOption.id}>
@@ -87,7 +88,7 @@ export function AddDocumentDialog({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="e.g., Additional Proof of Employment"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
 
@@ -98,7 +99,7 @@ export function AddDocumentDialog({
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+              className={fieldClasses}
             />
           </div>
           <div>
@@ -106,7 +107,7 @@ export function AddDocumentDialog({
             <select
               value={required ? 'required' : 'optional'}
               onChange={(event) => setRequired(event.target.value === 'required')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+              className={fieldClasses}
             >
               <option value="required">Required</option>
               <option value="optional">Optional</option>
@@ -121,7 +122,7 @@ export function AddDocumentDialog({
             onChange={(event) => setInstructions(event.target.value)}
             rows={3}
             placeholder="Optional guidance for client uploads."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
       </div>
@@ -131,7 +132,7 @@ export function AddDocumentDialog({
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+          className={buttonClasses('secondary')}
         >
           Cancel
         </button>
@@ -141,7 +142,7 @@ export function AddDocumentDialog({
             void handleSubmit();
           }}
           disabled={submitting}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className={buttonClasses('primary')}
         >
           {submitting ? 'Adding...' : 'Add Document'}
         </button>

@@ -7,6 +7,8 @@ import { CasesTable } from './active-cases/CasesTable';
 import { FilterBar } from './active-cases/FilterBar';
 import { SummaryCards } from './active-cases/SummaryCards';
 import { useActiveCasesData } from './active-cases/useActiveCasesData';
+import { PageHeader } from './AppShell';
+import { Alert, Button, Card } from './ui';
 
 interface ActiveCasesProps {
   onSelectCase: (caseId: string) => void;
@@ -32,20 +34,29 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-            type="button"
-          >
-            <ArrowLeft className="w-4 h-4" />
+    <div>
+      <PageHeader
+        title="Active Cases"
+        description="Manage and configure all your immigration cases"
+        actions={
+          <Button type="button" variant="secondary" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Active Cases</h1>
-          <p className="text-gray-600">Manage and configure all your immigration cases</p>
-        </div>
+          </Button>
+        }
+      />
+
+      <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        {error ? (
+          <Alert tone="danger" className="flex items-center justify-between gap-4">
+            <p>{error}</p>
+            <button className="font-medium underline underline-offset-2 hover:text-red-800" onClick={retry} type="button">
+              Retry
+            </button>
+          </Alert>
+        ) : null}
+
+        {!isLoading ? <SummaryCards cases={cases} /> : null}
 
         <FilterBar
           searchTerm={searchTerm}
@@ -54,29 +65,11 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
           onFilterStatusChange={setFilterStatus}
         />
 
-        {error ? (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-red-700">{error}</p>
-            <button
-              className="text-sm font-medium text-red-700 hover:text-red-800"
-              onClick={retry}
-              type="button"
-            >
-              Retry
-            </button>
-          </div>
-        ) : null}
-
         {isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-sm text-gray-500">Loading active cases...</div>
-        ) : null}
-
-        {!isLoading ? (
-          <>
-            <SummaryCards cases={cases} />
-            <CasesTable filteredCases={filteredCases} onSelectCase={onSelectCase} />
-          </>
-        ) : null}
+          <Card className="p-8 text-sm text-gray-500">Loading active cases...</Card>
+        ) : (
+          <CasesTable filteredCases={filteredCases} onSelectCase={onSelectCase} />
+        )}
       </div>
     </div>
   );

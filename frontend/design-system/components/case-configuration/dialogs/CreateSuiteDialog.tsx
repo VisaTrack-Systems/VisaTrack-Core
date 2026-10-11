@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import type { NewDocumentSuiteInput } from '../types';
 import { CaseConfigDialog } from './CaseConfigDialog';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 type CreateSuiteDialogProps = {
   submitting: boolean;
@@ -53,7 +54,7 @@ export function CreateSuiteDialog({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="e.g., Country-Specific Requirements"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
 
@@ -64,7 +65,7 @@ export function CreateSuiteDialog({
             onChange={(event) => setDescription(event.target.value)}
             rows={3}
             placeholder="Optional description for this suite."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
       </div>
@@ -74,7 +75,7 @@ export function CreateSuiteDialog({
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+          className={buttonClasses('secondary')}
         >
           Cancel
         </button>
@@ -82,7 +83,7 @@ export function CreateSuiteDialog({
           type="button"
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className={buttonClasses('primary')}
         >
           {submitting ? 'Creating...' : 'Create Suite'}
         </button>

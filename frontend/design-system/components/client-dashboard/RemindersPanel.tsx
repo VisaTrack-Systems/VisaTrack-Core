@@ -1,10 +1,11 @@
-/** RemindersPanel: reminderspanel implementation. */
+/** RemindersPanel: Recent lawyer reminders for the client, with a detail view and an all-reminders board. */
 
 import { BellRing, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { DashboardReminder } from './types';
 import { DialogPanel } from '../DialogPanel';
+import { Card } from '../ui';
 
 type RemindersPanelProps = {
   allReminders?: DashboardReminder[];
@@ -48,12 +49,13 @@ export function RemindersPanel({
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="p-6 border-b border-gray-200">
+      <Card className="overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Reminders</h2>
+            <h2 className="text-base font-semibold text-gray-900">Reminders</h2>
             <button
-              className="text-sm text-red-600 hover:text-red-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+              type="button"
+              className="text-sm text-primary-600 hover:text-primary-700 hover:underline font-medium disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
               onClick={openBoard}
               disabled={reminderList.length === 0}
             >
@@ -67,7 +69,7 @@ export function RemindersPanel({
               key={`${reminder.title}-${reminder.time}-${index}`}
               type="button"
               onClick={() => openReminder(reminder)}
-              className={`w-full text-left p-4 hover:bg-gray-50 transition-colors cursor-pointer ${reminder.unread ? 'bg-red-50' : ''}`}
+              className={`w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${reminder.unread ? 'bg-primary-50 border-l-2 border-primary-600' : ''}`}
             >
               <div className="flex items-start justify-between mb-1">
                 <p className={`text-sm font-medium ${reminder.unread ? 'text-gray-900' : 'text-gray-700'}`}>
@@ -82,16 +84,16 @@ export function RemindersPanel({
             </button>
           ))}
         </div>
-        <div className="p-4 border-t border-gray-200">
-          <div className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200">
-            <BellRing className="w-4 h-4" />
-            Laywer Reminders
-          </div>
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50">
+          <p className="flex items-center justify-center gap-2 text-xs font-medium text-gray-600">
+            <BellRing className="w-3.5 h-3.5" aria-hidden="true" />
+            Lawyer Reminders
+          </p>
         </div>
-      </div>
+      </Card>
       {selectedReminder && !isBoardOpen ? (
-        <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <DialogPanel labelledBy="reminder-detail-title" onClose={() => setSelectedReminderId(null)} className="w-full max-w-2xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[120] w-screen h-screen bg-navy-900/50 flex items-center justify-center p-4 overflow-y-auto">
+          <DialogPanel labelledBy="reminder-detail-title" onClose={() => setSelectedReminderId(null)} className="w-full max-w-2xl bg-white rounded-md border border-gray-200 shadow-popover overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h3 id="reminder-detail-title" className="text-base font-semibold text-gray-900">{selectedReminder.title}</h3>
@@ -115,8 +117,8 @@ export function RemindersPanel({
         </div>
       ) : null}
       {isBoardOpen ? (
-        <div className="fixed inset-0 z-[121] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <DialogPanel labelledBy="reminder-board-title" onClose={() => setIsBoardOpen(false)} className="w-full max-w-5xl bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[121] w-screen h-screen bg-navy-900/50 flex items-center justify-center p-4 overflow-y-auto">
+          <DialogPanel labelledBy="reminder-board-title" onClose={() => setIsBoardOpen(false)} className="w-full max-w-5xl bg-white rounded-md border border-gray-200 shadow-popover overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 id="reminder-board-title" className="text-base font-semibold text-gray-900">All Reminders</h3>
               <button
@@ -139,7 +141,7 @@ export function RemindersPanel({
                       type="button"
                       onClick={() => openReminder(reminder)}
                       className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 ${
-                        isSelected ? 'bg-gray-100' : reminder.unread ? 'bg-red-50' : ''
+                        isSelected ? 'bg-primary-50' : reminder.unread ? 'bg-gray-50 font-medium' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">

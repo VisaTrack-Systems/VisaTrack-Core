@@ -1,4 +1,6 @@
-/** utils: utils implementation. */
+/** utils: Formatting and status helpers for the case list. */
+
+import type { Tone } from '../ui';
 
 export function titleize(value: string): string {
   return value
@@ -50,31 +52,31 @@ export function completionFromStatus(status: string): number {
   }
 }
 
-export function statusColor(status: string): string {
+/** Badge tone for a case status. */
+export function statusTone(status: string): Tone {
   switch (status) {
-    case 'Intake':
-      return 'bg-slate-100 text-slate-700';
     case 'Awaiting Client':
-      return 'bg-yellow-100 text-yellow-700';
+      return 'warning';
     case 'In Progress':
-      return 'bg-purple-100 text-purple-700';
+      return 'primary';
     case 'Closed':
-      return 'bg-green-100 text-green-700';
+      return 'success';
     default:
-      return 'bg-gray-100 text-gray-700';
+      return 'neutral';
   }
 }
 
-export function priorityColor(priority: string): string {
+/** Badge tone for a case priority. */
+export function priorityTone(priority: string): Tone {
   switch (priority) {
     case 'high':
     case 'urgent':
-      return 'bg-red-100 text-red-700 border-red-200';
+      return 'danger';
     case 'medium':
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      return 'warning';
     case 'low':
-      return 'bg-green-100 text-green-700 border-green-200';
+      return 'success';
     default:
-      return 'bg-gray-100 text-gray-700 border-gray-200';
+      return 'neutral';
   }
 }

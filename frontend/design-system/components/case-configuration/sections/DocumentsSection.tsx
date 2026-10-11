@@ -14,6 +14,7 @@ import { DeleteDocumentDialog } from '../dialogs/DeleteDocumentDialog';
 import { RenameDocumentDialog } from '../dialogs/RenameDocumentDialog';
 import type { DocumentStats, NewDocumentInput, NewDocumentSuiteInput } from '../types';
 import { formatDate, statusColor, titleize } from '../utils';
+import { buttonClasses } from '../../ui';
 
 type DocumentsSectionProps = {
   workspace: CaseWorkspace;
@@ -164,50 +165,48 @@ export function DocumentsSection({
     <>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Document Requests</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Document Requests</h2>
           <p className="text-gray-600">
             Configure requests and securely add retainers or other firm-provided documents.
           </p>
         </div>
 
         <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
             <div className="text-2xl font-bold text-green-700">{documentStats.accepted}</div>
             <div className="text-sm text-green-600">Accepted</div>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-blue-700">{documentStats.received}</div>
-            <div className="text-sm text-blue-600">Received</div>
+          <div className="bg-primary-50 border border-primary-200 rounded-md p-4">
+            <div className="text-2xl font-bold text-primary-700">{documentStats.received}</div>
+            <div className="text-sm text-primary-600">Received</div>
           </div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-2xl font-bold text-yellow-700">{documentStats.requested}</div>
-            <div className="text-sm text-yellow-600">Requested</div>
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
+            <div className="text-2xl font-bold text-amber-700">{documentStats.requested}</div>
+            <div className="text-sm text-amber-600">Requested</div>
           </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <div className="text-2xl font-bold text-red-700">{documentStats.rejected}</div>
             <div className="text-sm text-red-600">Rejected</div>
           </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
             <div className="text-2xl font-bold text-gray-700">{documentStats.notRequested}</div>
             <div className="text-sm text-gray-600">Not Requested</div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="bg-white border border-gray-200 rounded-md shadow-card p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                className={buttonClasses('primary')}
                 onClick={() => setIsAddDocumentDialogOpen(true)}
               >
                 <Plus className="w-4 h-4" />
                 Add Custom Document
               </button>
               <label
-                className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors flex items-center gap-2 ${
-                  addingDocument || uploadingDocumentId !== null
-                    ? 'cursor-wait opacity-60'
-                    : 'cursor-pointer hover:bg-gray-50'
+                className={`${buttonClasses('secondary')} ${
+                  addingDocument || uploadingDocumentId !== null ? 'cursor-wait opacity-60' : 'cursor-pointer'
                 }`}
               >
                 <Upload className="w-4 h-4" />
@@ -227,17 +226,17 @@ export function DocumentsSection({
                 />
               </label>
               <button
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                className={buttonClasses('secondary')}
                 onClick={() => setIsCreateSuiteDialogOpen(true)}
               >
                 <FolderPlus className="w-4 h-4" />
                 Create Suite
               </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" onClick={onApplySuite}>
+              <button className={buttonClasses('secondary')} onClick={onApplySuite}>
                 Expand Suites
               </button>
               <button
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60"
+                className={buttonClasses('secondary')}
                 onClick={() => {
                   void onSendReminders();
                 }}
@@ -248,7 +247,7 @@ export function DocumentsSection({
               </button>
             </div>
             <button
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+              className={buttonClasses('secondary')}
               onClick={onDownloadAll}
             >
               <Download className="w-4 h-4" />
@@ -259,7 +258,7 @@ export function DocumentsSection({
 
         <div className="space-y-3">
           {workspace.document_suites.map((suite) => (
-            <div key={suite.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div key={suite.id} className="bg-white border border-gray-200 rounded-md shadow-card overflow-hidden">
               <div
                 onClick={() => onToggleSuite(suite.id)}
                 className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -274,7 +273,7 @@ export function DocumentsSection({
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-900">{suite.name}</h3>
                       {suite.recommended ? (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded">Recommended</span>
+                        <span className="px-2 py-0.5 bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-200 text-xs font-medium rounded">Recommended</span>
                       ) : null}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{suite.reason}</p>
@@ -490,8 +489,8 @@ export function DocumentsSection({
         />
       ) : null}
       {noteTarget ? (
-        <div className="fixed inset-0 z-[85] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <DialogPanel labelledBy="client-note-title" onClose={() => setNoteTarget(null)} className="w-full max-w-lg bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[85] bg-navy-900/50 flex items-center justify-center p-4">
+          <DialogPanel labelledBy="client-note-title" onClose={() => setNoteTarget(null)} className="w-full max-w-lg bg-white rounded-md border border-gray-200 shadow-popover overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h3 id="client-note-title" className="text-base font-semibold text-gray-900">Client Note</h3>
@@ -513,7 +512,7 @@ export function DocumentsSection({
               <button
                 type="button"
                 onClick={() => setNoteTarget(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+                className={buttonClasses('secondary')}
               >
                 Close
               </button>
@@ -555,7 +554,7 @@ export function DocumentsSection({
                 rows={4}
                 maxLength={2000}
                 placeholder="Tell the client what is wrong with this file and what they should upload instead."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
               />
               {rejectionError ? <p className="mt-2 text-xs text-red-600">{rejectionError}</p> : null}
             </div>
@@ -568,7 +567,7 @@ export function DocumentsSection({
                 setRejectionError(null);
               }}
               disabled={updatingDocumentId === rejectionTarget.id}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+              className={buttonClasses('secondary')}
             >
               Cancel
             </button>
@@ -578,7 +577,7 @@ export function DocumentsSection({
                 void handleRejectDocument();
               }}
               disabled={updatingDocumentId === rejectionTarget.id}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+              className={buttonClasses('danger')}
             >
               {updatingDocumentId === rejectionTarget.id ? 'Saving...' : 'Reject Document'}
             </button>

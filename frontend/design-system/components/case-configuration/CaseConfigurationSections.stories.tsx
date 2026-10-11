@@ -3,7 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
-import { SidebarNav } from './SidebarNav';
+import { CaseSectionNav } from './CaseSectionNav';
 import { CaseDetailsSection } from './sections/CaseDetailsSection';
 import { DocumentsSection } from './sections/DocumentsSection';
 import { RemindersSection } from './sections/RemindersSection';
@@ -32,10 +32,10 @@ const createReminder = fn(async () => true);
 const notifyReminder = fn();
 const updateDocumentStatus = fn(async () => {});
 
-export const Sidebar: Story = {
+export const SectionNav: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => (
-    <SidebarNav
+    <CaseSectionNav
       activeSection="overview"
       caseId="C-2026-001"
       onBack={() => {}}

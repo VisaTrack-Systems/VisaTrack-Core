@@ -29,6 +29,7 @@ import {
   selectAiProviderModel,
   sendAiChatMessage,
 } from '@/lib/api';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 type AiAssistantSectionProps = {
   workspace: CaseWorkspace;
@@ -462,8 +463,8 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
     <div className="space-y-6" aria-busy={busy !== null}>
       <div>
         <div className="flex items-center gap-2">
-          <Bot className="h-6 w-6 text-red-700" />
-          <h2 className="text-2xl font-bold text-gray-900">Case AI Assistant</h2>
+          <Bot className="h-6 w-6 text-primary-600" />
+          <h2 className="text-xl font-semibold text-gray-900">Case AI Assistant</h2>
         </div>
         <p className="mt-2 text-gray-600">
           Ask questions grounded in this client&apos;s structured case data and locally indexed,
@@ -471,7 +472,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         </p>
       </div>
 
-      <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+      <div className="flex gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
         <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
         <p>
           AI output may be incomplete or wrong. Verify citations and source records. No chat
@@ -479,10 +480,10 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
         </p>
       </div>
 
-      {error ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      {notice ? <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800">{notice}</p> : null}
+      {error ? <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+      {notice ? <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</p> : null}
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-provider-heading">
+      <section className="rounded-md border border-gray-200 bg-white p-5" aria-labelledby="ai-provider-heading">
         <h3 id="ai-provider-heading" className="flex items-center gap-2 font-semibold text-gray-900">
           <KeyRound className="h-4 w-4" /> Your model provider
         </h3>
@@ -517,7 +518,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                     });
                 }
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             >
               <option value="openai">OpenAI API</option>
               <option value="anthropic">Anthropic API</option>
@@ -534,7 +535,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               required
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -548,7 +549,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               required
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -560,7 +561,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               autoComplete="one-time-code"
               value={mfaCode}
               onChange={(event) => setMfaCode(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <label className="flex items-start gap-2 text-sm text-gray-700 md:col-span-2">
@@ -576,7 +577,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
           <button
             type="submit"
             disabled={busy !== null}
-            className="w-fit rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+            className="w-fit rounded-md bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white disabled:opacity-50"
           >
             {busy === 'provider' ? 'Verifying…' : connected ? 'Replace connection' : 'Connect provider'}
           </button>
@@ -589,7 +590,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               value={models.selected_model ?? models.recommended_model ?? ''}
               disabled={busy !== null}
               onChange={(event) => void changeModel(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             >
               {models.selected_model && !models.models.includes(models.selected_model) ? (
                 <option value={models.selected_model} disabled>
@@ -615,7 +616,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               type="button"
               disabled={busy !== null}
               onClick={() => void disconnectProvider()}
-              className="mt-3 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+              className="mt-3 rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
             >
               {busy === 'disconnect-provider' ? 'Disconnecting…' : 'Disconnect provider'}
             </button>
@@ -626,14 +627,14 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             type="button"
             disabled={busy !== null}
             onClick={() => void disconnectProvider()}
-            className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+            className="mt-4 rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
           >
             {busy === 'disconnect-provider' ? 'Disconnecting…' : 'Disconnect provider'}
           </button>
         ) : null}
       </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-chat-heading">
+      <section className="rounded-md border border-gray-200 bg-white p-5" aria-labelledby="ai-chat-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 id="ai-chat-heading" className="font-semibold text-gray-900">Case chat</h3>
@@ -643,14 +644,14 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             </p>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void refreshIndex()} disabled={busy !== null} className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+            <button type="button" onClick={() => void refreshIndex()} disabled={busy !== null} className={buttonClasses('secondary')}>
               <RefreshCw className="h-4 w-4" /> {busy === 'index' ? 'Queueing…' : 'Refresh document index'}
             </button>
-            <button type="button" onClick={() => void newChat()} disabled={busy !== null || !connected} className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+            <button type="button" onClick={() => void newChat()} disabled={busy !== null || !connected} className={buttonClasses('secondary')}>
               New chat
             </button>
             {chat ? (
-              <button type="button" onClick={() => void removeChat()} disabled={busy !== null} className="rounded-lg border border-red-300 p-2 text-red-700 disabled:opacity-50" aria-label="Delete current chat">
+              <button type="button" onClick={() => void removeChat()} disabled={busy !== null} className="rounded-md border border-red-300 p-2 text-red-700 disabled:opacity-50" aria-label="Delete current chat">
                 <Trash2 className="h-4 w-4" />
               </button>
             ) : null}
@@ -662,7 +663,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             <select
               value={chat?.id ?? ''}
               onChange={(event) => void openChat(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             >
               <option value="" disabled>Select a chat</option>
               {chats.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
@@ -670,7 +671,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
           </label>
         ) : null}
         <div
-          className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-red-500"
+          className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary-500"
           aria-label="Conversation transcript"
           tabIndex={0}
         >
@@ -678,7 +679,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             <article
               key={message.id}
               aria-label={message.role === 'user' ? 'Your message' : 'AI assistant response'}
-              className={`rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-blue-200 bg-blue-50'}`}
+              className={`rounded-md p-4 text-sm ${message.role === 'user' ? 'ml-8 bg-gray-100' : 'mr-8 border border-primary-200 bg-primary-50'}`}
             >
               <p className="whitespace-pre-wrap text-gray-900">{message.content}</p>
               {message.role === 'assistant' && message.provider && message.model ? (
@@ -698,7 +699,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                       <li key={`${message.id}-${citation.source_id}`}>
                         <button
                           type="button"
-                          className="font-semibold text-blue-800 underline"
+                          className="font-semibold text-primary-800 underline"
                           onClick={() => void openSource(citation.case_document_id, citation.page_number)}
                         >
                           {citation.source_id} · {citation.document_name}
@@ -723,15 +724,15 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="What passport expiry date is supported by the submitted documents?"
-            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2"
+            className={`min-w-0 flex-1 ${fieldClasses}`}
           />
-          <button type="submit" disabled={busy !== null || !connected} className="self-end rounded-lg bg-red-600 p-3 text-white disabled:opacity-50" aria-label="Send question">
+          <button type="submit" disabled={busy !== null || !connected} className="self-end rounded-md bg-primary-600 p-3 text-white hover:bg-primary-700 disabled:opacity-50" aria-label="Send question">
             <Send className="h-5 w-5" />
           </button>
         </form>
       </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-5" aria-labelledby="ai-form-heading">
+      <section className="rounded-md border border-gray-200 bg-white p-5" aria-labelledby="ai-form-heading">
         <h3 id="ai-form-heading" className="flex items-center gap-2 font-semibold text-gray-900">
           <FileOutput className="h-4 w-4" /> Create PDF form review draft
         </h3>
@@ -744,7 +745,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
             Form drafting is disabled until your firm approves exact PDF revisions.
           </p>
         ) : null}
-        <label className={`mt-4 flex w-fit items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm focus-within:ring-2 focus-within:ring-red-500 ${busy === 'form-upload' ? 'cursor-wait opacity-50' : models?.form_drafts_enabled === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
+        <label className={`mt-4 flex w-fit items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm focus-within:ring-2 focus-within:ring-primary-500 ${busy === 'form-upload' ? 'cursor-wait opacity-50' : models?.form_drafts_enabled === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}>
           {busy === 'form-upload' ? 'Uploading and quarantining…' : 'Upload official PDF form'}
           <input
             className="sr-only"
@@ -766,7 +767,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               required
               value={formDocumentId}
               onChange={(event) => setFormDocumentId(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             >
               <option value="">Select a PDF form</option>
               {cleanPdfDocuments.map((document) => (
@@ -784,15 +785,15 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               maxLength={2000}
               value={formInstructions}
               onChange={(event) => setFormInstructions(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
-          <button type="submit" disabled={busy !== null || !connected || !formDocumentId || models?.form_drafts_enabled === false} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">
+          <button type="submit" disabled={busy !== null || !connected || !formDocumentId || models?.form_drafts_enabled === false} className="rounded-md bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white disabled:opacity-50">
             {busy === 'form' ? 'Generating review draft…' : 'Generate review draft'}
           </button>
         </form>
         {formResult ? (
-          <div role="status" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <div role="status" className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             <p>{formResult.warning}</p>
             <p className="mt-2 text-xs">
               Generated with {formResult.provider} / {formResult.model}. Template SHA-256:{' '}
@@ -850,7 +851,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               href={formResult.downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex rounded-lg bg-gray-900 px-4 py-2 text-sm text-white"
+              className="mt-2 inline-flex rounded-md bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white"
             >
               Download {formResult.fileName}
             </a>
@@ -863,7 +864,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
               {formDrafts.slice(0, 10).map((draft) => (
                 <li
                   key={draft.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 p-3 text-sm"
                 >
                   <div>
                     <p className="font-medium text-gray-900">{draft.file_name}</p>
@@ -876,7 +877,7 @@ export function AiAssistantSection({ workspace, onWorkspaceRefresh }: AiAssistan
                   <button
                     type="button"
                     onClick={() => void downloadPriorDraft(draft.id)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    className={buttonClasses('secondary', 'sm')}
                   >
                     Get new download link
                   </button>

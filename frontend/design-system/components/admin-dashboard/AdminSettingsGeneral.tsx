@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { type InvitationStyles, getInvitationTemplate, saveInvitationTemplate } from '@/lib/api';
 import { DialogPanel } from '../DialogPanel';
+import { Alert, Button, Card, CardHeader, Input, Label, Select, Textarea } from '../ui';
 
 const DEFAULT_INVITATION_TEMPLATE =
   'Hi {recipient_name},\n\n' +
@@ -31,7 +32,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex w-9 h-5 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 ${checked ? 'bg-red-600' : 'bg-gray-300'}`}
+      className={`relative inline-flex w-9 h-5 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${checked ? 'bg-primary-600' : 'bg-gray-300'}`}
     >
       <span
         className={`inline-block w-4 h-4 mt-0.5 ml-0.5 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}
@@ -88,19 +89,19 @@ function TemplateDialog({
     onStylesChange({ ...styles, [field]: value });
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[80] bg-navy-900/50 flex items-center justify-center p-4">
       <DialogPanel
         labelledBy="invitation-template-title"
         onClose={onClose}
-        className="w-full max-w-lg bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-white border border-gray-200 rounded-md shadow-popover flex flex-col max-h-[90vh]"
       >
 
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 shrink-0">
           <div>
-            <h2 id="invitation-template-title" className="text-lg font-semibold text-gray-900">Edit Invitation Email</h2>
+            <h2 id="invitation-template-title" className="text-base font-semibold text-gray-900">Edit Invitation Email</h2>
             {isCustom && (
-              <span className="inline-block mt-1 text-xs text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+              <span className="inline-block mt-1 text-xs font-medium text-primary-700 bg-primary-50 ring-1 ring-inset ring-primary-200 px-2 py-0.5 rounded">
                 Custom template active
               </span>
             )}
@@ -109,7 +110,7 @@ function TemplateDialog({
             type="button"
             onClick={onClose}
             aria-label="Close invitation email editor"
-            className="p-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            className="-m-1 p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -119,7 +120,7 @@ function TemplateDialog({
         <div className="overflow-y-auto flex-1">
 
           {/* Message body section */}
-          <div className="px-6 py-5 space-y-3">
+          <div className="px-5 py-4 space-y-3">
             <p className="text-sm text-gray-600">
               Edit the message body sent to invitees. Leave blank to reset to the default.
             </p>
@@ -131,11 +132,12 @@ function TemplateDialog({
                 </code>
               ))}
             </div>
-            <textarea
+            <Textarea
               rows={9}
+              aria-label="Invitation message body"
               value={body}
               onChange={(e) => { onBodyChange(e.target.value); setError(null); }}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500 resize-y"
+              className="font-mono resize-y"
               placeholder="Leave blank to use the default template."
             />
           </div>
@@ -145,14 +147,15 @@ function TemplateDialog({
             <button
               type="button"
               onClick={() => setAppearanceOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              aria-expanded={appearanceOpen}
+              className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Appearance
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${appearanceOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {appearanceOpen && (
-              <div className="px-6 pb-5 space-y-4">
+              <div className="px-5 pb-5 space-y-4">
 
                 {/* Button color */}
                 <div className="flex items-center justify-between gap-4">
@@ -165,18 +168,23 @@ function TemplateDialog({
                       type="color"
                       value={styles.button_color}
                       onChange={(e) => set('button_color')(e.target.value)}
-                      className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0.5"
+                      aria-label="Button color picker"
+                      className="w-8 h-8 rounded-md border border-gray-300 cursor-pointer p-0.5"
                     />
-                    <input
-                      type="text"
-                      value={styles.button_color}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (/^#[0-9a-fA-F]{0,6}$/.test(val)) set('button_color')(val);
-                      }}
-                      className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm font-mono"
-                      maxLength={7}
-                    />
+                    <div className="w-24">
+                      <Input
+                        compact
+                        type="text"
+                        aria-label="Button color hex value"
+                        value={styles.button_color}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^#[0-9a-fA-F]{0,6}$/.test(val)) set('button_color')(val);
+                        }}
+                        className="font-mono"
+                        maxLength={7}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -186,24 +194,28 @@ function TemplateDialog({
                     <p className="text-sm font-medium text-gray-700">Button label</p>
                     <p className="text-xs text-gray-500">Text shown on the activation button.</p>
                   </div>
-                  <input
-                    type="text"
-                    value={styles.button_label}
-                    onChange={(e) => set('button_label')(e.target.value)}
-                    className="w-48 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                    maxLength={100}
-                  />
+                  <div className="w-48 shrink-0">
+                    <Input
+                      compact
+                      type="text"
+                      aria-label="Button label"
+                      value={styles.button_label}
+                      onChange={(e) => set('button_label')(e.target.value)}
+                      maxLength={100}
+                    />
+                  </div>
                 </div>
 
                 {/* Email subject */}
                 <div className="space-y-1.5">
                   <p className="text-sm font-medium text-gray-700">Email subject</p>
                   <p className="text-xs text-gray-500">Supports the <code className="font-mono bg-gray-100 px-1 rounded">{'{organization_name}'}</code> variable.</p>
-                  <input
+                  <Input
+                    compact
                     type="text"
+                    aria-label="Email subject"
                     value={styles.subject}
                     onChange={(e) => set('subject')(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                     maxLength={255}
                   />
                 </div>
@@ -223,31 +235,22 @@ function TemplateDialog({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between shrink-0">
+        <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-md flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors"
+            className="text-xs text-primary-700 underline underline-offset-2 hover:text-primary-800 transition-colors"
           >
             Reset to default
           </button>
           <div className="flex items-center gap-3">
             {error ? <p className="text-xs text-red-600">{error}</p> : null}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50 transition-colors"
-            >
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white transition-colors"
-            >
+            </Button>
+            <Button type="button" onClick={() => void handleSave()} disabled={saving}>
               {saving ? 'Saving…' : 'Save template'}
-            </button>
+            </Button>
           </div>
         </div>
       </DialogPanel>
@@ -289,101 +292,94 @@ export function AdminSettingsGeneral() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Branding */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">Branding & Customization</h3>
-          <p className="text-sm text-gray-500 mt-0.5">Customize your organization&apos;s identity within the platform.</p>
-        </div>
-        <div className="px-6 py-6 space-y-6">
+      <Card>
+        <CardHeader
+          title="Branding & Customization"
+          description="Customize your organization's identity within the platform."
+        />
+        <div className="px-5 py-5 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+            <p className="mb-2 text-sm font-medium text-gray-700">Company Logo</p>
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+              <div className="w-16 h-16 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
                 <span className="text-xs text-gray-700">No logo</span>
               </div>
               <div>
-                <button type="button" disabled className="border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                <Button type="button" variant="secondary" disabled>
                   Upload logo
-                </button>
+                </Button>
                 <p className="text-xs text-gray-500 mt-1">PNG or SVG, max 512 KB. Recommended: 256×256 px.</p>
               </div>
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="org-display-name">Organization Display Name</label>
-            <input id="org-display-name" type="text" disabled placeholder="Your organization name"
-              className="w-full max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
+          <div className="max-w-sm">
+            <Label htmlFor="org-display-name">Organization Display Name</Label>
+            <Input id="org-display-name" type="text" disabled placeholder="Your organization name" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="brand-color">Brand Accent Color</label>
+            <Label htmlFor="brand-color">Brand Accent Color</Label>
             <div className="flex items-center gap-3">
               <input id="brand-color" type="color" disabled defaultValue="#dc2626"
-                className="w-10 h-10 rounded border border-gray-300 cursor-not-allowed disabled:opacity-50" />
+                className="w-10 h-10 rounded-md border border-gray-300 cursor-not-allowed disabled:opacity-50" />
               <span className="text-sm text-gray-500">#dc2626 (default)</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-            <Info className="w-4 h-4 shrink-0" />
+          <Alert tone="warning" className="flex items-center gap-2">
+            <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
             Branding customization is not yet implemented. These controls are placeholders for a future release.
-          </div>
+          </Alert>
         </div>
-      </div>
+      </Card>
 
       {/* General settings */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">General Settings</h3>
-          <p className="text-sm text-gray-500 mt-0.5">Basic organization configuration.</p>
-        </div>
-        <div className="px-6 py-6 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="contact-email">Contact Email</label>
-            <input id="contact-email" type="email" disabled placeholder="contact@yourfirm.com"
-              className="w-full max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" />
+      <Card>
+        <CardHeader title="General Settings" description="Basic organization configuration." />
+        <div className="px-5 py-5 space-y-5">
+          <div className="max-w-sm">
+            <Label htmlFor="contact-email">Contact Email</Label>
+            <Input id="contact-email" type="email" disabled placeholder="contact@yourfirm.com" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="timezone">Timezone</label>
-            <select id="timezone" disabled
-              className="w-full max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:text-gray-500">
+          <div className="max-w-sm">
+            <Label htmlFor="timezone">Timezone</Label>
+            <Select id="timezone" disabled>
               <option>America/Toronto (Eastern)</option>
-            </select>
+            </Select>
           </div>
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-            <Info className="w-4 h-4 shrink-0" />
+          <Alert tone="warning" className="flex items-center gap-2">
+            <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
             General settings editing is not yet implemented. These controls are placeholders for a future release.
-          </div>
+          </Alert>
         </div>
-      </div>
+      </Card>
 
       {/* Email templates */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900">Email Templates</h3>
-          <p className="text-sm text-gray-500 mt-0.5">Customize automated emails sent to clients and staff.</p>
-        </div>
-        <div className="px-6 py-6 space-y-4">
+      <Card>
+        <CardHeader title="Email Templates" description="Customize automated emails sent to clients and staff." />
+        <div className="px-5 divide-y divide-gray-200">
 
           {/* Invitation email — enabled */}
-          <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-4 py-4">
             <div>
               <p className="text-sm font-medium text-gray-900">Invitation email</p>
               <p className="text-xs text-gray-700">
                 Sent when a user is invited to the organization. Every email adds the business
                 address and an unsubscribe link automatically.
-                {isCustom && <span className="ml-1 text-blue-800">Custom template active.</span>}
+                {isCustom && <span className="ml-1 font-medium text-primary-700">Custom template active.</span>}
               </p>
               {loadError ? <p className="text-xs text-red-600 mt-0.5">{loadError}</p> : null}
             </div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
               onClick={() => void handleOpenDialog()}
               disabled={loadingTemplate}
-              className="border border-gray-300 px-3 py-1.5 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               {loadingTemplate ? 'Loading…' : 'Edit template'}
-            </button>
+            </Button>
           </div>
 
           {/* Other templates — still placeholder */}
@@ -391,19 +387,18 @@ export function AdminSettingsGeneral() {
             { label: 'Case status update', description: 'Sent to clients when their case status changes.' },
             { label: 'Document request', description: 'Sent to clients when outstanding documents are needed.' },
           ].map(({ label, description }) => (
-            <div key={label} className="flex items-center justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
+            <div key={label} className="flex items-center justify-between gap-4 py-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">{label}</p>
                 <p className="text-xs text-gray-500">{description}</p>
               </div>
-              <button type="button" disabled
-                className="border border-gray-300 px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+              <Button type="button" variant="secondary" size="sm" className="shrink-0" disabled>
                 Edit template
-              </button>
+              </Button>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {dialogOpen && (
         <TemplateDialog

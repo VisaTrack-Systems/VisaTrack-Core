@@ -5,6 +5,7 @@ import { Upload, X } from 'lucide-react';
 
 import type { DashboardDocument } from './types';
 import { DialogPanel } from '../DialogPanel';
+import { Alert, Button, Label, Textarea } from '../ui';
 
 type DocumentUploadDialogProps = {
   isOpen: boolean;
@@ -45,43 +46,40 @@ export function DocumentUploadDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] w-screen h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[120] w-screen h-screen bg-navy-900/50 flex items-center justify-center p-4 overflow-y-auto">
       <DialogPanel
         labelledBy="document-upload-title"
         describedBy="document-upload-description"
         onClose={onClose}
-        className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+        className="w-full max-w-xl bg-white rounded-md shadow-popover border border-gray-200 overflow-hidden"
       >
-        <div className="px-6 py-4 bg-black text-white flex items-start justify-between">
+        <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between">
           <div>
-            <h2 id="document-upload-title" className="text-xl font-semibold">Upload Document</h2>
-            <p id="document-upload-description" className="text-xs text-gray-300 mt-1">Attach a file for {document.name}.</p>
+            <h2 id="document-upload-title" className="text-base font-semibold text-gray-900">Upload Document</h2>
+            <p id="document-upload-description" className="text-sm text-gray-500 mt-0.5">Attach a file for {document.name}.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-60"
+            className="-m-1 p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-60"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit}>
+          <div className="px-5 py-4 space-y-5">
           {validationError ? (
-            <div role="alert" className="rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-800 text-sm px-3 py-2">
-              {validationError}
-            </div>
+            <Alert tone="warning" role="alert">{validationError}</Alert>
           ) : null}
 
           {errorMessage ? (
-            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
-              {errorMessage}
-            </div>
+            <Alert tone="danger">{errorMessage}</Alert>
           ) : null}
 
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
             <p className="text-sm font-semibold text-gray-900">{document.name}</p>
             {document.instructions ? (
               <p className="mt-1 text-sm text-gray-600">{document.instructions}</p>
@@ -92,13 +90,13 @@ export function DocumentUploadDialog({
           </div>
 
           <div>
-            <label htmlFor="document-upload-file" className="block text-sm font-medium text-gray-700 mb-2">Select File</label>
+            <Label htmlFor="document-upload-file">Select File</Label>
             <input
               id="document-upload-file"
               type="file"
               accept=".pdf,.docx,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-red-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-red-700"
+              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border file:border-gray-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-50"
               disabled={submitting}
             />
             {selectedFile ? (
@@ -109,39 +107,28 @@ export function DocumentUploadDialog({
           </div>
 
           <div>
-            <label htmlFor="document-upload-note" className="block text-sm font-medium text-gray-700 mb-2">
-              Note for your lawyer (optional)
-            </label>
-            <textarea
+            <Label htmlFor="document-upload-note">Note for your lawyer (optional)</Label>
+            <Textarea
               id="document-upload-note"
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={3}
               maxLength={2000}
               placeholder="Add context about this file, if needed."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-red-500 focus:outline-none"
               disabled={submitting}
             />
             <p className="mt-1 text-xs text-gray-500">{note.length}/2000</p>
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-            >
+          </div>
+          <div className="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-60"
-            >
-              <Upload className="w-4 h-4" />
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              <Upload className="w-4 h-4" aria-hidden="true" />
               {submitting ? 'Uploading...' : 'Upload Document'}
-            </button>
+            </Button>
           </div>
         </form>
       </DialogPanel>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { titleize } from '../utils';
 import { CaseConfigDialog } from './CaseConfigDialog';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 export type MilestoneDialogInput = {
   name: string;
@@ -73,7 +74,7 @@ export function MilestoneDialog({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="e.g., Application submitted to IRCC"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
 
@@ -84,7 +85,7 @@ export function MilestoneDialog({
             onChange={(event) => setDetails(event.target.value)}
             rows={3}
             placeholder="Optional details visible in timeline."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+            className={fieldClasses}
           />
         </div>
 
@@ -95,7 +96,7 @@ export function MilestoneDialog({
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-gray-900"
+              className={fieldClasses}
             />
           </div>
 
@@ -104,7 +105,7 @@ export function MilestoneDialog({
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-gray-900"
+              className={fieldClasses}
             >
               {MILESTONE_STATUS_OPTIONS.map((statusOption) => (
                 <option key={statusOption} value={statusOption}>
@@ -131,7 +132,7 @@ export function MilestoneDialog({
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+          className={buttonClasses('secondary')}
         >
           Cancel
         </button>
@@ -141,7 +142,7 @@ export function MilestoneDialog({
             void handleSubmit();
           }}
           disabled={submitting}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className={buttonClasses('primary')}
         >
           {submitting ? 'Saving...' : submitLabel}
         </button>

@@ -1,4 +1,6 @@
-/** utils: utils implementation. */
+/** utils: Formatting helpers for the lawyer dashboard. */
+
+import type { Tone } from '../ui';
 
 export function titleize(value: string): string {
   return value
@@ -35,17 +37,16 @@ export function relativeTime(isoDate: string): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
-export function caseStatusColor(status: string): string {
+/** Badge tone for a dashboard case status. */
+export function caseStatusTone(status: string): Tone {
   switch (status) {
-    case 'Intake':
-      return 'bg-slate-100 text-slate-700';
     case 'Awaiting Client':
-      return 'bg-yellow-100 text-yellow-700';
+      return 'warning';
     case 'In Progress':
-      return 'bg-purple-100 text-purple-700';
+      return 'primary';
     case 'Closed':
-      return 'bg-green-100 text-green-700';
+      return 'success';
     default:
-      return 'bg-gray-100 text-gray-700';
+      return 'neutral';
   }
 }

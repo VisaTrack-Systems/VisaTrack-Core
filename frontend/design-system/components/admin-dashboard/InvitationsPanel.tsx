@@ -1,8 +1,8 @@
-/** InvitationsPanel: invitationspanel implementation. */
+/** InvitationsPanel: Paginated list of open and expired invitations with revoke and resend actions. */
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { Badge, Button, Card, CardHeader, Pagination } from '../ui';
 import type { Invitation } from './types';
 import { formatDate } from './utils';
 
@@ -17,24 +17,12 @@ type Props = {
 
 function StatusTag({ status }: { status: string }) {
   if (status === 'pending') {
-    return (
-      <span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">
-        Open
-      </span>
-    );
+    return <Badge tone="success">Open</Badge>;
   }
   if (status === 'expired') {
-    return (
-      <span className="inline-flex items-center rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500">
-        Expired
-      </span>
-    );
+    return <Badge>Expired</Badge>;
   }
-  return (
-    <span className="inline-flex items-center rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500">
-      {status}
-    </span>
-  );
+  return <Badge>{status}</Badge>;
 }
 
 export function InvitationsPanel({ invitations, busyInvitationId, onRevoke, onResend }: Props) {
@@ -50,32 +38,34 @@ export function InvitationsPanel({ invitations, busyInvitationId, onRevoke, onRe
   const paginated = sorted.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">Invitations</h3>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-            {pending.length} open
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
-            {expired.length} expired
-          </span>
-        </div>
-      </div>
-      <div className="divide-y divide-gray-200">
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Invitations"
+        actions={
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
+              {pending.length} open
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-gray-300" aria-hidden="true" />
+              {expired.length} expired
+            </span>
+          </div>
+        }
+      />
+      <ul className="divide-y divide-gray-200">
         {sorted.length === 0 ? (
-          <div className="px-6 py-5 text-sm text-gray-500">No invitations found.</div>
+          <li className="px-5 py-4 text-sm text-gray-500">No invitations found.</li>
         ) : (
           paginated.map((invite) => (
-            <div key={invite.invitation_id} className="px-6 py-4 flex items-center justify-between gap-3">
+            <li key={invite.invitation_id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-medium text-gray-900 truncate">{invite.email}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-medium text-gray-900">{invite.email}</p>
                   <StatusTag status={invite.status} />
                 </div>
-                <p className="text-sm text-gray-600 mt-0.5">
+                <p className="mt-0.5 text-xs text-gray-500">
                   {invite.role_slug}
                   {invite.invited_by_name ? ` • Invited by ${invite.invited_by_name}` : ''}
                   {' • '}Sent {formatDate(invite.created_at)}
@@ -85,62 +75,43 @@ export function InvitationsPanel({ invitations, busyInvitationId, onRevoke, onRe
                 </p>
               </div>
               {invite.status === 'pending' ? (
-                <button
+                <Button
                   type="button"
-                  className="shrink-0 border border-red-200 text-red-700 px-3 py-1 rounded-lg text-xs hover:bg-red-50 disabled:opacity-50"
+                  variant="danger-subtle"
+                  size="sm"
+                  className="shrink-0"
                   disabled={busyInvitationId === invite.invitation_id}
                   onClick={() => onRevoke(invite.invitation_id, invite.email)}
                 >
                   Revoke
-                </button>
+                </Button>
               ) : invite.status === 'expired' ? (
-                <button
+                <Button
                   type="button"
-                  className="shrink-0 border border-gray-300 text-gray-700 px-3 py-1 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
                   disabled={busyInvitationId === invite.invitation_id}
                   onClick={() => onResend(invite.invitation_id, invite.email)}
                 >
                   {busyInvitationId === invite.invitation_id ? 'Sending…' : 'Resend'}
-                </button>
+                </Button>
               ) : (
-                <span className="shrink-0 w-16" />
+                <span className="w-16 shrink-0" />
               )}
-            </div>
+            </li>
           ))
         )}
-      </div>
+      </ul>
 
-      {/* Pagination */}
       {sorted.length > PAGE_SIZE && (
-        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between gap-4 text-sm text-gray-600">
-          <span>
-            {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, sorted.length)} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={safePage === 1}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-2">
-              {safePage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage === totalPages}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          summary={`${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+        />
       )}
-    </div>
+    </Card>
   );
 }

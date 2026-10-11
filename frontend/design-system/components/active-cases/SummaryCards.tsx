@@ -1,7 +1,8 @@
-/** SummaryCards: summarycards implementation. */
+/** SummaryCards: Totals across the listed cases (all, high priority, outstanding documents, unpaid invoices). */
 
 import { AlertCircle, Clock, DollarSign, FileText } from 'lucide-react';
 
+import { StatCard } from '../ui';
 import type { UiCase } from './types';
 
 type SummaryCardsProps = {
@@ -10,45 +11,26 @@ type SummaryCardsProps = {
 
 export function SummaryCards({ cases }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">Total Cases</p>
-            <p className="text-2xl font-bold text-gray-900">{cases.length}</p>
-          </div>
-          <FileText className="w-8 h-8 text-blue-600" />
-        </div>
-      </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">High Priority</p>
-            <p className="text-2xl font-bold text-gray-900">
-              {cases.filter((c) => c.priority === 'high' || c.priority === 'urgent').length}
-            </p>
-          </div>
-          <AlertCircle className="w-8 h-8 text-red-600" />
-        </div>
-      </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">Outstanding Docs</p>
-            <p className="text-2xl font-bold text-gray-900">{cases.reduce((sum, c) => sum + c.outstandingDocs, 0)}</p>
-          </div>
-          <Clock className="w-8 h-8 text-yellow-600" />
-        </div>
-      </div>
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-600">Unpaid Invoices</p>
-            <p className="text-2xl font-bold text-gray-900">{cases.reduce((sum, c) => sum + c.outstandingPayments, 0)}</p>
-          </div>
-          <DollarSign className="w-8 h-8 text-green-600" />
-        </div>
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StatCard label="Total Cases" value={cases.length} icon={FileText} iconClassName="text-blue-600" />
+      <StatCard
+        label="High Priority"
+        value={cases.filter((c) => c.priority === 'high' || c.priority === 'urgent').length}
+        icon={AlertCircle}
+        iconClassName="text-red-600"
+      />
+      <StatCard
+        label="Outstanding Docs"
+        value={cases.reduce((sum, c) => sum + c.outstandingDocs, 0)}
+        icon={Clock}
+        iconClassName="text-yellow-600"
+      />
+      <StatCard
+        label="Unpaid Invoices"
+        value={cases.reduce((sum, c) => sum + c.outstandingPayments, 0)}
+        icon={DollarSign}
+        iconClassName="text-green-600"
+      />
     </div>
   );
 }

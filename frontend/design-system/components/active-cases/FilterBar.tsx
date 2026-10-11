@@ -1,6 +1,8 @@
-/** FilterBar: filterbar implementation. */
+/** FilterBar: Search box plus status (and optional lawyer) filters for the case list. */
 
-import { ChevronDown, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
+
+import { Card, Input, Select } from '../ui';
 
 type FilterBarProps = {
   searchTerm: string;
@@ -22,52 +24,47 @@ export function FilterBar({
   lawyerOptions,
 }: FilterBarProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
+    <Card className="p-3">
+      <div className="flex flex-col gap-3 md:flex-row">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+          <Input
             type="text"
+            aria-label="Search cases"
             placeholder="Search by client name, case type, or case ID..."
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            className="pl-9"
           />
         </div>
 
-        <div className="flex gap-2 flex-wrap">
-          <div className="relative">
-            <select
-              value={filterStatus}
-              onChange={(e) => onFilterStatusChange(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
-            >
+        <div className="flex flex-wrap gap-2">
+          <div className="w-44">
+            <Select aria-label="Filter by status" value={filterStatus} onChange={(e) => onFilterStatusChange(e.target.value)}>
               <option value="all">All Status</option>
               <option value="Awaiting Client">Awaiting Client</option>
               <option value="Intake">Intake</option>
               <option value="In Progress">In Progress</option>
               <option value="Closed">Closed</option>
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </Select>
           </div>
 
           {lawyerOptions && onFilterLawyerChange ? (
-            <div className="relative">
-              <select
+            <div className="w-44">
+              <Select
+                aria-label="Filter by lawyer"
                 value={filterLawyer ?? 'all'}
                 onChange={(e) => onFilterLawyerChange(e.target.value)}
-                className="appearance-none pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
               >
                 <option value="all">All Lawyers</option>
                 {lawyerOptions.map((name) => (
                   <option key={name} value={name}>{name}</option>
                 ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </Select>
             </div>
           ) : null}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

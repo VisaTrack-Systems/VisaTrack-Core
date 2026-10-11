@@ -1,62 +1,55 @@
-/** MilestonesPanel: milestonespanel implementation. */
+/** MilestonesPanel: Vertical timeline (Clio "Timeline" card style) of the client's case milestones. */
 
+import { Badge, Card, CardHeader, type Tone } from '../ui';
 import type { DashboardMilestone } from './types';
 
 type MilestonesPanelProps = {
   milestones: DashboardMilestone[];
 };
 
-function milestoneDotColor(status: DashboardMilestone['status']) {
-  switch (status) {
-    case 'completed':
-      return 'bg-green-500';
-    case 'in-progress':
-      return 'bg-blue-500';
-    default:
-      return 'bg-gray-300';
-  }
-}
+const STATUS_META: Record<DashboardMilestone['status'], { dot: string; tone: Tone; label: string }> = {
+  completed: { dot: 'bg-green-500', tone: 'success', label: 'Completed' },
+  'in-progress': { dot: 'bg-primary-600', tone: 'primary', label: 'In Progress' },
+  upcoming: { dot: 'bg-gray-300', tone: 'neutral', label: 'Upcoming' },
+};
 
 export function MilestonesPanel({ milestones }: MilestonesPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6">Case Milestones</h2>
-      <div className="space-y-6">
-        {milestones.map((milestone, index) => (
-          <div key={`${milestone.title}-${index}`} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <div className={`w-4 h-4 rounded-full ${milestoneDotColor(milestone.status)}`} />
-              {index < milestones.length - 1 ? (
-                <div className={`w-0.5 h-full mt-2 ${milestone.status === 'completed' ? 'bg-green-500' : 'bg-gray-300'}`} />
-              ) : null}
-            </div>
-            <div className="flex-1 pb-8">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-medium text-gray-900">{milestone.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{milestone.description}</p>
+    <Card>
+      <CardHeader title="Case Milestones" />
+      {milestones.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-gray-500">No milestones have been added to this case yet.</p>
+      ) : (
+        <ol className="px-5 py-4">
+          {milestones.map((milestone, index) => {
+            const meta = STATUS_META[milestone.status] ?? STATUS_META.upcoming;
+            const isLast = index === milestones.length - 1;
+            return (
+              <li key={`${milestone.title}-${index}`} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ring-4 ring-white ${meta.dot}`} aria-hidden="true" />
+                  {!isLast ? (
+                    <span
+                      className={`w-px flex-1 ${milestone.status === 'completed' ? 'bg-green-400' : 'bg-gray-200'}`}
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </div>
-                <span
-                  className={`text-sm font-medium px-3 py-1 rounded-full ${
-                    milestone.status === 'completed'
-                      ? 'bg-green-100 text-green-700'
-                      : milestone.status === 'in-progress'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {milestone.status === 'completed'
-                    ? 'Completed'
-                    : milestone.status === 'in-progress'
-                      ? 'In Progress'
-                      : 'Upcoming'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500">{milestone.date}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+                <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-5'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-medium text-gray-900">{milestone.title}</h3>
+                    <Badge tone={meta.tone}>{meta.label}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">{milestone.date}</p>
+                  {milestone.description ? (
+                    <p className="mt-1 text-sm text-gray-600">{milestone.description}</p>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Card>
   );
 }

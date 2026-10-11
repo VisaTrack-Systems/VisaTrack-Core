@@ -1,11 +1,12 @@
-/** ActiveCasesPanel: activecasespanel implementation. */
+/** ActiveCasesPanel: Searchable, status-filterable list of active cases; clicking a row opens the case. */
 
 import { useMemo, useRef, useState } from 'react';
 
 import { Clock } from 'lucide-react';
 
+import { Badge, Button, Card, Input, Select } from '../ui';
 import type { DashboardCase } from './types';
-import { caseStatusColor } from './utils';
+import { caseStatusTone } from './utils';
 
 type ActiveCasesPanelProps = {
   cases: DashboardCase[];
@@ -59,12 +60,13 @@ export function ActiveCasesPanel({
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      <div className="p-6 border-b border-gray-200">
+    <Card className="overflow-hidden">
+      <div className="border-b border-gray-200 px-5 py-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Active Cases</h2>
-          <button
-            className="text-sm text-gray-500 hover:text-gray-700"
+          <h2 className="text-base font-semibold text-gray-900">Active Cases</h2>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('all');
@@ -73,19 +75,19 @@ export function ActiveCasesPanel({
             type="button"
           >
             Reset filters
-          </button>
+          </Button>
         </div>
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input
             ref={searchInputRef}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            aria-label="Search active cases"
             placeholder="Search by client, case type, or case #"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
-          <select
+          <Select
             ref={filterSelectRef}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
@@ -95,52 +97,50 @@ export function ActiveCasesPanel({
                 {statusOption}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       <div className="divide-y divide-gray-200">
         {isLoading ? (
-          <div className="p-6 text-sm text-gray-500">Loading active cases...</div>
+          <div className="px-5 py-4 text-sm text-gray-500">Loading active cases...</div>
         ) : cases.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">No active cases yet.</div>
+          <div className="px-5 py-4 text-sm text-gray-500">No active cases yet.</div>
         ) : filteredCases.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">No cases match your current search/filter.</div>
+          <div className="px-5 py-4 text-sm text-gray-500">No cases match your current search/filter.</div>
         ) : (
           filteredCases.map((case_) => (
             <button
               key={case_.id}
-              className="w-full p-6 hover:bg-gray-50 transition-colors cursor-pointer text-left"
+              className="w-full px-5 py-3.5 text-left transition-colors hover:bg-gray-50"
               onClick={() => onSelectCase?.(case_.id)}
               type="button"
             >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-2">{case_.clientName}</h3>
-                  <p className="text-sm text-gray-600">
-                    {case_.caseType} • {case_.id}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-gray-900">{case_.clientName}</h3>
+                  <p className="mt-0.5 text-sm text-gray-600">
+                    {case_.caseType} • <span className="text-primary-700">{case_.id}</span>
                   </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${caseStatusColor(case_.status)}`}>
-                  {case_.status}
-                </span>
+                <Badge tone={caseStatusTone(case_.status)}>{case_.status}</Badge>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-4 text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {case_.lastUpdate}
-                  </span>
-                </div>
-              </div>
+              <p className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {case_.lastUpdate}
+              </p>
             </button>
           ))
         )}
       </div>
-      <div className="p-4 border-t border-gray-200">
-        <button className="text-sm text-red-600 hover:text-red-700 font-medium" onClick={onViewActiveCases}>
+      <div className="border-t border-gray-200 px-5 py-3">
+        <button
+          type="button"
+          className="text-sm font-medium text-primary-600 hover:text-primary-700 hover:underline"
+          onClick={onViewActiveCases}
+        >
           View all cases →
         </button>
       </div>
-    </div>
+    </Card>
   );
 }

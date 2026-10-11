@@ -1,34 +1,84 @@
 /**
  * Global Styles: Root-level CSS configuration for VisaTrack application.
- * Imports Tailwind CSS, defines CSS variables for theming, and sets base styling.
+ * Imports Tailwind CSS, defines the design tokens (colors, fonts, shadows)
+ * and sets base styling. Shared UI primitives that consume these tokens live
+ * in design-system/components/ui.tsx.
  */
 
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: oklch(20.8% 0.042 265.755); /* slate-900 */
   --form-background: #ffffff;
-  --form-foreground: #111827;
-  --form-placeholder: #6b7280;
+  --form-foreground: oklch(20.8% 0.042 265.755); /* slate-900 */
+  --form-placeholder: oklch(55.4% 0.046 257.417); /* slate-500 */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  /*
+   * Brand blue (Clio-inspired). Use `primary-600` for primary actions,
+   * `primary-700` for hover, and `primary-50`/`primary-100` for selected or
+   * highlighted backgrounds.
+   */
+  --color-primary-50: #eef5fe;
+  --color-primary-100: #d9e8fd;
+  --color-primary-200: #b6d3fa;
+  --color-primary-300: #84b5f5;
+  --color-primary-400: #4b90ec;
+  --color-primary-500: #1f73e0;
+  --color-primary-600: #0b63ce;
+  --color-primary-700: #0a51a8;
+  --color-primary-800: #0d4285;
+  --color-primary-900: #0f3768;
+
+  /* Deep navy for the app header, sidebars and the landing hero. */
+  --color-navy-700: #1b3e63;
+  --color-navy-800: #12304f;
+  --color-navy-900: #0b1f36;
+
+  /* Page background behind white cards. */
+  --color-canvas: oklch(98.4% 0.003 247.858); /* slate-50 */
+
+  /*
+   * Neutral grays: the existing UI is built on `gray-*` classes, so we point
+   * that scale at Tailwind's cooler slate values. Every `text-gray-700`,
+   * `border-gray-200`, etc. picks up the Clio-style slate tone without
+   * touching component markup. Delete this block to restore Tailwind's grays.
+   */
+  --color-gray-50: oklch(98.4% 0.003 247.858);
+  --color-gray-100: oklch(96.8% 0.007 247.896);
+  --color-gray-200: oklch(92.9% 0.013 255.508);
+  --color-gray-300: oklch(86.9% 0.022 252.894);
+  --color-gray-400: oklch(70.4% 0.04 256.788);
+  --color-gray-500: oklch(55.4% 0.046 257.417);
+  --color-gray-600: oklch(44.6% 0.043 257.281);
+  --color-gray-700: oklch(37.2% 0.044 257.287);
+  --color-gray-800: oklch(27.9% 0.041 260.031);
+  --color-gray-900: oklch(20.8% 0.042 265.755);
+  --color-gray-950: oklch(12.9% 0.042 264.695);
+
+  /* Soft, low-contrast elevation for cards and popovers. */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-popover: 0 4px 6px -1px rgb(15 23 42 / 0.08), 0 10px 24px -4px rgb(15 23 42 / 0.12);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
   color-scheme: light;
 }
 
 :focus-visible {
-  outline: 2px solid #1e3a8a;
+  outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
 }
 
@@ -43,32 +93,38 @@ body {
   }
 }
 
-input,
-textarea,
-select {
-  color: var(--form-foreground);
-  background-color: var(--form-background);
-}
+/*
+ * Form defaults live in the base layer so Tailwind utilities (e.g.
+ * `disabled:bg-gray-50`, `text-xs`) on individual fields can override them.
+ */
+@layer base {
+  input,
+  textarea,
+  select {
+    color: var(--form-foreground);
+    background-color: var(--form-background);
+  }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--form-placeholder);
-  opacity: 1;
-}
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--form-placeholder);
+    opacity: 1;
+  }
 
-option {
-  color: var(--form-foreground);
-}
+  option {
+    color: var(--form-foreground);
+  }
 
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill,
-textarea:-webkit-autofill:hover,
-textarea:-webkit-autofill:focus,
-select:-webkit-autofill,
-select:-webkit-autofill:hover,
-select:-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--form-foreground);
-  transition: background-color 5000s ease-in-out 0s;
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--form-foreground);
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }

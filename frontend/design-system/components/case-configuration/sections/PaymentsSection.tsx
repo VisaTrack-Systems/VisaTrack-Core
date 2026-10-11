@@ -4,6 +4,8 @@ import { FormEvent, useState } from 'react';
 
 import { createCaseInvoice, type CaseWorkspace } from '@/lib/api';
 
+import { buttonClasses, fieldClasses } from '../../ui';
+
 type PaymentsSectionProps = {
   workspace: CaseWorkspace;
   onInvoiceCreated: () => Promise<void>;
@@ -76,7 +78,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Payments & Invoices</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Payments & Invoices</h2>
         <p className="text-gray-800">
           Bill the client for a retainer installment, professional fees, or disbursements.
           The total below is what the client pays. VisaTrack does not add a checkout fee.
@@ -84,7 +86,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
         </p>
       </div>
 
-      <form onSubmit={submitInvoice} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+      <form onSubmit={submitInvoice} className="space-y-4 rounded-md border border-gray-200 bg-white p-6">
         <h3 className="text-lg font-semibold text-gray-900">Create invoice</h3>
         {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
         <div className="grid gap-4 md:grid-cols-2">
@@ -98,7 +100,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
               maxLength={500}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -113,7 +115,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
               step="0.01"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -129,7 +131,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
               step="0.01"
               value={taxPercent}
               onChange={(event) => setTaxPercent(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -143,7 +145,7 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
               min={new Date().toISOString().slice(0, 10)}
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
           <div>
@@ -155,11 +157,11 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
               maxLength={5000}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={`mt-1 ${fieldClasses}`}
             />
           </div>
         </div>
-        <div className="rounded-lg border border-gray-300 bg-gray-50 p-4 text-sm text-gray-900">
+        <div className="rounded-md border border-gray-300 bg-gray-50 p-4 text-sm text-gray-900">
           <p className="font-semibold">Client will be charged</p>
           <p className="mt-2">Professional fees: {formatMoney(previewFees)}</p>
           <p>Tax ({previewTaxRate}%): {formatMoney(previewTax)}</p>
@@ -168,13 +170,13 @@ export function PaymentsSection({ workspace, onInvoiceCreated }: PaymentsSection
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
+          className={buttonClasses('primary')}
         >
           {submitting ? 'Creating invoice…' : 'Create and send invoice'}
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
         <div className="border-b border-gray-200 px-6 py-4">
           <h3 className="font-semibold text-gray-900">Case invoices</h3>
         </div>

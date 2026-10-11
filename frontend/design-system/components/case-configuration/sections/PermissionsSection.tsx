@@ -4,6 +4,7 @@ import { AlertCircle, Save } from 'lucide-react';
 import { useState } from 'react';
 
 import type { CasePortalPermissions } from '@/lib/api';
+import { buttonClasses, fieldClasses } from '../../ui';
 
 type PermissionsSectionProps = {
   portalPermissions: CasePortalPermissions;
@@ -41,7 +42,7 @@ function VisibilityRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
       <div>
         <div className="font-medium text-gray-900">{title}</div>
         <div className="text-sm text-gray-600">{description}</div>
@@ -110,11 +111,11 @@ export function PermissionsSection({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Sharing / Permissions</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Sharing / Permissions</h2>
         <p className="text-gray-600">Control what information is visible to the client</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Access Control</h3>
 
         <div className="mb-4 text-sm">
@@ -138,7 +139,7 @@ export function PermissionsSection({
                 setHasLocalChanges(true);
               }}
               disabled={isDisabled}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
+              className={fieldClasses}
             >
               <option value="full_access">Full Access - Client can view all enabled sections (status, milestones, and checklist)</option>
               <option value="limited_access">Limited Access - Client sees core updates only (checklist and reminders)</option>
@@ -159,7 +160,7 @@ export function PermissionsSection({
                 setHasLocalChanges(true);
               }}
               disabled={isDisabled}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
+              className={fieldClasses}
             >
               <option value="enabled">Enabled - Client can upload requested documents</option>
               <option value="disabled">Disabled - Document upload suspended</option>
@@ -178,7 +179,7 @@ export function PermissionsSection({
                 setHasLocalChanges(true);
               }}
               disabled={isDisabled}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 disabled:bg-gray-100 disabled:text-gray-500"
+              className={fieldClasses}
             >
               <option value="enabled">Enabled - Client can view case reminders</option>
               <option value="disabled">Disabled - Hide reminders from client portal</option>
@@ -214,7 +215,7 @@ export function PermissionsSection({
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center justify-between p-4 bg-red-50 rounded-md border border-red-200">
             <div>
               <div className="font-medium text-gray-900">Internal Notes</div>
               <div className="text-sm text-gray-600">Lawyer-only notes (never visible to client)</div>
@@ -228,7 +229,7 @@ export function PermissionsSection({
             type="button"
             onClick={handleResetToDefault}
             disabled={isDisabled}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+            className={buttonClasses('secondary')}
           >
             Reset to Default
           </button>
@@ -238,7 +239,7 @@ export function PermissionsSection({
               void handleSave();
             }}
             disabled={isDisabled}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-60"
+            className={buttonClasses('primary')}
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Permissions'}
@@ -246,7 +247,7 @@ export function PermissionsSection({
         </div>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-md p-4">
         <div className="flex gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>

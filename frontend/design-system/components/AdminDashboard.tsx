@@ -20,7 +20,9 @@ import {
   resendAdminInvitation,
 } from '@/lib/api';
 
+import { PageHeader } from './AppShell';
 import { InvitationLinkDialog } from './InvitationLinkDialog';
+import { Alert, Button } from './ui';
 
 import { ActiveCasesPanel } from './lawyer-dashboard/ActiveCasesPanel';
 import { useLawyerDashboardData } from './lawyer-dashboard/useLawyerDashboardData';
@@ -63,9 +65,20 @@ const initialUserForm: AdminCreateUserInput = {
 type AdminDashboardProps = {
   currentUser: CurrentUser | null;
   onSelectCase?: (caseId: string) => void;
+  /**
+   * Optional controlled section. When provided, the app shell owns admin
+   * navigation and this component does not render its own sidebar.
+   */
+  activeSection?: AdminSection;
+  onSectionChange?: (section: AdminSection) => void;
 };
 
-export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProps) {
+export function AdminDashboard({
+  currentUser,
+  onSelectCase,
+  activeSection: controlledSection,
+  onSectionChange,
+}: AdminDashboardProps) {
   const {
     loading,
     error,
@@ -84,7 +97,16 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   const { cases: lawyerCases, isLoading: casesLoading } = useLawyerDashboardData();
 
   const [flash, setFlash] = useState<FlashState>(null);
-  const [activeSection, setActiveSection] = useState<AdminSection>('home');
+  const [localSection, setLocalSection] = useState<AdminSection>('home');
+  const isSectionControlled = controlledSection !== undefined;
+  const requestedSection = controlledSection ?? localSection;
+  const setActiveSection = (section: AdminSection) => {
+    if (isSectionControlled) {
+      onSectionChange?.(section);
+    } else {
+      setLocalSection(section);
+    }
+  };
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [pendingOrgCreate, setPendingOrgCreate] = useState<AdminCreateOrganizationInput | null>(null);
   const [pendingUserCreate, setPendingUserCreate] = useState<AdminCreateUserInput | null>(null);
@@ -107,18 +129,16 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
 
   const isSuperAdmin = currentUser?.active_role === 'super_admin';
 
-  // Redirect super_admin away from sections they can't access
-  useEffect(() => {
-    if (isSuperAdmin && (activeSection === 'case-history' || activeSection === 'settings-general' || activeSection === 'settings-billing')) {
-      setActiveSection('home');
-    }
-  }, [isSuperAdmin, activeSection]);
+  // Super admins can't access these sections, so show them Home instead.
+  const isRestrictedSection =
+    requestedSection === 'case-history' || requestedSection === 'settings-general' || requestedSection === 'settings-billing';
+  const activeSection: AdminSection = isSuperAdmin && isRestrictedSection ? 'home' : requestedSection;
 
-  useEffect(() => {
-    if (!userForm.organization_id && organizations.length > 0) {
-      setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
-    }
-  }, [organizations, userForm.organization_id]);
+  // Default the Create User form to the first organization once organizations load.
+  // Adjusted during render (not in an effect) so the form never renders without it.
+  if (!userForm.organization_id && organizations.length > 0) {
+    setUserForm((prev) => ({ ...prev, organization_id: organizations[0].id }));
+  }
 
   // ── Members layout: single observer on the stable grid container ────────────
   // The grid container width never changes when we switch grid-cols — it is
@@ -128,7 +148,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   useEffect(() => {
     if (activeSection !== 'org-members') return;
 
-    const GAP_PX = 32;       // gap-8
+    const GAP_PX = 24;       // gap-6 on the members grid below
     const RATIO = 7 / 10;    // 7fr of 7fr+3fr
     const UNSTACK_BUFFER = 50; // require 50 px of spare room before unstacking
 
@@ -323,11 +343,15 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   // ── render guards ───────────────────────────────────────────────────────────
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 p-10 text-gray-600">Loading admin dashboard...</div>;
+    return <div className="p-8 text-sm text-gray-600">Loading admin dashboard...</div>;
   }
 
   if (error) {
-    return <div className="min-h-screen bg-gray-50 p-10 text-red-600">Failed to load admin dashboard: {error}</div>;
+    return (
+      <div className="p-8">
+        <Alert tone="danger">Failed to load admin dashboard: {error}</Alert>
+      </div>
+    );
   }
 
   // ── derived values ──────────────────────────────────────────────────────────
@@ -337,44 +361,28 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
   const pendingInvitationsCount = invitations.filter((i) => i.status === 'pending').length;
 
   const refreshButton = (
-    <button
-      className="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
-      onClick={refresh}
-      disabled={refreshing}
-    >
-      <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+    <Button type="button" variant="secondary" onClick={refresh} disabled={refreshing}>
+      <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
       Refresh
-    </button>
+    </Button>
   );
 
   const sectionHeader = (title: string, subtitle: string) => (
-    <header className="bg-white border-b border-gray-200">
-      <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
-        </div>
-        {refreshButton}
-      </div>
-    </header>
+    <PageHeader title={title} description={subtitle} actions={refreshButton} />
   );
 
   // ── layout ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} isSuperAdmin={isSuperAdmin} />
+    <div className="flex bg-gray-50">
+      {isSectionControlled ? null : (
+        <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} isSuperAdmin={isSuperAdmin} />
+      )}
 
       <div className="flex-1 min-w-0">
         {flash ? (
-          <div
-            className={`mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-lg border px-4 py-3 text-sm ${
-              flash.kind === 'success'
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {flash.message}
+          <div className="px-4 sm:px-6 lg:px-8 pt-4">
+            <Alert tone={flash.kind === 'success' ? 'success' : 'danger'}>{flash.message}</Alert>
           </div>
         ) : null}
 
@@ -385,7 +393,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
               `Welcome back, ${adminFirstName}`,
               "Here's an overview of your organization today.",
             )}
-            <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
               <AdminStatsGrid
                 activeCases={operations?.aging_cases.length ?? 0}
                 totalMembers={users.length}
@@ -395,7 +403,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
 
               {/* Active Cases + Lawyer Workload — hidden for super_admin */}
               {!isSuperAdmin && (
-                <div className="grid lg:grid-cols-3 gap-8">
+                <div className="grid lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
                     <ActiveCasesPanel
                       cases={lawyerCases}
@@ -410,7 +418,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
 
               {/* Case assignment + Aging cases — hidden for super_admin */}
               {!isSuperAdmin && (
-                <div className="grid lg:grid-cols-2 gap-8">
+                <div className="grid lg:grid-cols-2 gap-6">
                   <CaseAssignmentQueue
                     unassignedCases={operations?.unassigned_cases ?? []}
                     lawyerWorkload={operations?.lawyer_workload ?? []}
@@ -446,7 +454,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
         {activeSection === 'case-history' ? (
           <>
             {sectionHeader('Case History', 'All organization cases — click a row to open the case.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-6">
               <AdminCaseHistory
                 onSelectCase={onSelectCase ?? (() => {})}
                 orgLawyerNames={operations?.lawyer_workload.map((l) => l.full_name)}
@@ -459,7 +467,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
         {activeSection === 'org-members' ? (
           <>
             {sectionHeader('Members', 'Manage organization members and create new users.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
               <CreateUserForm
                 organizations={organizations}
                 roles={roles}
@@ -470,7 +478,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
               {/* Members table + Invitations: 70/30 side-by-side, stacks on overflow */}
               <div
                 ref={membersGridRef}
-                className={`grid gap-8 items-start ${membersStacked ? 'grid-cols-1' : 'grid-cols-[7fr_3fr]'}`}
+                className={`grid gap-6 items-start ${membersStacked ? 'grid-cols-1' : 'grid-cols-[7fr_3fr]'}`}
               >
                 <MembersTable
                   users={users}
@@ -509,7 +517,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
         {activeSection === 'settings-general' ? (
           <>
             {sectionHeader('General Settings', 'Branding, organization configuration, and email templates.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-6">
               <AdminSettingsGeneral />
             </div>
           </>
@@ -519,7 +527,7 @@ export function AdminDashboard({ currentUser, onSelectCase }: AdminDashboardProp
         {activeSection === 'settings-billing' ? (
           <>
             {sectionHeader('Billing & Plan', 'Manage your subscription and payment details.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-6">
               <AdminSettingsBilling />
             </div>
           </>

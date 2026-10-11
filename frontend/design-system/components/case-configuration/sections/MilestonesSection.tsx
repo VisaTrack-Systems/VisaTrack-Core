@@ -8,6 +8,7 @@ import type { CaseWorkspace } from '@/lib/api';
 import { DeleteMilestoneDialog } from '../dialogs/DeleteMilestoneDialog';
 import { MilestoneDialog, type MilestoneDialogInput } from '../dialogs/MilestoneDialog';
 import { formatDate, milestoneStatus, statusColor, titleize } from '../utils';
+import { buttonClasses } from '../../ui';
 
 type MilestoneUpdate = {
   name?: string;
@@ -90,11 +91,11 @@ export function MilestonesSection({
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Milestones</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Milestones</h2>
             <p className="text-gray-600">Configure case milestones and timeline</p>
           </div>
           <button
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-60"
+            className={buttonClasses('primary')}
             onClick={() => setIsAddDialogOpen(true)}
             disabled={creatingMilestone}
           >
@@ -103,7 +104,7 @@ export function MilestonesSection({
           </button>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
           <div className="space-y-6">
             {workspace.milestones.map((milestone, index) => {
               const normalizedStatus = milestoneStatus(milestone.status);
@@ -121,7 +122,7 @@ export function MilestonesSection({
                         normalizedStatus === 'completed'
                           ? 'bg-green-100'
                           : normalizedStatus === 'in-progress'
-                            ? 'bg-blue-100'
+                            ? 'bg-primary-100'
                             : normalizedStatus === 'blocked'
                               ? 'bg-red-100'
                               : 'bg-gray-100'
@@ -130,7 +131,7 @@ export function MilestonesSection({
                       {normalizedStatus === 'completed' ? (
                         <CheckCircle className="w-6 h-6 text-green-600" />
                       ) : normalizedStatus === 'in-progress' ? (
-                        <Clock className="w-6 h-6 text-blue-600" />
+                        <Clock className="w-6 h-6 text-primary-600" />
                       ) : normalizedStatus === 'blocked' ? (
                         <AlertCircle className="w-6 h-6 text-red-600" />
                       ) : (
@@ -139,7 +140,7 @@ export function MilestonesSection({
                     </div>
 
                     <div className="flex-1 pb-8">
-                      <div className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                      <div className="bg-gray-50 rounded-md p-4 hover:bg-gray-100 transition-colors">
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="font-semibold text-gray-900">{milestone.name}</h3>
@@ -216,12 +217,12 @@ export function MilestonesSection({
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-primary-50 border border-primary-200 rounded-md p-4">
           <div className="flex gap-3">
-            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <Info className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-blue-900">Milestone Templates Available</p>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="text-sm font-medium text-primary-900">Milestone Templates Available</p>
+              <p className="text-sm text-primary-700 mt-1">
                 Milestones are loaded directly from your case data. Add or adjust milestones from the backend to update this timeline.
               </p>
             </div>

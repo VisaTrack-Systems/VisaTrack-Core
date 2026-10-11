@@ -1,8 +1,10 @@
-/** CreateUserForm: createuserform implementation. */
+/** CreateUserForm: Form for an admin to create a new organization member (active account or emailed invitation). */
 
 import { FormEvent } from 'react';
 
 import type { AdminCreateUserInput, AdminRoleItem, OrganizationListItem } from '@/lib/api';
+
+import { Button, Card, CardHeader, Input, Label, Select } from '../ui';
 
 type Props = {
   organizations: OrganizationListItem[];
@@ -16,16 +18,16 @@ export function CreateUserForm({ organizations, roles, userForm, onFormChange, o
   const set = (patch: Partial<AdminCreateUserInput>) => onFormChange({ ...userForm, ...patch });
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Create User</h2>
-      <form onSubmit={onSubmit} className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <Card>
+      <CardHeader title="Create User" description="Add a member directly, or invite them to set their own password." />
+      <form onSubmit={onSubmit} className="grid gap-4 px-5 py-4 md:grid-cols-2 lg:grid-cols-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-          <select
+          <Label htmlFor="create-user-organization">Organization</Label>
+          <Select
+            id="create-user-organization"
             required
             value={userForm.organization_id}
             onChange={(e) => set({ organization_id: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"
           >
             <option value="" disabled>
               Select organization
@@ -35,69 +37,65 @@ export function CreateUserForm({ organizations, roles, userForm, onFormChange, o
                 {org.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-          <input
+          <Label htmlFor="create-user-first-name">First Name</Label>
+          <Input
+            id="create-user-first-name"
             required
             type="text"
             placeholder="First"
             value={userForm.first_name}
             onChange={(e) => set({ first_name: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-          <input
+          <Label htmlFor="create-user-last-name">Last Name</Label>
+          <Input
+            id="create-user-last-name"
             required
             type="text"
             placeholder="Last"
             value={userForm.last_name}
             onChange={(e) => set({ last_name: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input
+          <Label htmlFor="create-user-email">Email</Label>
+          <Input
+            id="create-user-email"
             required
             type="email"
             placeholder="first@example.com"
             value={userForm.email}
             onChange={(e) => set({ email: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
           />
         </div>
         {userForm.status !== 'invited' ? (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-            <input
+            <Label htmlFor="create-user-password">Temporary Password</Label>
+            <Input
+              id="create-user-password"
               required
               minLength={8}
               type="password"
               placeholder="Min. 8 characters"
               value={userForm.password}
               onChange={(e) => set({ password: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
             />
           </div>
         ) : (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="mb-1.5 text-sm font-medium text-gray-700">Temporary Password</p>
+            <p className="text-sm text-gray-500">
               No password needed — the user will set one via the invitation link.
             </p>
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-          <select
-            value={userForm.role_slug}
-            onChange={(e) => set({ role_slug: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"
-          >
+          <Label htmlFor="create-user-role">Role</Label>
+          <Select id="create-user-role" value={userForm.role_slug} onChange={(e) => set({ role_slug: e.target.value })}>
             {roles.length === 0 ? (
               <option value="lawyer">Lawyer</option>
             ) : (
@@ -109,27 +107,21 @@ export function CreateUserForm({ organizations, roles, userForm, onFormChange, o
                   </option>
                 ))
             )}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select
-            value={userForm.status}
-            onChange={(e) => set({ status: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"
-          >
+          <Label htmlFor="create-user-status">Status</Label>
+          <Select id="create-user-status" value={userForm.status} onChange={(e) => set({ status: e.target.value })}>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="invited">Invited</option>
             <option value="disabled">Disabled</option>
-          </select>
+          </Select>
         </div>
-        <div className="md:col-span-2 lg:col-span-3">
-          <button type="submit" className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
-            Create User
-          </button>
+        <div className="flex justify-end border-t border-gray-200 pt-4 md:col-span-2 lg:col-span-3">
+          <Button type="submit">Create User</Button>
         </div>
       </form>
-    </div>
+    </Card>
   );
 }
