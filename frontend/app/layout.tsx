@@ -4,15 +4,15 @@
  */
 
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import { Suspense } from "react";
 import { CookieConsent } from "../components/compliance/CookieConsent";
 import { BugReportWidget } from "../design-system/components/BugReportWidget";
 import "./globals.css";
 
-// Geist is SIL Open Font License and is self-hosted by next/font at build time.
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Inter and Geist Mono are SIL Open Font License and are self-hosted by next/font at build time.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -38,7 +38,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${geistMono.variable} antialiased`}
       >
         <a
           href="#main-content"

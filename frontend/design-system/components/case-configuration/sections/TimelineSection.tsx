@@ -3,6 +3,7 @@
 import type { CaseWorkspace } from '@/lib/api';
 
 import { formatDate, formatDateInput } from '../utils';
+import { fieldClasses } from '../../ui';
 
 type TimelineSectionProps = {
   workspace: CaseWorkspace;
@@ -14,11 +15,11 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Timeline & Estimates</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Timeline & Estimates</h2>
         <p className="text-gray-600">Configure estimated timeline and completion dates</p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Estimated Timeline</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -27,7 +28,7 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
             <input
               type="date"
               value={formatDateInput(workspace.case.start_date)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               readOnly
             />
           </div>
@@ -36,7 +37,7 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
             <input
               type="date"
               value={formatDateInput(workspace.case.estimated_completion_from)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               readOnly
             />
           </div>
@@ -45,7 +46,7 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
             <input
               type="date"
               value={formatDateInput(workspace.case.estimated_completion_to)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+              className={fieldClasses}
               readOnly
             />
           </div>
@@ -73,7 +74,7 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
           <label className="block text-sm font-medium text-gray-700 mb-2">What Can Delay This (Client-Visible)</label>
           <textarea
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            className={fieldClasses}
             value={`Pending required documents: ${missingDocuments}. Pending payment amount: $${pendingPaymentsAmount.toLocaleString()}.`}
             readOnly
           />
@@ -83,14 +84,14 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
           <label className="block text-sm font-medium text-gray-700 mb-2">Internal Risk Notes (Lawyer Only)</label>
           <textarea
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+            className={fieldClasses}
             value={workspace.case.internal_notes ?? 'No internal notes available.'}
             readOnly
           />
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Timeline Visualization</h3>
         <div className="relative">
           <div className="flex items-center justify-between mb-2">
@@ -99,13 +100,13 @@ export function TimelineSection({ workspace, missingDocuments, pendingPaymentsAm
           </div>
           <div className="bg-gray-200 rounded-full h-4">
             <div
-              className="bg-gradient-to-r from-green-500 via-blue-500 to-gray-300 h-4 rounded-full"
+              className="bg-gradient-to-r from-green-500 via-primary-500 to-gray-300 h-4 rounded-full"
               style={{ width: `${workspace.case.progress_percent}%` }}
             />
           </div>
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-green-600">Started</span>
-            <span className="text-xs text-blue-600">Current ({workspace.case.progress_percent}%)</span>
+            <span className="text-xs text-primary-600">Current ({workspace.case.progress_percent}%)</span>
             <span className="text-xs text-gray-500">Target</span>
           </div>
         </div>

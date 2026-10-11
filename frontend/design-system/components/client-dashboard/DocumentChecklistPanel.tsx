@@ -1,4 +1,4 @@
-/** DocumentChecklistPanel: documentchecklistpanel implementation. */
+/** DocumentChecklistPanel: Client's document checklist with status, rejection notes, and view/upload/delete actions. */
 
 import { AlertCircle, CheckCircle, Clock, Download, FileText, Trash2, Upload } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { CaseConfigDialog } from '../case-configuration/dialogs/CaseConfigDialog';
 import type { DashboardDocument, DashboardDocumentStatus } from './types';
 import { DocumentUploadDialog } from './DocumentUploadDialog';
+import { Badge, Button, Card } from '../ui';
 
 type DocumentChecklistPanelProps = {
   documents: DashboardDocument[];
@@ -25,9 +26,9 @@ function documentStatusMeta(status: DashboardDocumentStatus) {
     case 'completed':
       return { color: 'text-green-600 bg-green-50', icon: CheckCircle, text: 'Uploaded' };
     case 'pending':
-      return { color: 'text-red-600 bg-red-50', icon: AlertCircle, text: 'Required' };
+      return { color: 'text-amber-700 bg-amber-50', icon: AlertCircle, text: 'Required' };
     case 'review':
-      return { color: 'text-yellow-600 bg-yellow-50', icon: Clock, text: 'Under Review' };
+      return { color: 'text-primary-600 bg-primary-50', icon: Clock, text: 'Under Review' };
     default:
       return { color: 'text-gray-600 bg-gray-50', icon: FileText, text: 'Optional' };
   }
@@ -88,16 +89,16 @@ export function DocumentChecklistPanel({
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="p-6 border-b border-gray-200">
+      <Card className="overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Document Checklist</h2>
-            <span className="text-sm text-gray-600">
+            <h2 className="text-base font-semibold text-gray-900">Document Checklist</h2>
+            <Badge tone={completedRequiredDocuments >= requiredDocuments ? 'success' : 'neutral'}>
               {completedRequiredDocuments} of {requiredDocuments} required
-            </span>
+            </Badge>
           </div>
         </div>
-        <div className="divide-y divide-gray-200">
+        <ul className="divide-y divide-gray-200">
           {documents.map((document) => {
             const statusInfo = documentStatusMeta(document.status);
             const StatusIcon = statusInfo.icon;
@@ -107,22 +108,20 @@ export function DocumentChecklistPanel({
             const showViewButton = document.canDownload && document.status !== 'pending';
 
             return (
-              <div key={document.id} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 flex-1">
+              <li key={document.id} className="px-5 py-4 hover:bg-gray-50 transition-colors">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${statusInfo.color}`}
+                      className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center ${statusInfo.color}`}
                       title={`Lawyer status: ${document.lawyerStatus}`}
                       aria-label={`Lawyer status: ${document.lawyerStatus}`}
                     >
-                      <StatusIcon className="w-5 h-5" />
+                      <StatusIcon className="w-4 h-4" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-gray-900">{document.name}</p>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-                          {document.lawyerStatus}
-                        </span>
+                        <Badge>{document.lawyerStatus}</Badge>
                       </div>
                       <p className="text-sm text-gray-500">
                         {document.uploadedDate !== 'Not set' ? `Uploaded ${document.uploadedDate}` : statusInfo.text}
@@ -134,7 +133,7 @@ export function DocumentChecklistPanel({
                         <p className="mt-2 text-xs text-gray-500">{document.instructions}</p>
                       ) : null}
                       {document.rejectionNote ? (
-                        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2">
                           <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
                             Rejection Note
                           </p>
@@ -143,28 +142,26 @@ export function DocumentChecklistPanel({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {showViewButton ? (
-                      <button
-                        className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-60"
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => void onDownloadDocument(document.id)}
                         disabled={isDownloading}
                       >
                         <Download className="w-4 h-4" />
                         {isDownloading ? 'Opening...' : 'View'}
-                      </button>
+                      </Button>
                     ) : document.status === 'review' ? (
-                      <span className="text-sm text-yellow-600 font-medium">Reviewing...</span>
+                      <span className="text-sm text-primary-700 font-medium">Reviewing...</span>
                     ) : null}
 
-                    <button
-                      className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                        canUploadDocuments
-                          ? document.status === 'pending'
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
-                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      }`}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={canUploadDocuments && document.status === 'pending' ? 'primary' : 'secondary'}
                       disabled={!canUploadDocuments || isUploading}
                       onClick={() => {
                         setDialogErrorMessage(null);
@@ -173,9 +170,11 @@ export function DocumentChecklistPanel({
                     >
                       <Upload className="w-4 h-4" />
                       {!canUploadDocuments ? 'Uploads Disabled' : isUploading ? 'Uploading...' : 'Upload'}
-                    </button>
-                    <button
-                      className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
                       disabled={!canUploadDocuments || !document.canDownload || isDeleting}
                       onClick={() => {
                         if (!document.canDownload || isDeleting) {
@@ -192,14 +191,14 @@ export function DocumentChecklistPanel({
                     >
                       <Trash2 className="w-4 h-4" />
                       {isDeleting ? 'Deleting...' : 'Delete'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </Card>
       <DocumentUploadDialog
         key={uploadTarget?.id ?? 'closed'}
         isOpen={uploadTarget !== null}
@@ -218,30 +217,30 @@ export function DocumentChecklistPanel({
           description="This action removes the uploaded file for this document from your case and deletes the note if you sent one with it."
           onClose={() => setDeleteTargetId(null)}
         >
-          <div className="px-6 py-5">
+          <div className="px-5 py-4">
             <p className="text-sm text-gray-700">
               Delete <span className="font-semibold text-gray-900">{deleteTarget.name}</span>?
             </p>
           </div>
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
-            <button
+          <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-md flex justify-end gap-2">
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => setDeleteTargetId(null)}
               disabled={deletingDocumentId === deleteTarget.id}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
               onClick={() => {
                 void handleDeleteConfirm();
               }}
               disabled={deletingDocumentId === deleteTarget.id}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
             >
               {deletingDocumentId === deleteTarget.id ? 'Deleting...' : 'Delete'}
-            </button>
+            </Button>
           </div>
         </CaseConfigDialog>
       ) : null}

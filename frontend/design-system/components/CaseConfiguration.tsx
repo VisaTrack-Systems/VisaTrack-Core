@@ -25,7 +25,7 @@ import {
   updateCasePortalPermissions,
 } from '@/lib/api';
 
-import { SidebarNav } from './case-configuration/SidebarNav';
+import { CaseSectionNav } from './case-configuration/CaseSectionNav';
 import { CaseDetailsSection } from './case-configuration/sections/CaseDetailsSection';
 import { DocumentsSection } from './case-configuration/sections/DocumentsSection';
 import { AiAssistantSection } from './case-configuration/sections/AiAssistantSection';
@@ -868,11 +868,11 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   };
 
   if (isLoadingCase && !workspace) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-gray-600">Loading case configuration...</div>;
+    return <div className="p-8 text-sm text-gray-600">Loading case configuration...</div>;
   }
 
   if (error && !workspace) {
-    return <div className="min-h-screen bg-gray-50 p-8 text-red-600">Failed to load case: {error}</div>;
+    return <div className="p-8"><div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Failed to load case: {error}</div></div>;
   }
 
   const renderSection = () => {
@@ -998,8 +998,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <SidebarNav
+    <div className="bg-gray-50">
+      <CaseSectionNav
         activeSection={activeSection}
         caseId={caseId}
         onBack={onBack}
@@ -1007,16 +1007,16 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
         workspace={workspace}
       />
 
-      <div className="flex-1">
-        <div className="max-w-6xl mx-auto px-8 py-8">
+      <div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {notice ? (
             <div
-              className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+              className={`mb-4 rounded-md border px-4 py-3 text-sm ${
                 notice.kind === 'success'
                   ? 'border-green-200 bg-green-50 text-green-700'
                   : notice.kind === 'error'
                     ? 'border-red-200 bg-red-50 text-red-700'
-                    : 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-primary-200 bg-primary-50 text-primary-700'
               }`}
             >
               {notice.message}

@@ -26,7 +26,7 @@ function NavItem({
       onClick={() => onNavigate(section)}
       className={`w-full flex items-center gap-2 rounded-lg text-sm transition-colors ${
         indent ? 'pl-7 pr-3 py-1.5' : 'px-3 py-2'
-      } ${isActive ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      } ${isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
     >
       {icon}
       {label}

@@ -1,6 +1,8 @@
-/** LawyerWorkloadPanel: lawyerworkloadpanel implementation. */
+/** LawyerWorkloadPanel: Lists each lawyer in the organization with their active case count, busiest first. */
 
 import type { AdminOperations } from '@/lib/api';
+
+import { Badge, Card, CardHeader } from '../ui';
 
 type Props = {
   workload: AdminOperations['lawyer_workload'];
@@ -10,22 +12,20 @@ export function LawyerWorkloadPanel({ workload }: Props) {
   const sorted = [...workload].sort((a, b) => b.active_cases - a.active_cases);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900">Lawyer Workload</h3>
-      </div>
-      <div className="divide-y divide-gray-200">
+    <Card className="overflow-hidden">
+      <CardHeader title="Lawyer Workload" />
+      <ul className="divide-y divide-gray-200">
         {sorted.length === 0 ? (
-          <div className="px-6 py-5 text-sm text-gray-500">No active lawyers found.</div>
+          <li className="px-5 py-4 text-sm text-gray-500">No active lawyers found.</li>
         ) : (
           sorted.map((lawyer) => (
-            <div key={lawyer.lawyer_user_id} className="px-6 py-4 flex items-center justify-between">
-              <p className="text-sm text-gray-800">{lawyer.full_name}</p>
-              <span className="text-sm font-semibold text-gray-900">{lawyer.active_cases} active</span>
-            </div>
+            <li key={lawyer.lawyer_user_id} className="flex items-center justify-between gap-3 px-5 py-3">
+              <p className="truncate text-sm font-medium text-gray-900">{lawyer.full_name}</p>
+              <Badge tone={lawyer.active_cases > 0 ? 'primary' : 'neutral'}>{lawyer.active_cases} active</Badge>
+            </li>
           ))
         )}
-      </div>
-    </div>
+      </ul>
+    </Card>
   );
 }

@@ -1,7 +1,8 @@
-/** AppointmentsPanel: appointmentspanel implementation. */
+/** AppointmentsPanel: List of the client's upcoming appointments (derived from milestones). */
 
 import { Calendar } from 'lucide-react';
 
+import { Card, CardHeader } from '../ui';
 import type { DashboardAppointment } from './types';
 
 type AppointmentsPanelProps = {
@@ -10,28 +11,28 @@ type AppointmentsPanelProps = {
 
 export function AppointmentsPanel({ upcomingAppointments }: AppointmentsPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
-      </div>
-      <div className="p-6 space-y-4">
-        {upcomingAppointments.map((appointment, index) => (
-          <div key={`${appointment.title}-${index}`} className="border border-gray-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="bg-red-100 p-2 rounded">
-                <Calendar className="w-5 h-5 text-red-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900 text-sm">{appointment.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{appointment.date}</p>
-                <p className="text-xs text-gray-500 mt-1">
+    <Card>
+      <CardHeader title="Upcoming Appointments" />
+      {upcomingAppointments.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-gray-500">No upcoming appointments.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100 px-5 py-1">
+          {upcomingAppointments.map((appointment, index) => (
+            <li key={`${appointment.title}-${index}`} className="flex items-start gap-3 py-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600">
+                <Calendar className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900">{appointment.title}</p>
+                <p className="text-sm text-gray-600">{appointment.date}</p>
+                <p className="text-xs text-gray-500">
                   {appointment.time} • {appointment.type}
                 </p>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

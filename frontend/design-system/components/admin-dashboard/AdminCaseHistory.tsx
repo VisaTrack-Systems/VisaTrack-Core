@@ -1,4 +1,4 @@
-/** AdminCaseHistory: admincasehistory implementation. */
+/** AdminCaseHistory: Organization-wide case list for admins, filterable by search, status, and lawyer. */
 
 import { useMemo, useState } from 'react';
 
@@ -6,6 +6,7 @@ import { CasesTable } from '../active-cases/CasesTable';
 import { FilterBar } from '../active-cases/FilterBar';
 import { SummaryCards } from '../active-cases/SummaryCards';
 import { useActiveCasesData } from '../active-cases/useActiveCasesData';
+import { Alert, Card } from '../ui';
 
 type Props = {
   onSelectCase: (caseId: string) => void;
@@ -43,17 +44,17 @@ export function AdminCaseHistory({ onSelectCase, orgLawyerNames }: Props) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-700">{error}</p>
-        <button className="text-sm font-medium text-red-700 hover:text-red-800" onClick={retry} type="button">
+      <Alert tone="danger" className="flex items-center justify-between gap-4">
+        <p>{error}</p>
+        <button className="font-medium underline underline-offset-2 hover:text-red-800" onClick={retry} type="button">
           Retry
         </button>
-      </div>
+      </Alert>
     );
   }
 
   if (isLoading) {
-    return <div className="bg-white rounded-lg shadow-sm p-8 text-sm text-gray-500">Loading cases...</div>;
+    return <Card className="p-8 text-sm text-gray-500">Loading cases...</Card>;
   }
 
   return (

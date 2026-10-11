@@ -1,14 +1,8 @@
-/** AdminStatsGrid: adminstatsgrid implementation. */
+/** AdminStatsGrid: Row of headline organization metrics shown on the admin Home section. */
 
 import { FileText, Mail, TrendingUp, Users } from 'lucide-react';
 
-type StatCard = {
-  label: string;
-  value: number;
-  icon: React.ElementType;
-  color: string;
-  trend: string;
-};
+import { StatCard } from '../ui';
 
 type AdminStatsGridProps = {
   activeCases: number;
@@ -23,49 +17,12 @@ export function AdminStatsGrid({
   pendingInvitations,
   unassignedCases,
 }: AdminStatsGridProps) {
-  const cards: StatCard[] = [
-    {
-      label: 'Active Cases',
-      value: activeCases,
-      icon: FileText,
-      color: 'text-red-600',
-      trend: 'Live from database',
-    },
-    {
-      label: 'Total Members',
-      value: totalMembers,
-      icon: Users,
-      color: 'text-blue-600',
-      trend: 'All organization members',
-    },
-    {
-      label: 'Pending Invitations',
-      value: pendingInvitations,
-      icon: Mail,
-      color: 'text-yellow-600',
-      trend: 'Awaiting response',
-    },
-    {
-      label: 'Unassigned Cases',
-      value: unassignedCases,
-      icon: TrendingUp,
-      color: 'text-green-600',
-      trend: 'Needs a lawyer assigned',
-    },
-  ];
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      {cards.map((stat) => (
-        <div key={stat.label} className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <stat.icon className={`w-8 h-8 ${stat.color}`} />
-          </div>
-          <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-          <div className="text-sm text-gray-600 mb-2">{stat.label}</div>
-          <div className="text-xs text-gray-500">{stat.trend}</div>
-        </div>
-      ))}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StatCard label="Active Cases" value={activeCases} icon={FileText} iconClassName="text-red-600" hint="Live from database" />
+      <StatCard label="Total Members" value={totalMembers} icon={Users} iconClassName="text-blue-600" hint="All organization members" />
+      <StatCard label="Pending Invitations" value={pendingInvitations} icon={Mail} iconClassName="text-yellow-600" hint="Awaiting response" />
+      <StatCard label="Unassigned Cases" value={unassignedCases} icon={TrendingUp} iconClassName="text-green-600" hint="Needs a lawyer assigned" />
     </div>
   );
 }

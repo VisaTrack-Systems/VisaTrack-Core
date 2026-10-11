@@ -1,6 +1,7 @@
 /** DeleteDocumentDialog: Modal dialog for DeleteDocument management and configuration. */
 
 import { CaseConfigDialog } from './CaseConfigDialog';
+import { buttonClasses } from '../../ui';
 
 type DeleteDocumentDialogProps = {
   documentName: string;
@@ -31,7 +32,7 @@ export function DeleteDocumentDialog({
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+          className={buttonClasses('secondary')}
         >
           Cancel
         </button>
@@ -41,7 +42,7 @@ export function DeleteDocumentDialog({
           onClick={() => {
             void onConfirm();
           }}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className={buttonClasses('danger')}
         >
           {submitting ? 'Deleting...' : 'Delete'}
         </button>
