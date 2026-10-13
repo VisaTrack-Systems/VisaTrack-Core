@@ -4,6 +4,9 @@ This directory contains the frontend web application for VisaTrack, built using 
 
 The frontend is a responsive web app designed to work on both desktop and mobile browsers.
 
+**UI testing:** See [the Playwright guide and manual checklist](e2e/README.md)
+for interactive (`npm run test:e2e:ui`), headed, debug, and CI runs.
+
 ---
 
 ## Reading the Code (Where to Start)

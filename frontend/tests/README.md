@@ -1,5 +1,9 @@
 # frontend/tests
 
+For browser workflows, interactive Playwright runs, and the manual review checklist,
+see [Frontend UI testing](../e2e/README.md). This directory contains the separate
+Vitest/component suite.
+
 This directory contains the frontend test suite for VisaTrack, organized to test UI components, integration scenarios, and utilities. Tests use Vitest (Vite's native test runner) and React Testing Library for component testing, with Storybook integration for visual regression and component snapshot testing.
 
 ## Overview

@@ -6,6 +6,9 @@ This directory contains project documentation and design artifacts.
 
 ## Contents
 
+- [Frontend UI testing and manual checklist](../frontend/e2e/README.md)
+- [Post-merge Teams update draft](testing/TEAMS_UI_TESTING_UPDATE.md)
+
 - Architecture decisions
 - API specifications
 - Design rationale
