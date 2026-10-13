@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('cookie choice and legal pages are reachable from the keyboard', async ({ page }) => {
   await page.goto('/');
