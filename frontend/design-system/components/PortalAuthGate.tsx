@@ -1,13 +1,13 @@
 /** PortalAuthGate: Public landing page and sign-in form. Shows the Clio-style hero with the sign-in card, a feature summary, and the legal footer. Renders nothing once a user with an allowed role is signed in. */
 
-import { CircleCheck, CreditCard, FileText, FileUp, FolderKanban, type LucideIcon, Users } from 'lucide-react';
-import Link from 'next/link';
+import { CircleCheck, CreditCard, FileUp, FolderKanban, type LucideIcon, Users } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 
 import { LegalFooter } from '@/components/compliance/LegalFooter';
+import { SiteHeader } from '@/components/compliance/SiteHeader';
 import type { AuthLoginInput, CurrentUser } from '@/lib/api';
 
-import { Alert, Button, Card, Input, Label, buttonClasses } from './ui';
+import { Alert, Button, Card, Input, Label } from './ui';
 
 // Landing copy describes only features the product ships today.
 const HERO_POINTS = [
@@ -124,25 +124,7 @@ export function PortalAuthGate({
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* ── Public header ── */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-white">
-              <FileText className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="text-xl font-semibold tracking-tight text-gray-900">{portalTitle}</span>
-          </div>
-          <nav aria-label="Site" className="flex items-center gap-5">
-            <Link href="/legal/privacy" className="text-sm font-medium text-gray-700 hover:text-primary-700">
-              Privacy
-            </Link>
-            {/* A link, not a button: the form below owns the only "Sign in" button. */}
-            <a href="#sign-in" className={buttonClasses('primary')}>
-              Sign in
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader title={portalTitle} />
 
       {/* ── Hero with sign-in card ── */}
       <section className="bg-linear-to-br from-navy-900 via-navy-900 to-navy-800 text-white">

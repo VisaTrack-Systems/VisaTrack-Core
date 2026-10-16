@@ -7,12 +7,13 @@ export const business = {
 
 export const legalUpdated = "September 27, 2026";
 
+/** `group` decides which footer column a link appears in. */
 export const legalLinks = [
-  { href: "/legal/privacy", label: "Privacy policy" },
-  { href: "/legal/terms", label: "Terms of service" },
-  { href: "/legal/refund", label: "Refund policy" },
-  { href: "/legal/cookies", label: "Cookie policy" },
-  { href: "/legal/licenses", label: "Font and image licenses" },
-  { href: "/legal/sdks", label: "Third-party SDK audit" },
-  { href: "/privacy/deletion", label: "Data deletion request" },
+  { href: "/legal/privacy", label: "Privacy policy", group: "policies" },
+  { href: "/legal/terms", label: "Terms of service", group: "policies" },
+  { href: "/legal/refund", label: "Refund policy", group: "policies" },
+  { href: "/legal/cookies", label: "Cookie policy", group: "policies" },
+  { href: "/legal/licenses", label: "Font and image licenses", group: "policies" },
+  { href: "/legal/sdks", label: "Third-party SDK audit", group: "more" },
+  { href: "/privacy/deletion", label: "Data deletion request", group: "more" },
 ] as const;

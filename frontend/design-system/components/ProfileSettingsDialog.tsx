@@ -7,6 +7,10 @@ import { FormEvent, useState } from 'react';
 import { createPrivacyRequest, type CurrentUserSettings, type UpdateCurrentUserSettingsInput } from '@/lib/api';
 import { DialogPanel } from './DialogPanel';
 import { MfaSettings } from './MfaSettings';
+import { Alert, Button, FieldHint, Input, Label, Textarea } from './ui';
+
+/** Lets the footer's Save button submit the profile form from outside it. */
+const PROFILE_FORM_ID = 'profile-settings-form';
 
 type ProfileSettingsDialogProps = {
   isOpen: boolean;
@@ -73,160 +77,139 @@ export function ProfileSettingsDialog({
     return null;
   }
 
+  const fieldsDisabled = loading || submitting;
+
   return (
-    <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[90] bg-navy-900/50 flex items-center justify-center p-4">
       <DialogPanel
         labelledBy="profile-settings-title"
         onClose={onClose}
-        className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+        className="w-full max-w-2xl bg-white border border-gray-200 rounded-md shadow-popover flex flex-col max-h-[90vh]"
       >
-        <div className="px-6 py-4 bg-black text-white flex items-start justify-between">
+        {/* Header: stays pinned at the top while the body scrolls */}
+        <div className="flex items-start justify-between border-b border-gray-200 px-5 py-4 shrink-0">
           <div>
-            <h2 id="profile-settings-title" className="text-xl font-semibold">Profile Settings</h2>
-            <p className="text-xs text-gray-300 mt-1">Manage your account details and security preferences.</p>
+            <h2 id="profile-settings-title" className="text-base font-semibold text-gray-900">Profile Settings</h2>
+            <p className="mt-0.5 text-sm text-gray-500">Manage your account details and security preferences.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="p-2 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-60"
+            className="-m-1 rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-60"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {validationError ? (
-            <div className="rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-800 text-sm px-3 py-2">
-              {validationError}
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 min-h-0">
+          <form id={PROFILE_FORM_ID} onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
+            {validationError ? <Alert tone="warning">{validationError}</Alert> : null}
+
+            {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
+
+            {loading ? <Alert>Loading profile settings...</Alert> : null}
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profile-first-name">First Name</Label>
+                <Input
+                  id="profile-first-name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  disabled={fieldsDisabled}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="profile-last-name">Last Name</Label>
+                <Input
+                  id="profile-last-name"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  disabled={fieldsDisabled}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profile-email">Email</Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  disabled={fieldsDisabled}
+                  required
+                />
+                <FieldHint>Email verified: {settings?.email_verified ? 'Yes' : 'No'}</FieldHint>
+              </div>
+              <div>
+                <Label htmlFor="profile-phone">Phone (optional)</Label>
+                <Input
+                  id="profile-phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  disabled={fieldsDisabled}
+                  placeholder="+1 555 123 4567"
+                />
+                <FieldHint>
+                  Used only if your firm needs to call you about a case. Leave it blank to keep email as the only contact.
+                  Phone verified: {settings?.phone_verified ? 'Yes' : 'No'}
+                </FieldHint>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profile-timezone">Timezone</Label>
+                <Input
+                  id="profile-timezone"
+                  value={timezone}
+                  onChange={(event) => setTimezone(event.target.value)}
+                  disabled={fieldsDisabled}
+                  placeholder="America/Toronto"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="profile-locale">Locale</Label>
+                <Input
+                  id="profile-locale"
+                  value={locale}
+                  onChange={(event) => setLocale(event.target.value)}
+                  disabled={fieldsDisabled}
+                  placeholder="en-CA"
+                  required
+                />
+              </div>
+            </div>
+          </form>
+
+          {settings ? (
+            <div className="space-y-4 border-t border-gray-200 px-5 py-4">
+              <MfaSettings initiallyEnabled={settings.mfa_enabled} />
+              <DataDeletionPanel />
             </div>
           ) : null}
+        </div>
 
-          {errorMessage ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-3 py-2">
-              {errorMessage}
-            </div>
-          ) : null}
-
-          {loading ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm px-3 py-2">
-              Loading profile settings...
-            </div>
-          ) : null}
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="profile-first-name" className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input
-                id="profile-first-name"
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="profile-last-name" className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input
-                id="profile-last-name"
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                required
-              />
-            </div>
+        {/* Footer: stays pinned at the bottom. Save submits the profile form via the `form` attribute. */}
+        <div className="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-5 py-3 shrink-0">
+          <p className="text-xs text-gray-500">Account status: {settings?.status ?? 'active'}</p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" form={PROFILE_FORM_ID} disabled={fieldsDisabled}>
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </Button>
           </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                id="profile-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                required
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Email verified: {settings?.email_verified ? 'Yes' : 'No'}
-              </p>
-            </div>
-            <div>
-              <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
-              <input
-                id="profile-phone"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                placeholder="+1 555 123 4567"
-              />
-              <p className="mt-1 text-sm text-gray-800">
-                Used only if your firm needs to call you about a case. Leave it blank to keep email as the only contact.
-                Phone verified: {settings?.phone_verified ? 'Yes' : 'No'}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="profile-timezone" className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-              <input
-                id="profile-timezone"
-                value={timezone}
-                onChange={(event) => setTimezone(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                placeholder="America/Toronto"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="profile-locale" className="block text-sm font-medium text-gray-700 mb-1">Locale</label>
-              <input
-                id="profile-locale"
-                value={locale}
-                onChange={(event) => setLocale(event.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
-                disabled={loading || submitting}
-                placeholder="en-CA"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-gray-500">Account status: {settings?.status ?? 'active'}</p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60"
-                disabled={loading || submitting}
-              >
-                {submitting ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </form>
-        {settings ? (
-          <div className="px-6 pb-6 space-y-6">
-            <MfaSettings initiallyEnabled={settings.mfa_enabled} />
-            <DataDeletionPanel />
-          </div>
-        ) : null}
+        </div>
       </DialogPanel>
     </div>
   );
@@ -263,43 +246,40 @@ function DataDeletionPanel() {
   };
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="rounded-lg border border-gray-300 p-4 space-y-3">
-      <h3 className="text-base font-semibold text-gray-900">Delete my data</h3>
-      <p className="text-sm text-gray-800">
-        Ask VisaTrack to delete the personal information on this account. A legal hold can delay deletion.
-        You can also use the{' '}
-        <Link className="text-blue-800 underline" href="/privacy/deletion">public deletion request</Link>.
-      </p>
-      {error ? <p role="alert" className="text-sm text-red-800">{error}</p> : null}
-      {message ? <p role="status" className="text-sm text-gray-900">{message}</p> : null}
-      <label htmlFor="profile-deletion-details" className="block text-sm font-medium text-gray-700">
-        Details (optional)
-      </label>
-      <textarea
-        id="profile-deletion-details"
-        value={details}
-        onChange={(event) => setDetails(event.target.value)}
-        rows={3}
-        maxLength={5000}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2"
-      />
-      <label htmlFor="profile-deletion-confirm" className="flex items-start gap-3 text-sm text-gray-900">
+    <form onSubmit={(event) => void submit(event)} className="rounded-md border border-gray-200 p-4 space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900">Delete my data</h3>
+        <p className="mt-0.5 text-sm text-gray-600">
+          Ask VisaTrack to delete the personal information on this account. A legal hold can delay deletion.
+          You can also use the{' '}
+          <Link className="text-primary-700 underline hover:text-primary-800" href="/privacy/deletion">public deletion request</Link>.
+        </p>
+      </div>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {message ? <Alert tone="success" role="status">{message}</Alert> : null}
+      <div>
+        <Label htmlFor="profile-deletion-details">Details (optional)</Label>
+        <Textarea
+          id="profile-deletion-details"
+          value={details}
+          onChange={(event) => setDetails(event.target.value)}
+          rows={3}
+          maxLength={5000}
+        />
+      </div>
+      <label htmlFor="profile-deletion-confirm" className="flex items-start gap-3 text-sm text-gray-700">
         <input
           id="profile-deletion-confirm"
           type="checkbox"
           checked={confirmed}
           onChange={(event) => setConfirmed(event.target.checked)}
-          className="mt-1"
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary-600"
         />
         <span>I want my VisaTrack personal information deleted.</span>
       </label>
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-lg border-2 border-gray-900 bg-white px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-60"
-      >
+      <Button type="submit" variant="danger-subtle" disabled={submitting}>
         {submitting ? 'Submitting…' : 'Request deletion'}
-      </button>
+      </Button>
     </form>
   );
 }
