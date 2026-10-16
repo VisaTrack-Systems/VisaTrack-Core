@@ -13,12 +13,13 @@ import { Alert, Button, Card } from './ui';
 interface ActiveCasesProps {
   onSelectCase: (caseId: string) => void;
   onBack: () => void;
+  enablePersonalFlags?: boolean;
 }
 
-export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
+export function ActiveCases({ onSelectCase, onBack, enablePersonalFlags = false }: ActiveCasesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const { cases, isLoading, error, retry } = useActiveCasesData();
+  const { cases, isLoading, error, retry, flagError, flaggingCaseNumbers, toggleFlag } = useActiveCasesData();
 
   const filteredCases = useMemo(
     () =>
@@ -56,6 +57,10 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
           </Alert>
         ) : null}
 
+        {enablePersonalFlags && flagError ? <Alert tone="danger">{flagError}</Alert> : null}
+
+        {enablePersonalFlags ? <p className="text-sm text-gray-600">Flag cases for your attention. Your flags are visible only to you and stay at the top.</p> : null}
+
         {!isLoading ? <SummaryCards cases={cases} /> : null}
 
         <FilterBar
@@ -68,7 +73,12 @@ export function ActiveCases({ onSelectCase, onBack }: ActiveCasesProps) {
         {isLoading ? (
           <Card className="p-8 text-sm text-gray-500">Loading active cases...</Card>
         ) : (
-          <CasesTable filteredCases={filteredCases} onSelectCase={onSelectCase} />
+          <CasesTable
+            filteredCases={filteredCases}
+            onSelectCase={onSelectCase}
+            onToggleFlag={enablePersonalFlags ? (caseNumber, isFlagged) => { void toggleFlag(caseNumber, isFlagged); } : undefined}
+            flaggingCaseNumbers={flaggingCaseNumbers}
+          />
         )}
       </div>
     </div>

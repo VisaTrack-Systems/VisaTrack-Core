@@ -1,5 +1,14 @@
 # backend/tests
 
+Personal case flags have request/authorization tests in
+`api/routes/test_case_flags.py` and real PostgreSQL checks in
+`integration/test_case_flags_postgres.py`. The integration suite is opt-in: point
+`CASE_FLAGS_TEST_DATABASE_URL` at an **empty disposable PostgreSQL database named
+`visatrack_case_flags_test`**, then run `pytest tests/integration/test_case_flags_postgres.py`.
+It migrates that database from the baseline to head and checks personal isolation,
+pagination, concurrent idempotent writes, access boundaries, and cascading cleanup.
+It refuses a populated database and never falls back to the application's database URL.
+
 This directory contains the pytest test suite for the VisaTrack backend API, organized to mirror the source code structure under `app/`. Tests verify API endpoints, business logic, database models, and service layer functionality using fixtures for database setup, mocked dependencies, and authentication context.
 
 ## Overview

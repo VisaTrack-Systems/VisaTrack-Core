@@ -17,6 +17,7 @@ class CaseListItem(BaseModel):
     primary_lawyer_name: Optional[str]
     target_filing_date: Optional[date]
     created_at: datetime
+    is_flagged: bool = False
 
 
 class CaseCreateRequest(BaseModel):

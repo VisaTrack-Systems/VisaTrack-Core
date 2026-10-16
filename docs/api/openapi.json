@@ -2364,6 +2364,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_flagged": {
+            "default": false,
+            "title": "Is Flagged",
+            "type": "boolean"
+          },
           "organization_id": {
             "format": "uuid",
             "title": "Organization Id",
@@ -4266,6 +4271,38 @@
           "case_type"
         ],
         "title": "LawyerCaseCreateRequest",
+        "type": "object"
+      },
+      "LawyerCaseFlagRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "is_flagged": {
+            "title": "Is Flagged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_flagged"
+        ],
+        "title": "LawyerCaseFlagRequest",
+        "type": "object"
+      },
+      "LawyerCaseFlagResponse": {
+        "properties": {
+          "case_number": {
+            "title": "Case Number",
+            "type": "string"
+          },
+          "is_flagged": {
+            "title": "Is Flagged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "case_number",
+          "is_flagged"
+        ],
+        "title": "LawyerCaseFlagResponse",
         "type": "object"
       },
       "LawyerClientCreateRequest": {
@@ -9307,6 +9344,63 @@
           }
         ],
         "summary": "Invite Client To Case",
+        "tags": [
+          "lawyer"
+        ]
+      }
+    },
+    "/api/v1/lawyer/cases/{case_number}/flag": {
+      "put": {
+        "operationId": "set_lawyer_case_flag_api_v1_lawyer_cases__case_number__flag_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LawyerCaseFlagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawyerCaseFlagResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Lawyer Case Flag",
         "tags": [
           "lawyer"
         ]

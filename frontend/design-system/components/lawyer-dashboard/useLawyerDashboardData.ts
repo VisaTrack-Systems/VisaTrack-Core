@@ -1,8 +1,11 @@
 /** useLawyerDashboardData: React hook for handling lawyerdashboarddata logic and state management. */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { getLawyerCases, getLawyerClients } from '@/lib/api';
+import { getLawyerClients } from '@/lib/api';
+import { loadAllLawyerCases, sortFlaggedCases } from '@/lib/lawyerCases';
+
+import { useCaseFlagging } from '../useCaseFlagging';
 
 import type { ActivityItem, DashboardCase, DashboardStats } from './types';
 import { relativeTime, titleize } from './utils';
@@ -21,14 +24,23 @@ type LawyerDashboardData = {
   isLoading: boolean;
   error: string | null;
   retry: () => void;
+  flaggingCaseNumbers: string[];
+  flagError: string | null;
+  toggleFlag: (caseNumber: string, isFlagged: boolean) => Promise<void>;
 };
 
 export function useLawyerDashboardData(): LawyerDashboardData {
-  const [cases, setCases] = useState<DashboardCase[]>([]);
+  const [allCases, setCases] = useState<DashboardCase[]>([]);
   const [stats, setStats] = useState<DashboardStats>(fallbackStats);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const onFlagSaved = useCallback((caseNumber: string, isFlagged: boolean) => {
+    setCases((current) => sortFlaggedCases(current.map((entry) =>
+      entry.id === caseNumber ? { ...entry, isFlagged } : entry
+    )));
+  }, []);
+  const flagging = useCaseFlagging(onFlagSaved);
 
   useEffect(() => {
     let ignore = false;
@@ -39,7 +51,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
 
       try {
         const [caseRows, clients] = await Promise.all([
-          getLawyerCases(100),
+          loadAllLawyerCases(),
           getLawyerClients(200).catch(() => null),
         ]);
         if (ignore) {
@@ -50,13 +62,15 @@ export function useLawyerDashboardData(): LawyerDashboardData {
         const totalUsers = clients ? clients.length : totalUsersFromCases;
 
         setCases(
-          caseRows.slice(0, 8).map((entry) => ({
+          sortFlaggedCases(caseRows.map((entry) => ({
             id: entry.case_number,
             clientName: entry.client_name,
             caseType: entry.case_type,
             status: titleize(entry.status),
             lastUpdate: relativeTime(entry.created_at),
             priority: entry.priority,
+            isFlagged: entry.is_flagged ?? false,
+            createdAt: entry.created_at,
             nextDeadline: entry.target_filing_date
               ? new Date(entry.target_filing_date).toLocaleDateString('en-US', {
                   month: 'short',
@@ -64,7 +78,7 @@ export function useLawyerDashboardData(): LawyerDashboardData {
                   year: 'numeric',
                 })
               : 'Not set',
-          }))
+          })))
         );
 
         const activeCases = caseRows.filter((entry) => entry.status !== 'closed').length;
@@ -98,21 +112,28 @@ export function useLawyerDashboardData(): LawyerDashboardData {
     };
   }, [reloadToken]);
 
+  const cases = useMemo(() => {
+    const flagged = allCases.filter((entry) => entry.isFlagged);
+    const recent = allCases.filter((entry) => !entry.isFlagged).slice(0, Math.max(0, 8 - flagged.length));
+    return [...flagged, ...recent];
+  }, [allCases]);
+
   const derivedActivity = useMemo<ActivityItem[]>(
     () =>
-      cases.slice(0, 4).map((entry, index) => ({
+      [...allCases].sort((a, b) => (Date.parse(b.createdAt ?? '') || 0) - (Date.parse(a.createdAt ?? '') || 0))
+        .slice(0, 4).map((entry, index) => ({
         action: 'Case updated',
         client: entry.clientName,
         detail: `${entry.caseType} (${entry.id})`,
         time: entry.lastUpdate,
         type: (['document', 'reminder', 'payment', 'milestone'] as ActivityItem['type'][])[index % 4],
       })),
-    [cases]
+    [allCases]
   );
 
   const retry = () => {
     setReloadToken((current) => current + 1);
   };
 
-  return { cases, stats, derivedActivity, isLoading, error, retry };
+  return { cases, stats, derivedActivity, isLoading, error, retry, ...flagging };
 }
