@@ -6,7 +6,8 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import String, cast, func, select, text
+from sqlalchemy import String, cast, delete, func, literal, select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
 from app.api.deps.auth import AuthContext, require_roles
@@ -18,6 +19,7 @@ from app.models.case_client import CaseClient
 from app.models.organization import Organization
 from app.models.role import Role
 from app.models.user import User
+from app.models.user_case_flag import UserCaseFlag
 from app.models.user_invitation import UserInvitation
 from app.models.user_profile import UserProfile
 from app.models.user_role import UserRole
@@ -26,6 +28,8 @@ from app.schemas.lawyer import (
     InviteClientRequest,
     InviteClientResponse,
     LawyerCaseCreateRequest,
+    LawyerCaseFlagRequest,
+    LawyerCaseFlagResponse,
     LawyerClientCreateRequest,
     LawyerClientCreateResponse,
     LawyerProfileResponse,
@@ -305,6 +309,13 @@ def list_lawyer_cases(
 ) -> list[CaseListItem]:
     client_user = aliased(User)
     lawyer_user = aliased(User)
+    is_flagged = (
+        select(UserCaseFlag.case_id)
+        .where(UserCaseFlag.case_id == Case.id, UserCaseFlag.user_id == auth.user_id)
+        .exists()
+        if auth.active_role == "lawyer"
+        else literal(False)
+    ).label("is_flagged")
 
     stmt = (
         select(
@@ -313,11 +324,12 @@ def list_lawyer_cases(
             client_user.last_name,
             lawyer_user.first_name,
             lawyer_user.last_name,
+            is_flagged,
         )
         .join(client_user, client_user.id == Case.client_id)
         .outerjoin(lawyer_user, lawyer_user.id == Case.primary_lawyer_id)
         .where(Case.deleted_at.is_(None), Case.organization_id == auth.organization_id)
-        .order_by(Case.created_at.desc())
+        .order_by(is_flagged.desc(), Case.created_at.desc(), Case.id.desc())
     )
 
     if auth.active_role not in {"super_admin", "org_admin"}:
@@ -339,9 +351,49 @@ def list_lawyer_cases(
             ),
             target_filing_date=case.target_filing_date,
             created_at=case.created_at,
+            is_flagged=flagged,
         )
-        for case, client_first, client_last, lawyer_first, lawyer_last in rows
+        for case, client_first, client_last, lawyer_first, lawyer_last, flagged in rows
     ]
+
+
+@router.put("/cases/{case_number}/flag", response_model=LawyerCaseFlagResponse)
+def set_lawyer_case_flag(
+    case_number: str,
+    payload: LawyerCaseFlagRequest,
+    auth: AuthContext = Depends(require_roles("lawyer")),
+    db: Session = Depends(get_db),
+) -> LawyerCaseFlagResponse:
+    # Lock the authorized case so concurrent set/remove requests are serialized,
+    # including requests made before the caller's first flag row exists.
+    case = db.scalar(
+        select(Case)
+        .where(
+            Case.case_number == case_number,
+            Case.organization_id == auth.organization_id,
+            Case.deleted_at.is_(None),
+            (Case.primary_lawyer_id == auth.user_id) | (Case.created_by == auth.user_id),
+        )
+        .with_for_update()
+    )
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if payload.is_flagged:
+        db.execute(
+            insert(UserCaseFlag)
+            .values(user_id=auth.user_id, case_id=case.id)
+            .on_conflict_do_nothing(index_elements=["user_id", "case_id"])
+        )
+    else:
+        db.execute(
+            delete(UserCaseFlag).where(
+                UserCaseFlag.user_id == auth.user_id, UserCaseFlag.case_id == case.id
+            )
+        )
+    db.commit()
+
+    return LawyerCaseFlagResponse(case_number=case.case_number, is_flagged=payload.is_flagged)
 
 
 @router.post("/cases", response_model=CaseListItem, status_code=status.HTTP_201_CREATED)

@@ -3,21 +3,25 @@
 import { Calendar, Clock, DollarSign, FileText } from 'lucide-react';
 
 import { Badge, Card, TableBody, TableHead, TableRow, Td, Th } from '../ui';
+import { CaseFlagButton } from '../CaseFlagButton';
 import type { UiCase } from './types';
 import { priorityTone, statusTone } from './utils';
 
 type CasesTableProps = {
   filteredCases: UiCase[];
   onSelectCase: (caseId: string) => void;
+  onToggleFlag?: (caseNumber: string, isFlagged: boolean) => void;
+  flaggingCaseNumbers?: string[];
 };
 
-export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
+export function CasesTable({ filteredCases, onSelectCase, onToggleFlag, flaggingCaseNumbers = [] }: CasesTableProps) {
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <TableHead>
             <tr>
+              {onToggleFlag ? <Th>Personal flag</Th> : null}
               <Th>Client / Case</Th>
               <Th>Status</Th>
               <Th>Priority</Th>
@@ -29,7 +33,17 @@ export function CasesTable({ filteredCases, onSelectCase }: CasesTableProps) {
           </TableHead>
           <TableBody>
             {filteredCases.map((case_) => (
-              <TableRow key={case_.id} onClick={() => onSelectCase(case_.id)} className="cursor-pointer">
+              <TableRow key={case_.id} onClick={() => onSelectCase(case_.id)} className={`cursor-pointer ${onToggleFlag && case_.isFlagged ? 'bg-amber-50/50' : ''}`}>
+                {onToggleFlag ? (
+                  <Td>
+                    <CaseFlagButton
+                      caseNumber={case_.id}
+                      flagged={Boolean(case_.isFlagged)}
+                      saving={flaggingCaseNumbers.includes(case_.id)}
+                      onToggle={() => onToggleFlag(case_.id, !case_.isFlagged)}
+                    />
+                  </Td>
+                ) : null}
                 <Td>
                   <div className="font-semibold text-gray-900">{case_.clientName}</div>
                   <div className="text-sm text-gray-600">{case_.caseType}</div>

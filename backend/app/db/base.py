@@ -17,6 +17,7 @@ from app.models import (  # noqa: F401,E402
     privacy_request,
     role,
     user,
+    user_case_flag,
     user_invitation,
     user_profile,
     user_role,

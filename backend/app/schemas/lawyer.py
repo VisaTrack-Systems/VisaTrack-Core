@@ -3,7 +3,7 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LawyerProfileResponse(BaseModel):
@@ -31,6 +31,17 @@ class LawyerCaseCreateRequest(BaseModel):
     priority: str = Field(default="medium", min_length=2, max_length=20)
     target_filing_date: Optional[date] = None
     description: Optional[str] = None
+
+
+class LawyerCaseFlagRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_flagged: bool = Field(strict=True)
+
+
+class LawyerCaseFlagResponse(BaseModel):
+    case_number: str
+    is_flagged: bool
 
 
 class InviteClientRequest(BaseModel):
