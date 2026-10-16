@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { business, legalUpdated } from "@/lib/business";
 
 import { LegalFooter } from "./LegalFooter";
+import { SiteHeader } from "./SiteHeader";
 
 export function LegalDocument({
   title,
@@ -12,8 +13,9 @@ export function LegalDocument({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <article className="mx-auto max-w-3xl px-6 py-12">
+    <div className="min-h-screen bg-white text-gray-900 flex flex-col">
+      <SiteHeader />
+      <article className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-gray-800">
           Last updated {legalUpdated}. {business.legalName}, {business.address}. Contact{" "}
