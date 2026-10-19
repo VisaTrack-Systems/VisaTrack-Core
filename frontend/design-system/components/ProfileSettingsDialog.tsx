@@ -12,25 +12,29 @@ import { Alert, Button, FieldHint, Input, Label, Textarea } from './ui';
 /** Lets the footer's Save button submit the profile form from outside it. */
 const PROFILE_FORM_ID = 'profile-settings-form';
 
-type ProfileSettingsDialogProps = {
-  isOpen: boolean;
+type ProfileSettingsFormProps = {
+  /** id of the <form>, so a Save button outside it can submit it with the `form` attribute. */
+  formId: string;
   settings: CurrentUserSettings | null;
   loading: boolean;
   submitting: boolean;
   errorMessage: string | null;
-  onClose: () => void;
   onSubmit: (payload: UpdateCurrentUserSettingsInput) => Promise<void>;
 };
 
-export function ProfileSettingsDialog({
-  isOpen,
+/**
+ * The profile fields plus the MFA and data-deletion panels. Used by the dialog and by the
+ * lawyer Settings → Profile tab. Give it a `key` that changes when settings load so the
+ * fields start from the loaded values.
+ */
+export function ProfileSettingsForm({
+  formId,
   settings,
   loading,
   submitting,
   errorMessage,
-  onClose,
   onSubmit,
-}: ProfileSettingsDialogProps) {
+}: ProfileSettingsFormProps) {
   const [firstName, setFirstName] = useState(settings?.first_name ?? '');
   const [lastName, setLastName] = useState(settings?.last_name ?? '');
   const [email, setEmail] = useState(settings?.email ?? '');
@@ -73,6 +77,124 @@ export function ProfileSettingsDialog({
     });
   };
 
+  const fieldsDisabled = loading || submitting;
+
+  return (
+    <>
+      <form id={formId} onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
+        {validationError ? <Alert tone="warning">{validationError}</Alert> : null}
+
+        {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
+
+        {loading ? <Alert>Loading profile settings...</Alert> : null}
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formId}-first-name`}>First Name</Label>
+            <Input
+              id={`${formId}-first-name`}
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+              disabled={fieldsDisabled}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor={`${formId}-last-name`}>Last Name</Label>
+            <Input
+              id={`${formId}-last-name`}
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              disabled={fieldsDisabled}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formId}-email`}>Email</Label>
+            <Input
+              id={`${formId}-email`}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={fieldsDisabled}
+              required
+            />
+            <FieldHint>Email verified: {settings?.email_verified ? 'Yes' : 'No'}</FieldHint>
+          </div>
+          <div>
+            <Label htmlFor={`${formId}-phone`}>Phone (optional)</Label>
+            <Input
+              id={`${formId}-phone`}
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              disabled={fieldsDisabled}
+              placeholder="+1 555 123 4567"
+            />
+            <FieldHint>
+              Used only if your firm needs to call you about a case. Leave it blank to keep email as the only contact.
+              Phone verified: {settings?.phone_verified ? 'Yes' : 'No'}
+            </FieldHint>
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formId}-timezone`}>Timezone</Label>
+            <Input
+              id={`${formId}-timezone`}
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+              disabled={fieldsDisabled}
+              placeholder="America/Toronto"
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor={`${formId}-locale`}>Locale</Label>
+            <Input
+              id={`${formId}-locale`}
+              value={locale}
+              onChange={(event) => setLocale(event.target.value)}
+              disabled={fieldsDisabled}
+              placeholder="en-CA"
+              required
+            />
+          </div>
+        </div>
+      </form>
+
+      {settings ? (
+        <div className="space-y-4 border-t border-gray-200 px-5 py-4">
+          <MfaSettings initiallyEnabled={settings.mfa_enabled} />
+          <DataDeletionPanel />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+type ProfileSettingsDialogProps = {
+  isOpen: boolean;
+  settings: CurrentUserSettings | null;
+  loading: boolean;
+  submitting: boolean;
+  errorMessage: string | null;
+  onClose: () => void;
+  onSubmit: (payload: UpdateCurrentUserSettingsInput) => Promise<void>;
+};
+
+export function ProfileSettingsDialog({
+  isOpen,
+  settings,
+  loading,
+  submitting,
+  errorMessage,
+  onClose,
+  onSubmit,
+}: ProfileSettingsDialogProps) {
   if (!isOpen) {
     return null;
   }
@@ -105,97 +227,14 @@ export function ProfileSettingsDialog({
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 min-h-0">
-          <form id={PROFILE_FORM_ID} onSubmit={handleSubmit} className="space-y-5 px-5 py-4">
-            {validationError ? <Alert tone="warning">{validationError}</Alert> : null}
-
-            {errorMessage ? <Alert tone="danger">{errorMessage}</Alert> : null}
-
-            {loading ? <Alert>Loading profile settings...</Alert> : null}
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="profile-first-name">First Name</Label>
-                <Input
-                  id="profile-first-name"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  disabled={fieldsDisabled}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="profile-last-name">Last Name</Label>
-                <Input
-                  id="profile-last-name"
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  disabled={fieldsDisabled}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="profile-email">Email</Label>
-                <Input
-                  id="profile-email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  disabled={fieldsDisabled}
-                  required
-                />
-                <FieldHint>Email verified: {settings?.email_verified ? 'Yes' : 'No'}</FieldHint>
-              </div>
-              <div>
-                <Label htmlFor="profile-phone">Phone (optional)</Label>
-                <Input
-                  id="profile-phone"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  disabled={fieldsDisabled}
-                  placeholder="+1 555 123 4567"
-                />
-                <FieldHint>
-                  Used only if your firm needs to call you about a case. Leave it blank to keep email as the only contact.
-                  Phone verified: {settings?.phone_verified ? 'Yes' : 'No'}
-                </FieldHint>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="profile-timezone">Timezone</Label>
-                <Input
-                  id="profile-timezone"
-                  value={timezone}
-                  onChange={(event) => setTimezone(event.target.value)}
-                  disabled={fieldsDisabled}
-                  placeholder="America/Toronto"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="profile-locale">Locale</Label>
-                <Input
-                  id="profile-locale"
-                  value={locale}
-                  onChange={(event) => setLocale(event.target.value)}
-                  disabled={fieldsDisabled}
-                  placeholder="en-CA"
-                  required
-                />
-              </div>
-            </div>
-          </form>
-
-          {settings ? (
-            <div className="space-y-4 border-t border-gray-200 px-5 py-4">
-              <MfaSettings initiallyEnabled={settings.mfa_enabled} />
-              <DataDeletionPanel />
-            </div>
-          ) : null}
+          <ProfileSettingsForm
+            formId={PROFILE_FORM_ID}
+            settings={settings}
+            loading={loading}
+            submitting={submitting}
+            errorMessage={errorMessage}
+            onSubmit={onSubmit}
+          />
         </div>
 
         {/* Footer: stays pinned at the bottom. Save submits the profile form via the `form` attribute. */}
@@ -214,6 +253,7 @@ export function ProfileSettingsDialog({
     </div>
   );
 }
+
 
 function DataDeletionPanel() {
   const [details, setDetails] = useState('');
