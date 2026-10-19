@@ -69,6 +69,8 @@ export const CaseDetails: Story = {
       workspace={mockCaseWorkspace}
       saving={false}
       onSave={async () => true}
+      savingClientNotes={false}
+      onSaveClientNotes={async () => true}
       onNotify={() => {}}
     />
   ),

@@ -21,8 +21,12 @@ type CaseDetailsSectionProps = {
   workspace: CaseWorkspace;
   saving: boolean;
   onSave: (updates: CaseDetailsUpdate) => Promise<boolean>;
+  savingClientNotes: boolean;
+  onSaveClientNotes: (clientNotes: string | null) => Promise<boolean>;
   onNotify: (message: string) => void;
 };
+
+const MAX_CLIENT_NOTES_LENGTH = 5000;
 
 type CaseDetailsDraft = {
   case_type: string;
@@ -48,8 +52,32 @@ function toDraft(workspace: CaseWorkspace): CaseDetailsDraft {
   };
 }
 
-export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: CaseDetailsSectionProps) {
+export function CaseDetailsSection({
+  workspace,
+  saving,
+  onSave,
+  savingClientNotes,
+  onSaveClientNotes,
+  onNotify,
+}: CaseDetailsSectionProps) {
   const [draft, setDraft] = useState<CaseDetailsDraft>(() => toDraft(workspace));
+  const [clientNotesDraft, setClientNotesDraft] = useState(() => workspace.case.client_notes ?? '');
+
+  const handleResetClientNotes = () => {
+    if (savingClientNotes) {
+      return;
+    }
+    setClientNotesDraft(workspace.case.client_notes ?? '');
+    onNotify('Notes for the client reset to current saved value.');
+  };
+
+  const handleSaveClientNotes = async () => {
+    const clientNotes = clientNotesDraft.trim() || null;
+    const success = await onSaveClientNotes(clientNotes);
+    if (success) {
+      setClientNotesDraft(clientNotes ?? '');
+    }
+  };
 
   const handleReset = () => {
     if (saving) {
@@ -210,6 +238,52 @@ export function CaseDetailsSection({ workspace, saving, onSave, onNotify }: Case
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-md shadow-card p-6">
+        <div className="mb-4">
+          <h3 className="font-semibold text-gray-900">Notes for Client</h3>
+          <p className="mt-1 text-sm text-gray-600">
+            A case summary, important information, or what you need from the client next. Shown on
+            the client&apos;s dashboard. Clients can&apos;t reply. Separate from internal notes and reminders.
+          </p>
+        </div>
+
+        <label htmlFor="client-notes" className="block text-sm font-medium text-gray-700 mb-2">
+          Notes
+          <span className="text-gray-500 font-normal ml-1">(Visible to Client)</span>
+        </label>
+        <textarea
+          id="client-notes"
+          rows={5}
+          maxLength={MAX_CLIENT_NOTES_LENGTH}
+          value={clientNotesDraft}
+          className={fieldClasses}
+          onChange={(event) => setClientNotesDraft(event.target.value)}
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          {clientNotesDraft.length}/{MAX_CLIENT_NOTES_LENGTH}
+        </p>
+
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            className={buttonClasses('secondary')}
+            onClick={handleResetClientNotes}
+            disabled={savingClientNotes}
+          >
+            Reset
+          </button>
+          <button
+            className={buttonClasses('primary')}
+            onClick={() => {
+              void handleSaveClientNotes();
+            }}
+            disabled={savingClientNotes}
+          >
+            <Save className="w-4 h-4" />
+            {savingClientNotes ? 'Saving...' : 'Save Notes'}
           </button>
         </div>
       </div>

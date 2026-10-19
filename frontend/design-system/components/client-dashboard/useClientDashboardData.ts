@@ -45,6 +45,7 @@ type ClientDashboardData = {
   recentReminders: DashboardReminder[];
   upcomingAppointments: DashboardAppointment[];
   billingInfo: BillingInfo;
+  clientNotes: string | null;
   requiredDocuments: number;
   completedRequiredDocuments: number;
   capabilities: ClientPortalCapabilities;
@@ -575,6 +576,13 @@ export function useClientDashboardData(): ClientDashboardData {
     };
   }, [workspace, capabilities.canViewBilling]);
 
+  const clientNotes = useMemo<string | null>(() => {
+    if (!workspace || capabilities.portalAccess === 'disabled') {
+      return null;
+    }
+    return workspace.case.client_notes?.trim() || null;
+  }, [workspace, capabilities.portalAccess]);
+
   const requiredDocuments = useMemo(
     () => documents.filter((document) => document.required).length,
     [documents]
@@ -599,6 +607,7 @@ export function useClientDashboardData(): ClientDashboardData {
     recentReminders,
     upcomingAppointments,
     billingInfo,
+    clientNotes,
     requiredDocuments,
     completedRequiredDocuments,
     capabilities,

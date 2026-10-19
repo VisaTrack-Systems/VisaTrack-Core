@@ -142,7 +142,7 @@ export function PermissionsSection({
               className={fieldClasses}
             >
               <option value="full_access">Full Access - Client can view all enabled sections (status, milestones, and checklist)</option>
-              <option value="limited_access">Limited Access - Client sees core updates only (checklist and reminders)</option>
+              <option value="limited_access">Limited Access - Client sees core updates only (checklist, reminders, and notes)</option>
               <option value="read_only">Read Only - Client can view enabled information but cannot upload or respond</option>
               <option value="disabled">Disabled - Client portal access suspended</option>
             </select>

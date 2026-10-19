@@ -6,6 +6,7 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { AppointmentsPanel } from './AppointmentsPanel';
 import { BillingSummaryPanel } from './BillingSummaryPanel';
 import { CaseSummaryCard } from './CaseSummaryCard';
+import { ClientNotesPanel } from './ClientNotesPanel';
 import { DocumentChecklistPanel } from './DocumentChecklistPanel';
 import { DocumentUploadDialog } from './DocumentUploadDialog';
 import { RemindersPanel } from './RemindersPanel';
@@ -140,6 +141,12 @@ export const Reminders: Story = {
 
 export const Appointments: Story = {
   render: () => <AppointmentsPanel upcomingAppointments={mockDashboardAppointments} />,
+};
+
+export const ClientNotes: Story = {
+  render: () => (
+    <ClientNotesPanel notes={'Your file is in good shape.\nNext, please upload your police certificate by Friday.'} />
+  ),
 };
 
 export const BillingSummary: Story = {

@@ -183,6 +183,7 @@ export const mockCaseWorkspace: CaseWorkspace = {
     progress_percent: 68,
     description: 'Express Entry permanent residence application for a software engineer.',
     internal_notes: 'Waiting on employment reference and police certificate.',
+    client_notes: 'Your file is in good shape. Next, please upload your police certificate by Friday.',
   },
   document_suites: [
     {
@@ -407,6 +408,7 @@ export const mockCaseWorkspaceSecondary: CaseWorkspace = {
     progress_percent: 24,
     description: 'Work permit extension matter for an in-Canada applicant.',
     internal_notes: 'Waiting on updated employer support letter.',
+    client_notes: null,
   },
   portal_permissions: {
     ...mockPortalPermissions,

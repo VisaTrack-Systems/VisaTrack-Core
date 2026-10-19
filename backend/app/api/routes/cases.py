@@ -22,6 +22,8 @@ from app.models.milestone import Milestone
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.case import (
+    CaseClientNotesResponse,
+    CaseClientNotesUpdateRequest,
     CaseCreateRequest,
     CaseCustomDocumentCreateRequest,
     CaseDocumentRenameRequest,
@@ -74,6 +76,7 @@ from app.services.storage import (
 router = APIRouter(prefix="/cases", tags=["cases"])
 
 MAX_ARCHIVE_DOCUMENTS = 100
+MAX_CLIENT_NOTES_LENGTH = 5000
 ARCHIVE_MEMORY_THRESHOLD_BYTES = 16 * 1024 * 1024
 
 DEFAULT_PORTAL_PERMISSIONS = {
@@ -1039,6 +1042,51 @@ def update_case_details_by_number(
     )
 
 
+@router.put("/by-number/{case_number}/client-notes", response_model=CaseClientNotesResponse)
+def update_case_client_notes(
+    case_number: str,
+    payload: CaseClientNotesUpdateRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseClientNotesResponse:
+    """Save the lawyer's one-way notes for the client. Clients can read them but never write."""
+    case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
+
+    normalized_client_notes = (payload.client_notes or "").strip() or None
+    if normalized_client_notes and len(normalized_client_notes) > MAX_CLIENT_NOTES_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"client_notes must be {MAX_CLIENT_NOTES_LENGTH} characters or fewer",
+        )
+
+    old_values = {"client_notes": case.client_notes}
+    case.client_notes = normalized_client_notes
+    case.updated_at = datetime.now(timezone.utc)
+
+    log_activity(
+        db,
+        organization_id=case.organization_id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="case",
+        entity_id=case.id,
+        case_id=case.id,
+        client_id=case.client_id,
+        old_values=old_values,
+        new_values={"client_notes": case.client_notes},
+    )
+
+    db.add(case)
+    db.commit()
+    db.refresh(case)
+
+    return CaseClientNotesResponse(
+        case_number=case.case_number,
+        client_notes=case.client_notes,
+        updated_at=case.updated_at,
+    )
+
+
 @router.post(
     "/by-number/{case_number}/milestones",
     response_model=CaseWorkspaceMilestone,
@@ -1605,6 +1653,7 @@ def get_case_workspace_by_number(
                 c.completion_confidence,
                 c.description,
                 c.internal_notes,
+                c.client_notes,
                 c.custom_fields,
                 CONCAT(cu.first_name, ' ', cu.last_name) AS client_name,
                 CASE
@@ -2169,6 +2218,7 @@ def get_case_workspace_by_number(
         progress_percent=progress_percent,
         description=case_row["description"],
         internal_notes=case_row["internal_notes"],
+        client_notes=case_row.get("client_notes"),
     )
 
     billing_summary = CaseWorkspaceBillingSummary(
@@ -2184,6 +2234,9 @@ def get_case_workspace_by_number(
     if is_client_portal_view:
         workspace_case.internal_notes = None
         assignments = []
+
+        if portal_access == "disabled":
+            workspace_case.client_notes = None
 
         if not client_can_view_case_status:
             workspace_case.status = "restricted"
