@@ -22,17 +22,28 @@ import {
   Underline,
   type LucideIcon,
 } from 'lucide-react';
-import { type ClipboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ClipboardEvent,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 
 // ── Variables ────────────────────────────────────────────────────────────────
 
 /** What each {placeholder} becomes when an email is sent. Names match backend/app/services/email.py. */
 export const TEMPLATE_VARIABLE_DESCRIPTIONS: Record<string, string> = {
   '{client_name}': 'Full name of the client',
+  '{client_given_name}': "Client's first name",
   '{recipient_name}': 'Full name of the person receiving the email',
-  '{case_number}': 'Unique case reference ID',
+  '{case_number}': 'Unique case reference ID (keep it out of subject lines)',
+  '{redacted_case_number}': 'Case number with all but the last 4 characters hidden, safe for subject lines',
   '{case_status}': 'Current status stage of the case',
-  '{lawyer_name}': "Assigned lawyer's name",
+  '{lawyer_name}': "Assigned lawyer's name (in invitations, the person who sent it)",
   '{lawyer_phone_number}': "Assigned lawyer's phone number",
   '{document_name}': 'Requested document name(s)',
   '{organization_name}': 'Firm or business name',
@@ -42,6 +53,7 @@ export const TEMPLATE_VARIABLE_DESCRIPTIONS: Record<string, string> = {
   '{expiration_time_hours}': 'Hours until the invitation link expires',
   '{organization_main_email}': "Firm's main contact email",
   '{organization_support_email}': "Firm's support email (the main contact email if none is set)",
+  '{license_number}': "Firm's RCIC / Law Society license number",
   '{portal_url}': 'Link to the VisaTrack sign-in page',
   '{reminder_title}': 'Title of the reminder',
   '{reminder_body}': 'Message of the reminder',
@@ -197,16 +209,20 @@ const FONT_SIZES = [
   { label: 'Huge', value: '6' },
 ];
 
+/** Lets the parent insert text (e.g. a variable from its menu) at the editor's cursor. */
+export type RichTextEditorHandle = { insertText: (text: string) => void };
+
 type RichTextEditorProps = {
   /** Read once when the editor mounts. Give the editor a new `key` to load different content. */
   initialHtml: string;
   onChange: (html: string) => void;
-  variables: string[];
+  onFocus?: () => void;
   label: string;
   disabled?: boolean;
+  ref?: Ref<RichTextEditorHandle>;
 };
 
-export function RichTextEditor({ initialHtml, onChange, variables, label, disabled = false }: RichTextEditorProps) {
+export function RichTextEditor({ initialHtml, onChange, onFocus, label, disabled = false, ref }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const savedRange = useRef<Range | null>(null);
@@ -273,6 +289,8 @@ export function RichTextEditor({ initialHtml, onChange, variables, label, disabl
     savedRange.current = range;
     emitChange();
   };
+
+  useImperativeHandle(ref, () => ({ insertText }));
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
     // Paste as plain text: formatting copied from Word or web pages is long and rarely email-safe.
@@ -362,11 +380,6 @@ export function RichTextEditor({ initialHtml, onChange, variables, label, disabl
         <ToolbarButton icon={ListOrdered} label="Numbered list" disabled={disabled} onClick={() => runCommand('insertOrderedList')} />
         <ToolbarDivider />
         <ToolbarButton icon={Link} label="Insert link" disabled={disabled} onClick={handleLink} />
-
-        <div className="ml-auto flex items-center gap-1">
-          <VariableReference variables={variables} />
-          <InsertVariableMenu variables={variables} disabled={disabled} onInsert={insertText} />
-        </div>
       </div>
       {linkError ? <p role="alert" className="px-3 pt-2 text-xs text-red-600">{linkError}</p> : null}
 
@@ -378,6 +391,7 @@ export function RichTextEditor({ initialHtml, onChange, variables, label, disabl
         contentEditable={!disabled}
         tabIndex={0}
         onInput={emitChange}
+        onFocus={onFocus}
         onKeyUp={saveSelection}
         onMouseUp={saveSelection}
         onBlur={saveSelection}
@@ -420,7 +434,7 @@ function ToolbarButton({
   );
 }
 
-function InsertVariableMenu({
+export function InsertVariableMenu({
   variables,
   disabled,
   onInsert,

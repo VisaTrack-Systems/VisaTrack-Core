@@ -56,6 +56,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.services.audit import log_activity
 from app.services.email import (
+    DEFAULT_INVITATION_SUBJECT,
     DEFAULT_INVITATION_TEMPLATE,
     DEFAULT_NOTIFICATION_TEMPLATES,
     INVITATION_VARIABLES,
@@ -69,6 +70,7 @@ from app.services.email_notifications import (
     extract_template_text,
     org_notification_settings,
     org_template_body,
+    org_license_number,
     org_support_email,
     org_template_subject,
     unknown_notification_keys,
@@ -768,6 +770,7 @@ def send_invitation_email_endpoint(
             organization_main_email=org.contact_email if org is not None else "",
             organization_support_email=org_support_email(org.settings) if org is not None else "",
             organization_phone_number=(getattr(org, "contact_phone", None) or "") if org is not None else "",
+            license_number=org_license_number(org.settings) if org is not None else "",
         )
     except EmailNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail="Invitation email is unavailable") from exc
@@ -794,7 +797,7 @@ def get_invitation_template(
     styles = InvitationStyles(
         button_color=styles_data.get("button_color", "#dc2626"),
         button_label=styles_data.get("button_label", "Activate my account"),
-        subject=styles_data.get("subject", "You have been invited to join {organization_name}"),
+        subject=styles_data.get("subject", DEFAULT_INVITATION_SUBJECT),
         bold_org_name=styles_data.get("bold_org_name", True),
     )
     return InvitationTemplateResponse(
@@ -881,6 +884,7 @@ def _general_settings_response(org: Organization) -> OrganizationGeneralSettings
     return OrganizationGeneralSettingsResponse(
         contact_email=org.contact_email,
         support_email=org_support_email(org.settings),
+        license_number=org_license_number(org.settings),
         timezone=(org.settings or {}).get("timezone") or DEFAULT_ORGANIZATION_TIMEZONE,
         available_timezones=list(ORGANIZATION_TIMEZONES),
     )
@@ -891,7 +895,7 @@ def get_general_settings(
     auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> OrganizationGeneralSettingsResponse:
-    """The organization's main contact email, support email and timezone."""
+    """The organization's main contact email, support email, license number and timezone."""
     return _general_settings_response(_get_admin_org(auth, db))
 
 
@@ -901,9 +905,10 @@ def save_general_settings(
     auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
     db: Session = Depends(get_db),
 ) -> OrganizationGeneralSettingsResponse:
-    """Update the organization's main contact email, support email and timezone."""
+    """Update the organization's main contact email, support email, license number and timezone."""
     contact_email = _normalize_email(payload.contact_email)
     support_email = _normalize_email(payload.support_email) if payload.support_email.strip() else ""
+    license_number = payload.license_number.strip()
     if payload.timezone not in ORGANIZATION_TIMEZONES:
         raise HTTPException(status_code=400, detail="Unsupported timezone")
     org = _get_admin_org(auth, db)
@@ -911,16 +916,18 @@ def save_general_settings(
     old_values = {
         "contact_email": org.contact_email,
         "support_email": org_support_email(org.settings),
+        "license_number": org_license_number(org.settings),
         "timezone": (org.settings or {}).get("timezone") or DEFAULT_ORGANIZATION_TIMEZONE,
     }
     org.contact_email = contact_email
-    # The timezone and support email live in the settings JSON so no migration is needed.
+    # The timezone, support email and license number live in the settings JSON so no migration is needed.
     new_settings = dict(org.settings or {})
     new_settings["timezone"] = payload.timezone
-    if support_email:
-        new_settings["support_email"] = support_email
-    else:
-        new_settings.pop("support_email", None)
+    for key, value in (("support_email", support_email), ("license_number", license_number)):
+        if value:
+            new_settings[key] = value
+        else:
+            new_settings.pop(key, None)
     org.settings = new_settings
     flag_modified(org, "settings")
     db.add(org)
@@ -932,7 +939,12 @@ def save_general_settings(
         entity_type="organization_settings",
         entity_id=org.id,
         old_values=old_values,
-        new_values={"contact_email": contact_email, "support_email": support_email, "timezone": payload.timezone},
+        new_values={
+            "contact_email": contact_email,
+            "support_email": support_email,
+            "license_number": license_number,
+            "timezone": payload.timezone,
+        },
     )
     db.commit()
     return _general_settings_response(org)

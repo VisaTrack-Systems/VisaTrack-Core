@@ -109,6 +109,12 @@ def org_support_email(org_settings: Any) -> str:
     return value if isinstance(value, str) else ""
 
 
+def org_license_number(org_settings: Any) -> str:
+    """The firm's RCIC / Law Society license number for {license_number}, or "" if none is set."""
+    value = _as_dict(org_settings).get("license_number")
+    return value if isinstance(value, str) else ""
+
+
 def lawyer_communication_settings(custom_fields: Any) -> dict[str, Any]:
     """Return {"enabled_templates": {key: bool}, "banner": dict | None} with defaults filled in."""
     stored = _as_dict(_as_dict(custom_fields).get("communication"))
@@ -225,6 +231,17 @@ def case_status_label(status: str) -> str:
     return status.replace("_", " ").title()
 
 
+def mask_case_number(case_number: str) -> str:
+    """Hide all but the last 4 characters, e.g. "C-2026-00123" -> "***0123".
+
+    Used for {redacted_case_number} so a case can be referenced in a subject line,
+    which mail servers and lock screens show without signing in.
+    """
+    if len(case_number) <= 4:
+        return "*" * len(case_number)
+    return "***" + case_number[-4:]
+
+
 def document_list_text(document_names: list[str]) -> str:
     """The {document_name} value: the name itself, or one "- name" line per document."""
     if len(document_names) == 1:
@@ -285,14 +302,17 @@ def notify_case_client(
         client_name = f"{client.first_name} {client.last_name}".strip()
         all_values = {
             "client_name": client_name,
+            "client_given_name": (client.first_name or "").strip() or client_name,
             "organization_name": org.name if org is not None else "VisaTrack",
             "case_number": case.case_number,
+            "redacted_case_number": mask_case_number(case.case_number or ""),
             "case_status": case_status_label(case.status or ""),
             "lawyer_name": lawyer_name or "Your legal team",
             "lawyer_phone_number": (getattr(lawyer, "phone", None) or "") if lawyer is not None else "",
             "organization_phone_number": (getattr(org, "contact_phone", None) or "") if org is not None else "",
             "organization_main_email": main_email,
             "organization_support_email": org_support_email(org_settings) or main_email,
+            "license_number": org_license_number(org_settings),
             "portal_url": portal_url(),
             "document_name": "",
             **values,
@@ -300,6 +320,7 @@ def notify_case_client(
         # Names used by templates saved before {client_name} and {case_status} existed.
         all_values["recipient_name"] = all_values["client_name"]
         all_values["status"] = all_values["case_status"]
+        all_values["case_number_masked"] = all_values["redacted_case_number"]
 
         banner_bytes = None
         banner = lawyer_config["banner"]

@@ -394,6 +394,7 @@ def test_send_invitation_email_requires_server_issued_invitation(
     assert fake_send.call_args.kwargs['organization_name'] == 'Acme Law'
     assert fake_send.call_args.kwargs['organization_main_email'] == 'hello@acme.law'
     assert fake_send.call_args.kwargs['organization_support_email'] == ''
+    assert fake_send.call_args.kwargs['license_number'] == ''
 
 
 def test_send_invitation_email_is_blocked_when_admin_turned_it_off(monkeypatch, make_auth_context, make_user):
@@ -479,7 +480,10 @@ def test_save_general_settings_updates_contact_email_and_timezone(monkeypatch, m
 
     result = admin.save_general_settings(
         payload=OrganizationGeneralSettingsRequest(
-            contact_email=' Hello@Firm.com ', support_email=' Help@Firm.com ', timezone='America/Vancouver'
+            contact_email=' Hello@Firm.com ',
+            support_email=' Help@Firm.com ',
+            license_number=' R123456 ',
+            timezone='America/Vancouver',
         ),
         auth=auth,
         db=db,
@@ -490,9 +494,11 @@ def test_save_general_settings_updates_contact_email_and_timezone(monkeypatch, m
         'email_templates': {},
         'timezone': 'America/Vancouver',
         'support_email': 'help@firm.com',
+        'license_number': 'R123456',
     }
     assert result.timezone == 'America/Vancouver'
     assert result.support_email == 'help@firm.com'
+    assert result.license_number == 'R123456'
     assert 'America/Toronto' in result.available_timezones
     db.commit.assert_called_once()
 
@@ -503,7 +509,9 @@ def test_save_general_settings_updates_contact_email_and_timezone(monkeypatch, m
         db=db,
     )
     assert 'support_email' not in organization.settings
+    assert 'license_number' not in organization.settings
     assert result.support_email == ''
+    assert result.license_number == ''
 
 
 def test_save_general_settings_rejects_invalid_support_email(make_auth_context):
@@ -619,12 +627,14 @@ def test_list_notification_templates_returns_defaults_and_custom_bodies(make_aut
 
     by_key = {item.key: item for item in result.templates}
     assert result.banner_position == 'bottom'
-    assert by_key['case_status_update'].body == "Your case status has been updated to '{case_status}'."
+    assert by_key['case_status_update'].body == by_key['case_status_update'].default_body
+    assert 'Hi {client_name},' in by_key['case_status_update'].body
     assert by_key['case_status_update'].is_custom is False
     assert by_key['reminder'].body == 'Custom reminder'
     assert by_key['reminder'].is_custom is True
     assert by_key['document_request'].enabled is False
-    assert by_key['reminder'].subject == by_key['reminder'].default_subject == 'Reminder: {reminder_title}'
+    assert by_key['reminder'].subject == by_key['reminder'].default_subject
+    assert '{redacted_case_number}' in by_key['reminder'].subject
     assert result.invitation_enabled is True
     assert '{invitation_url}' in result.invitation_variables
 
@@ -672,7 +682,9 @@ def test_save_notification_template_sanitizes_html_and_stores_subject(monkeypatc
     # Saving the default subject removes the custom one.
     admin.save_notification_template(
         template_key='reminder',
-        payload=NotificationTemplateRequest(body='<p>Hi</p>', subject='Reminder: {reminder_title}'),
+        payload=NotificationTemplateRequest(
+            body='<p>Hi</p>', subject='Reminder regarding your matter (Ref: {redacted_case_number})'
+        ),
         auth=auth,
         db=db,
     )

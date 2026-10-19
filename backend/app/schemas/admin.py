@@ -223,6 +223,8 @@ class OrganizationGeneralSettingsResponse(BaseModel):
     contact_email: str
     # Where clients go for help ({organization_support_email}); "" means use the main contact email.
     support_email: str = ""
+    # RCIC / Law Society license number ({license_number}); "" if not set.
+    license_number: str = ""
     timezone: str
     # The timezones an admin can pick from, so the frontend list matches what the server accepts.
     available_timezones: list[str]
@@ -232,6 +234,7 @@ class OrganizationGeneralSettingsRequest(BaseModel):
     contact_email: str = Field(min_length=3, max_length=255)
     # Optional; leave empty to use the main contact email.
     support_email: str = Field(default="", max_length=255)
+    license_number: str = Field(default="", max_length=100)
     timezone: str = Field(min_length=1, max_length=50)
 
 
