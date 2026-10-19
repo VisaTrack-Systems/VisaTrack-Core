@@ -142,12 +142,12 @@ export interface paths {
         };
         /**
          * Get General Settings
-         * @description The organization's main contact email, support email and timezone.
+         * @description The organization's main contact email, support email, license number and timezone.
          */
         get: operations["get_general_settings_api_v1_admin_general_settings_get"];
         /**
          * Save General Settings
-         * @description Update the organization's main contact email, support email and timezone.
+         * @description Update the organization's main contact email, support email, license number and timezone.
          */
         put: operations["save_general_settings_api_v1_admin_general_settings_put"];
         post?: never;
@@ -3407,6 +3407,11 @@ export interface components {
             /** Contact Email */
             contact_email: string;
             /**
+             * License Number
+             * @default
+             */
+            license_number: string;
+            /**
              * Support Email
              * @default
              */
@@ -3420,6 +3425,11 @@ export interface components {
             available_timezones: string[];
             /** Contact Email */
             contact_email: string;
+            /**
+             * License Number
+             * @default
+             */
+            license_number: string;
             /**
              * Support Email
              * @default

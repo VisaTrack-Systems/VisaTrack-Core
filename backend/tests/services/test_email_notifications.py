@@ -7,12 +7,14 @@ from uuid import uuid4
 import pytest
 
 from app.services import email_notifications
+from app.services.email import DEFAULT_NOTIFICATION_TEMPLATES
 from app.services.email_notifications import (
     UploadValidationError,
     decode_upload,
     extract_template_text,
     is_notification_enabled,
     lawyer_communication_settings,
+    mask_case_number,
     notify_case_client,
     org_notification_settings,
     validate_banner_image,
@@ -210,7 +212,10 @@ def test_notify_sends_with_custom_body_and_merged_values(fake_send):
     assert values["portal_url"].endswith("/")
     # No support email set and no contact email on the row: both fall back to "".
     assert values["organization_support_email"] == values["organization_main_email"] == ""
-    assert kwargs["subject_template"] == "Case {case_number}: status updated"
+    assert kwargs["subject_template"] == DEFAULT_NOTIFICATION_TEMPLATES["case_status_update"]["subject"]
+    assert values["client_given_name"] == "Casey"
+    assert values["redacted_case_number"] == values["case_number_masked"] == "***-001"
+    assert values["license_number"] == ""
 
 
 def test_notify_uses_custom_subject_and_phone_numbers(fake_send):
@@ -254,7 +259,7 @@ def test_notify_uses_default_body_and_attaches_banner(fake_send, monkeypatch):
     notify_case_client(db, case=case, template_key="case_status_update", values={})
 
     kwargs = fake_send.call_args.kwargs
-    assert kwargs["body_template"] == "Your case status has been updated to '{case_status}'."
+    assert kwargs["body_template"] == DEFAULT_NOTIFICATION_TEMPLATES["case_status_update"]["body"]
     assert kwargs["use_default_layout"] is True
     assert kwargs["banner_bytes"] == PNG_BYTES
     assert kwargs["banner_content_type"] == "image/png"
@@ -352,6 +357,28 @@ def test_custom_notification_template_replaces_the_default_layout(monkeypatch):
     assert "Unsubscribe" in params["html"]
 
 
+@pytest.mark.parametrize(
+    ("case_number", "masked"),
+    [("C-2026-00123", "***0123"), ("C-2026-001", "***-001"), ("1234", "****"), ("", "")],
+)
+def test_mask_case_number_shows_only_the_last_four_characters(case_number, masked):
+    assert mask_case_number(case_number) == masked
+
+
+def test_default_case_subjects_never_show_the_full_case_number():
+    for template in DEFAULT_NOTIFICATION_TEMPLATES.values():
+        assert "{case_number}" not in template["subject"]
+        assert "{redacted_case_number}" in template["subject"]
+
+
+def test_notify_fills_license_number_from_org_settings(fake_send):
+    db, case = _notification_db(org_settings={"license_number": "R123456"})
+
+    notify_case_client(db, case=case, template_key="reminder", values={"reminder_title": "Upload ID"})
+
+    assert fake_send.call_args.kwargs["values"]["license_number"] == "R123456"
+
+
 def test_fill_placeholders_is_single_pass():
     from app.services.email import fill_placeholders
 
@@ -375,6 +402,33 @@ def _send_invite(monkeypatch, body_template):
         organization_support_email="help@visatest.ca",
     )
     return sent.call_args.args[0]
+
+
+def test_default_invitation_uses_default_text_with_link_as_button(monkeypatch):
+    from app.services import email
+
+    sent = MagicMock()
+    monkeypatch.setattr(email.settings, "resend_api_key", "test-key")
+    monkeypatch.setattr(email.resend.Emails, "send", sent)
+    email.send_invitation_email(
+        to_email="new@example.com",
+        recipient_name="Riley New",
+        invitation_url="https://app.example/invite#token=abc",
+        organization_name="VisaTest",
+        inviter_name="Avery Lawyer",
+        organization_main_email="hello@visatest.ca",
+        license_number="R123456",
+    )
+    params = sent.call_args.args[0]
+
+    assert params["subject"] == "Invitation to join VisaTest on VisaTrack"
+    assert "You have been invited by Avery Lawyer to join VisaTest" in params["text"]
+    assert "https://app.example/invite#token=abc" in params["text"]
+    assert "RCIC / Law Society License #: R123456" in params["text"]
+    # In the HTML the link line is the button, not the raw URL text.
+    assert "Activate my account</a>" in params["html"]
+    assert "[[invitation-button]]" not in params["html"]
+    assert "License #: R123456" in params["html"]
 
 
 def test_custom_invitation_template_replaces_the_default_layout(monkeypatch):

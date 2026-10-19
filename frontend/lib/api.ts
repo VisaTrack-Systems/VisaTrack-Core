@@ -1382,6 +1382,8 @@ export type OrganizationGeneralSettings = {
   contact_email: string;
   /** Support email, the {organization_support_email} variable. Empty means "use the main contact email". */
   support_email: string;
+  /** RCIC / Law Society license number, the {license_number} variable. Empty if not set. */
+  license_number: string;
   timezone: string;
   available_timezones: string[];
 };
@@ -1393,6 +1395,7 @@ export async function getGeneralSettings(): Promise<OrganizationGeneralSettings>
 export async function saveGeneralSettings(input: {
   contact_email: string;
   support_email: string;
+  license_number: string;
   timezone: string;
 }): Promise<OrganizationGeneralSettings> {
   return requestJson<OrganizationGeneralSettings>('/api/v1/admin/general-settings', {

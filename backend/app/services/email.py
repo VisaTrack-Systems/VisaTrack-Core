@@ -18,31 +18,58 @@ from app.services.email_compliance import (
 logger = logging.getLogger(__name__)
 
 # Placeholders an invitation template may use. {invitation_link} is an alias of {invitation_url},
-# and templates saved before the rename may still use {support_email} (same as {organization_main_email}).
+# {lawyer_name} is the same as {inviter_name}, and templates saved before the rename may still
+# use {support_email} (same as {organization_main_email}).
 INVITATION_VARIABLES = [
-    "{recipient_name}", "{organization_name}", "{organization_phone_number}",
-    "{organization_main_email}", "{organization_support_email}", "{invitation_url}",
-    "{inviter_name}", "{expiration_time_hours}", "{portal_url}",
+    "{recipient_name}", "{lawyer_name}", "{inviter_name}", "{organization_name}",
+    "{organization_phone_number}", "{organization_main_email}", "{organization_support_email}",
+    "{license_number}", "{invitation_url}", "{expiration_time_hours}", "{portal_url}",
 ]
+
+DEFAULT_INVITATION_SUBJECT = "Invitation to join {organization_name} on VisaTrack"
 
 # The default invitation email body.
 DEFAULT_INVITATION_TEMPLATE = (
     "Hi {recipient_name},\n\n"
-    "You have been invited to join {organization_name} on VisaTrack. "
-    "Click the link below to set your password and activate your account.\n\n"
+    "You have been invited by {lawyer_name} to join {organization_name} on VisaTrack, "
+    "a secure legal workflow platform.\n\n"
+    "To activate your account and set your password, please click the link below:\n"
     "{invitation_url}\n\n"
-    "This link expires in 72 hours. If you did not expect this invitation, "
-    "you can safely ignore this email.\n\n"
-    "— The {organization_name} Team"
+    "This link is secure and will expire in 72 hours. If you were not expecting this invitation, "
+    "please disregard this email or contact us immediately.\n\n"
+    "---\n\n"
+    "IMPORTANT CONFIDENTIALITY & LEGAL NOTICE:\n"
+    "This email and any attachments are intended solely for the confidential use of the intended "
+    "recipient. VisaTrack is a software platform provider and does not provide legal representation "
+    "or immigration advice. Legal services are provided directly by {organization_name}.\n\n"
+    "{organization_name}\n"
+    "Contact: {organization_main_email}\n"
+    "RCIC / Law Society License #: {license_number}\n\n"
+    "VisaTrack Technologies Inc. | support@visatrack.ca"
 )
 
-# Placeholders every case email may use. Older templates may still use {recipient_name}
-# (same as {client_name}) and {status} (same as {case_status}); both keep working.
+# Placeholders every case email may use. {redacted_case_number} hides most of the case number
+# so it is safe in a subject line ({case_number_masked} is an alias). Older templates may still
+# use {recipient_name} (same as {client_name}) and {status} (same as {case_status}).
 CASE_EMAIL_VARIABLES = [
-    "{client_name}", "{case_number}", "{case_status}", "{lawyer_name}", "{lawyer_phone_number}",
-    "{document_name}", "{organization_name}", "{organization_phone_number}",
-    "{organization_main_email}", "{organization_support_email}", "{portal_url}",
+    "{client_name}", "{client_given_name}", "{case_number}", "{redacted_case_number}",
+    "{case_status}", "{lawyer_name}", "{lawyer_phone_number}", "{document_name}",
+    "{organization_name}", "{organization_phone_number}", "{organization_main_email}",
+    "{organization_support_email}", "{license_number}", "{portal_url}",
 ]
+
+# The notice and firm contact block shared by the default case emails.
+_CASE_EMAIL_FOOTER = (
+    "---\n\n"
+    "CONFIDENTIALITY & PRIVACY NOTICE:\n"
+    "This email contains confidential information intended solely for the recipient. If you "
+    "received this email in error, please notify the sender immediately and delete it. VisaTrack "
+    "provides secure portal infrastructure for legal professionals and does not provide legal "
+    "advice or representation.\n\n"
+    "{organization_name}\n"
+    "Contact: {organization_phone_number} | {organization_main_email}\n\n"
+    "VisaTrack Technologies Inc. | visatrack.support@gmail.com"
+)
 
 # Notification emails sent to clients about their case. Each entry holds the
 # default body (used until an admin saves a custom one), the subject line, and
@@ -52,31 +79,54 @@ DEFAULT_NOTIFICATION_TEMPLATES: dict[str, dict] = {
     "case_status_update": {
         "label": "Case status update",
         "description": "Sent to clients when their case status changes.",
-        "subject": "Case {case_number}: status updated",
-        "body": "Your case status has been updated to '{case_status}'.",
+        "subject": "Update regarding your immigration matter - Case ref: {redacted_case_number}",
+        "body": (
+            "Hi {client_name},\n\n"
+            "An update has been posted to your file by {organization_name}.\n\n"
+            "For security and privacy reasons, full case details and official documents are not "
+            "included in this email. You can view the latest status and updates securely by logging "
+            "into your account:\n\n"
+            "{portal_url}\n\n"
+            "If you have questions about this update or need assistance accessing your account, "
+            "please reach out to your legal representative directly using the contact details below.\n\n"
+            + _CASE_EMAIL_FOOTER
+        ),
         "variables": CASE_EMAIL_VARIABLES,
     },
     "document_request": {
         "label": "Document request",
         "description": "Sent to clients when documents are requested on their case.",
-        "subject": "Case {case_number}: documents requested",
+        "subject": "Action required: Document request for your matter (Ref: {redacted_case_number})",
         "body": (
-            "Hi {client_name},\n\n"
-            "Please upload the following for case {case_number}:\n{document_name}\n\n"
-            "You can upload them securely from your client portal.\n\n"
-            "— {lawyer_name}, {organization_name}"
+            "Hi {client_given_name},\n\n"
+            "{organization_name} has requested supporting documentation for your immigration file "
+            "(Reference: {redacted_case_number}).\n\n"
+            "To protect the privacy and security of your personal information, please do not send "
+            "documents or personal records by email. Instead, please log in to your secure client "
+            "portal to view the requested items and upload them directly:\n\n"
+            "{portal_url}\n\n"
+            "If you have questions regarding the requested documents or need assistance with "
+            "uploading, please contact your legal representative directly using the information below.\n\n"
+            + _CASE_EMAIL_FOOTER
         ),
         "variables": CASE_EMAIL_VARIABLES,
     },
     "reminder": {
         "label": "Reminder",
         "description": "Sent to clients when a reminder with email notification is posted on their case.",
-        "subject": "Reminder: {reminder_title}",
+        "subject": "Reminder regarding your matter (Ref: {redacted_case_number})",
         "body": (
-            "Hi {client_name},\n\n"
+            "Hi {client_given_name},\n\n"
+            "This is a reminder from {organization_name} regarding your immigration file "
+            "(Reference: {redacted_case_number}).\n\n"
             "{reminder_title}\n\n"
-            "{reminder_body}\n\n"
-            "— {lawyer_name}, {organization_name}"
+            "To view the complete details of this reminder or take action, please log in to your "
+            "secure client portal:\n\n"
+            "{portal_url}\n\n"
+            "For your privacy and security, please do not reply to this email with sensitive personal "
+            "information or attachments. If you have questions, please reach out to your legal "
+            "representative directly using the contact details below.\n\n"
+            + _CASE_EMAIL_FOOTER
         ),
         "variables": [*CASE_EMAIL_VARIABLES, "{reminder_title}", "{reminder_body}"],
     },
@@ -95,6 +145,8 @@ class EmailNotConfiguredError(Exception):
 
 
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
+# Stands in for {invitation_url} in the default invitation so the HTML email can show a button there.
+_INVITATION_BUTTON_MARKER = "[[invitation-button]]"
 _SUBJECT_LINE = re.compile(r"^[ \t]*subject[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
 
 
@@ -425,6 +477,7 @@ def send_invitation_email(
     organization_main_email: str = "",
     organization_support_email: str = "",
     organization_phone_number: str = "",
+    license_number: str = "",
 ) -> None:
     """Send an invitation email via Resend.
 
@@ -456,6 +509,8 @@ def send_invitation_email(
         "invitation_url": invitation_url,
         "invitation_link": invitation_url,
         "inviter_name": inviter_name or organization_name,
+        "lawyer_name": inviter_name or organization_name,
+        "license_number": license_number,
         "expiration_time_hours": str(settings.invitation_expiry_hours),
         "organization_main_email": main_email,
         "organization_support_email": organization_support_email or main_email,
@@ -464,7 +519,7 @@ def send_invitation_email(
         "organization_phone_number": organization_phone_number,
         "portal_url": portal_url(),
     }
-    subject = fill_placeholders(subject_template or "You have been invited to join {organization_name}", values)
+    subject = fill_placeholders(subject_template or DEFAULT_INVITATION_SUBJECT, values)
 
     if body_template:
         is_html = is_html_template(body_template)
@@ -501,9 +556,7 @@ def send_invitation_email(
     darker = _darken_hex(button_color)
     escaped_url = html_lib.escape(invitation_url)
     escaped_org = html_lib.escape(organization_name)
-    escaped_recipient = html_lib.escape(recipient_name)
     escaped_label = html_lib.escape(button_label)
-    org_display = f"<strong>{escaped_org}</strong>" if bold_org_name else escaped_org
 
     # CTA button — inline-block anchor, widely supported.
     button_html = (
@@ -525,19 +578,17 @@ def send_invitation_email(
         f'</td></tr></table>'
     )
 
-    body_html = f"""
-      <h2 style="margin:0 0 16px;color:#111827;font-size:20px;font-weight:600;font-family:Arial,Helvetica,sans-serif;">Hello, {escaped_recipient}!</h2>
-      <p style="margin:0 0 16px;color:#374151;line-height:1.65;">
-        You have been invited to join {org_display} on VisaTrack.
-        Click the button below to set your password and activate your account.
-      </p>
-      {button_html}
-      <p style="margin:0 0 16px;color:#374151;font-size:13px;line-height:1.6;">
-        This link expires in 72 hours. If you did not expect this invitation,
-        you can safely ignore this email.
-      </p>
-      <p style="margin:20px 0 4px;color:#374151;">Best regards,</p>
-      <p style="margin:0;color:#111827;font-weight:600;">The {escaped_org} Team</p>"""
+    # The default text, with the invitation link shown as the button.
+    default_html, _ = render_template_body(
+        DEFAULT_INVITATION_TEMPLATE.replace("{invitation_url}", _INVITATION_BUTTON_MARKER),
+        values,
+        bold_names=("organization_name",) if bold_org_name else (),
+    )
+    body_html = (
+        '<div style="color:#374151;line-height:1.65;">'
+        + default_html.replace(_INVITATION_BUTTON_MARKER, button_html)
+        + "</div>"
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
