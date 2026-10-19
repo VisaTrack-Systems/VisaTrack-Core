@@ -5074,6 +5074,12 @@
             "title": "Contact Email",
             "type": "string"
           },
+          "license_number": {
+            "default": "",
+            "maxLength": 100,
+            "title": "License Number",
+            "type": "string"
+          },
           "support_email": {
             "default": "",
             "maxLength": 255,
@@ -5105,6 +5111,11 @@
           },
           "contact_email": {
             "title": "Contact Email",
+            "type": "string"
+          },
+          "license_number": {
+            "default": "",
+            "title": "License Number",
             "type": "string"
           },
           "support_email": {
@@ -6170,7 +6181,7 @@
     },
     "/api/v1/admin/general-settings": {
       "get": {
-        "description": "The organization's main contact email, support email and timezone.",
+        "description": "The organization's main contact email, support email, license number and timezone.",
         "operationId": "get_general_settings_api_v1_admin_general_settings_get",
         "responses": {
           "200": {
@@ -6195,7 +6206,7 @@
         ]
       },
       "put": {
-        "description": "Update the organization's main contact email, support email and timezone.",
+        "description": "Update the organization's main contact email, support email, license number and timezone.",
         "operationId": "save_general_settings_api_v1_admin_general_settings_put",
         "requestBody": {
           "content": {

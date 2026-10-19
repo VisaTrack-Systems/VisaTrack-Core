@@ -36,7 +36,10 @@ import {
 import { PageHeader } from '../AppShell';
 import { Alert, Button, Card, CardHeader, FieldHint, Input, Label, Select } from '../ui';
 import {
+  InsertVariableMenu,
   RichTextEditor,
+  type RichTextEditorHandle,
+  VariableReference,
   isHtmlEmpty,
   normalizeHtml,
   plainTextToHtml,
@@ -46,17 +49,27 @@ import {
 // Must match DEFAULT_INVITATION_TEMPLATE in backend/app/services/email.py.
 const DEFAULT_INVITATION_TEMPLATE =
   'Hi {recipient_name},\n\n' +
-  'You have been invited to join {organization_name} on VisaTrack. ' +
-  'Click the link below to set your password and activate your account.\n\n' +
+  'You have been invited by {lawyer_name} to join {organization_name} on VisaTrack, ' +
+  'a secure legal workflow platform.\n\n' +
+  'To activate your account and set your password, please click the link below:\n' +
   '{invitation_url}\n\n' +
-  'This link expires in 72 hours. If you did not expect this invitation, ' +
-  'you can safely ignore this email.\n\n' +
-  '— The {organization_name} Team';
+  'This link is secure and will expire in 72 hours. If you were not expecting this invitation, ' +
+  'please disregard this email or contact us immediately.\n\n' +
+  '---\n\n' +
+  'IMPORTANT CONFIDENTIALITY & LEGAL NOTICE:\n' +
+  'This email and any attachments are intended solely for the confidential use of the intended ' +
+  'recipient. VisaTrack is a software platform provider and does not provide legal representation ' +
+  'or immigration advice. Legal services are provided directly by {organization_name}.\n\n' +
+  '{organization_name}\n' +
+  'Contact: {organization_main_email}\n' +
+  'RCIC / Law Society License #: {license_number}\n\n' +
+  'VisaTrack Technologies Inc. | support@visatrack.ca';
 
+// Must match DEFAULT_INVITATION_SUBJECT in backend/app/services/email.py.
 const DEFAULT_STYLES: InvitationStyles = {
   button_color: '#dc2626',
   button_label: 'Activate my account',
-  subject: 'You have been invited to join {organization_name}',
+  subject: 'Invitation to join {organization_name} on VisaTrack',
   bold_org_name: true,
 };
 
@@ -167,6 +180,7 @@ function BrandingCard() {
 function GeneralSettingsCard() {
   const [contactEmail, setContactEmail] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
   const [timezone, setTimezone] = useState('');
   const [timezones, setTimezones] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +195,7 @@ function GeneralSettingsCard() {
         if (ignore) return;
         setContactEmail(result.contact_email);
         setSupportEmail(result.support_email);
+        setLicenseNumber(result.license_number);
         setTimezone(result.timezone);
         setTimezones(result.available_timezones);
       })
@@ -211,9 +226,15 @@ function GeneralSettingsCard() {
     }
     setSaving(true);
     try {
-      const result = await saveGeneralSettings({ contact_email: email, support_email: support, timezone });
+      const result = await saveGeneralSettings({
+        contact_email: email,
+        support_email: support,
+        license_number: licenseNumber.trim(),
+        timezone,
+      });
       setContactEmail(result.contact_email);
       setSupportEmail(result.support_email);
+      setLicenseNumber(result.license_number);
       setTimezone(result.timezone);
       setSaved(true);
     } catch (err) {
@@ -264,6 +285,22 @@ function GeneralSettingsCard() {
           <FieldHint>
             Where clients can get help. Leave blank to use the main contact email.
           </FieldHint>
+        </div>
+        <div className="max-w-sm">
+          <Label htmlFor="license-number">RCIC / Law Society License #</Label>
+          <Input
+            id="license-number"
+            type="text"
+            value={licenseNumber}
+            maxLength={100}
+            onChange={(event) => {
+              setLicenseNumber(event.target.value);
+              setSaved(false);
+            }}
+            disabled={disabled}
+            placeholder="R123456"
+          />
+          <FieldHint>Shown in emails that use the {'{license_number}'} variable.</FieldHint>
         </div>
         <div className="max-w-sm">
           <Label htmlFor="timezone">Timezone</Label>
@@ -329,6 +366,10 @@ type TemplatePanelProps = {
 
 function TemplatePanel({ template, draft, onDraftChange, onToggle, toggleDisabled, onSave }: TemplatePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  // The one Insert Variable menu fills whichever field the admin was last in.
+  const [activeField, setActiveField] = useState<'subject' | 'body'>('body');
   const [body, setBody] = useState(() => draft?.body ?? templateBodyToHtml(template.body));
   const [subject, setSubject] = useState(draft?.subject ?? template.subject);
   // Bumped to reload the editor after its content is replaced (file upload, reset).
@@ -348,6 +389,27 @@ function TemplatePanel({ template, draft, onDraftChange, onToggle, toggleDisable
   const replaceContent = (next: TemplateDraft) => {
     updateDraft(next);
     setEditorVersion((version) => version + 1);
+  };
+
+  // Puts the variable where the cursor is in the subject (or at the end), then moves the cursor after it.
+  const insertSubjectVariable = (variable: string) => {
+    const input = subjectInputRef.current;
+    const start = input?.selectionStart ?? subject.length;
+    const end = input?.selectionEnd ?? subject.length;
+    updateDraft({ body, subject: subject.slice(0, start) + variable + subject.slice(end) });
+    const cursor = start + variable.length;
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(cursor, cursor);
+    });
+  };
+
+  const insertVariable = (variable: string) => {
+    if (activeField === 'subject') {
+      insertSubjectVariable(variable);
+    } else {
+      editorRef.current?.insertText(variable);
+    }
   };
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -462,16 +524,36 @@ function TemplatePanel({ template, draft, onDraftChange, onToggle, toggleDisable
         </Button>
       </div>
 
+      {/* Editor header: one variable menu for both the subject and the body */}
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3">
+        <h3 className="text-base font-semibold text-gray-900">Template Editor: {template.label}</h3>
+        <div className="flex items-center gap-1">
+          <VariableReference variables={template.variables} />
+          <InsertVariableMenu
+            // In the subject the full case number is left out: subject lines show without signing in.
+            variables={
+              activeField === 'subject'
+                ? template.variables.filter((variable) => variable !== '{case_number}')
+                : template.variables
+            }
+            disabled={false}
+            onInsert={insertVariable}
+          />
+        </div>
+      </div>
+
       {/* Subject */}
       <div>
         <label htmlFor={subjectId} className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700">
           Email Subject Line
         </label>
         <Input
+          ref={subjectInputRef}
           id={subjectId}
           type="text"
           value={subject}
           maxLength={255}
+          onFocus={() => setActiveField('subject')}
           onChange={(event) => updateDraft({ body, subject: event.target.value })}
           placeholder={template.defaultSubject}
         />
@@ -479,10 +561,11 @@ function TemplatePanel({ template, draft, onDraftChange, onToggle, toggleDisable
 
       {/* Body */}
       <RichTextEditor
+        ref={editorRef}
         key={`${template.key}-${editorVersion}`}
         initialHtml={body}
         onChange={(html) => updateDraft({ body: html, subject })}
-        variables={template.variables}
+        onFocus={() => setActiveField('body')}
         label={`${template.label} message body`}
       />
 

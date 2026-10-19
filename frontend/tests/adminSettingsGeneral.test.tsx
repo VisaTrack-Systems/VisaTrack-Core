@@ -49,7 +49,13 @@ const overview: EmailTemplatesOverview = {
       default_subject: 'Case {case_number}: status updated',
       is_custom: false,
       enabled: true,
-      variables: ['{client_name}', '{case_number}', '{organization_main_email}', '{organization_support_email}'],
+      variables: [
+        '{client_name}',
+        '{case_number}',
+        '{redacted_case_number}',
+        '{organization_main_email}',
+        '{organization_support_email}',
+      ],
     },
     {
       key: 'reminder',
@@ -76,6 +82,7 @@ const invitationStyles = {
 const generalSettings = {
   contact_email: 'hello@firm.com',
   support_email: '',
+  license_number: '',
   timezone: 'America/Toronto',
   available_timezones: ['America/Toronto', 'America/Vancouver', 'UTC'],
 };
@@ -220,7 +227,7 @@ describe('AdminSettingsGeneral email templates', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
-  it('CT-ADMSET-09: inserts a variable from the toolbar menu into the body', async () => {
+  it('CT-ADMSET-09: inserts a variable from the editor header menu into the body', async () => {
     const user = userEvent.setup();
     await renderCommunication(user);
     await openTab(user, 'Case Status Update');
@@ -232,6 +239,33 @@ describe('AdminSettingsGeneral email templates', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save Template' }));
     expect(saveEmailTemplate).toHaveBeenCalledWith('case_status_update', expect.stringContaining('{client_name}'), '');
+  });
+
+  it('CT-ADMSET-14: inserts a variable into the subject at the cursor, without offering the full case number', async () => {
+    const user = userEvent.setup();
+    await renderCommunication(user);
+    await openTab(user, 'Case Status Update');
+
+    // One menu serves both fields, in the editor header.
+    expect(screen.getByRole('heading', { name: 'Template Editor: Case Status Update' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Insert Variable/ })).toHaveLength(1);
+
+    const subject = screen.getByLabelText('Email Subject Line') as HTMLInputElement;
+    await user.clear(subject);
+    await user.type(subject, 'Ref:  - update');
+    subject.setSelectionRange(5, 5);
+    await user.click(screen.getByRole('button', { name: /Insert Variable/ }));
+
+    expect(screen.queryByRole('menuitem', { name: /\{case_number\}/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: /\{redacted_case_number\}/ }));
+
+    expect(subject).toHaveValue('Ref: {redacted_case_number} - update');
+    await user.click(screen.getByRole('button', { name: 'Save Template' }));
+    expect(saveEmailTemplate).toHaveBeenCalledWith(
+      'case_status_update',
+      '',
+      'Ref: {redacted_case_number} - update'
+    );
   });
 
   it('CT-ADMSET-10: keeps unsaved edits when switching tabs and saves the invitation subject', async () => {
@@ -286,6 +320,7 @@ describe('AdminSettingsGeneral general settings', () => {
       ...generalSettings,
       contact_email: 'team@firm.com',
       support_email: 'help@firm.com',
+      license_number: 'R123456',
       timezone: 'UTC',
     });
     render(<AdminSettingsGeneral />);
@@ -295,12 +330,14 @@ describe('AdminSettingsGeneral general settings', () => {
     await user.clear(email);
     await user.type(email, 'team@firm.com');
     await user.type(screen.getByLabelText('Support Email'), 'help@firm.com');
+    await user.type(screen.getByLabelText('RCIC / Law Society License #'), ' R123456 ');
     await user.selectOptions(screen.getByLabelText('Timezone'), 'UTC');
     await user.click(screen.getByRole('button', { name: 'Save settings' }));
 
     expect(saveGeneralSettings).toHaveBeenCalledWith({
       contact_email: 'team@firm.com',
       support_email: 'help@firm.com',
+      license_number: 'R123456',
       timezone: 'UTC',
     });
     expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
