@@ -1,6 +1,7 @@
 """Lawyer Routes: API endpoints for lawyer profile, workload, and lawyer-specific operations."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
@@ -32,14 +33,37 @@ from app.schemas.lawyer import (
     LawyerCaseFlagResponse,
     LawyerClientCreateRequest,
     LawyerClientCreateResponse,
+    LawyerCommunicationSettingsResponse,
+    LawyerCommunicationSettingsUpdateRequest,
+    LawyerCommunicationTemplateItem,
+    LawyerEmailBanner,
+    LawyerEmailBannerUploadRequest,
     LawyerProfileResponse,
     LawyerProfileUpsertRequest,
 )
 from app.schemas.user import UserListItem
 from app.services.audit import log_activity
+from app.services.email import DEFAULT_NOTIFICATION_TEMPLATES
+from app.services.email_notifications import (
+    UploadValidationError,
+    banner_object_key,
+    decode_upload,
+    lawyer_communication_settings,
+    org_notification_settings,
+    unknown_notification_keys,
+    validate_banner_image,
+)
 from app.services.rbac import assign_role_to_user
+from app.services.storage import (
+    StorageConfigurationError,
+    StorageOperationError,
+    create_presigned_download,
+    delete_object,
+    put_object_bytes,
+)
 
 router = APIRouter(prefix="/lawyer", tags=["lawyer"])
+logger = logging.getLogger(__name__)
 
 LEGACY_CASE_STATUS_MAP = {
     "document_collection": "awaiting_client",
@@ -298,6 +322,182 @@ def upsert_lawyer_profile(
         hourly_rate=float(profile.hourly_rate) if profile.hourly_rate is not None else None,
         onboarding_complete=onboarding_complete,
     )
+
+
+def _get_or_create_profile(db: Session, user_id: UUID) -> UserProfile:
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
+    if profile is None:
+        profile = UserProfile(user_id=user_id, user_type="lawyer", custom_fields={})
+    return profile
+
+
+def _save_communication_settings(profile: UserProfile, communication: dict) -> None:
+    # Build a fresh dict so SQLAlchemy detects the mutation on the JSONB column.
+    profile.custom_fields = {**(profile.custom_fields or {}), "communication": communication}
+    profile.updated_at = datetime.now(timezone.utc)
+
+
+def _communication_settings_response(db: Session, auth: AuthContext) -> LawyerCommunicationSettingsResponse:
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    org_config = org_notification_settings(org.settings if org is not None else {})
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == auth.user_id))
+    lawyer_config = lawyer_communication_settings(profile.custom_fields if profile is not None else {})
+
+    banner = None
+    stored_banner = lawyer_config["banner"]
+    if stored_banner is not None:
+        try:
+            preview_url = create_presigned_download(object_key=stored_banner["object_key"])
+        except (StorageConfigurationError, StorageOperationError):
+            preview_url = None
+        banner = LawyerEmailBanner(
+            file_name=stored_banner.get("file_name", "banner"),
+            content_type=stored_banner.get("content_type", "image/png"),
+            url=preview_url,
+        )
+
+    return LawyerCommunicationSettingsResponse(
+        banner=banner,
+        banner_position=org_config["banner_position"],
+        templates=[
+            LawyerCommunicationTemplateItem(
+                key=key,
+                label=default["label"],
+                description=default["description"],
+                org_enabled=org_config["enabled"][key],
+                enabled=lawyer_config["enabled_templates"][key],
+            )
+            for key, default in DEFAULT_NOTIFICATION_TEMPLATES.items()
+        ],
+    )
+
+
+@router.get("/communication-settings", response_model=LawyerCommunicationSettingsResponse)
+def get_communication_settings(
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> LawyerCommunicationSettingsResponse:
+    return _communication_settings_response(db, auth)
+
+
+@router.put("/communication-settings", response_model=LawyerCommunicationSettingsResponse)
+def update_communication_settings(
+    payload: LawyerCommunicationSettingsUpdateRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> LawyerCommunicationSettingsResponse:
+    """Save the lawyer's email opt-ins. Admin-disabled types stay off regardless of this choice."""
+    unknown = unknown_notification_keys(payload.enabled_templates)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown email template: {', '.join(unknown)}")
+
+    profile = _get_or_create_profile(db, auth.user_id)
+    current = lawyer_communication_settings(profile.custom_fields)
+    stored = dict((profile.custom_fields or {}).get("communication") or {})
+    stored["enabled_templates"] = {**current["enabled_templates"], **payload.enabled_templates}
+    _save_communication_settings(profile, stored)
+
+    db.add(profile)
+    log_activity(
+        db,
+        organization_id=auth.organization_id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="communication_settings",
+        entity_id=auth.user_id,
+        old_values={"enabled_templates": current["enabled_templates"]},
+        new_values={"enabled_templates": stored["enabled_templates"]},
+    )
+    db.commit()
+    return _communication_settings_response(db, auth)
+
+
+@router.put("/communication-settings/banner", response_model=LawyerCommunicationSettingsResponse)
+def upload_email_banner(
+    payload: LawyerEmailBannerUploadRequest,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> LawyerCommunicationSettingsResponse:
+    """Store the lawyer's branding banner (logo and contact info) shown in their notification emails."""
+    try:
+        data = decode_upload(payload.content_base64)
+        content_type = validate_banner_image(payload.file_name, data)
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    profile = _get_or_create_profile(db, auth.user_id)
+    previous_banner = lawyer_communication_settings(profile.custom_fields)["banner"]
+    object_key = banner_object_key(
+        organization_id=auth.organization_id, user_id=auth.user_id, file_name=payload.file_name
+    )
+    try:
+        put_object_bytes(object_key=object_key, payload=data, content_type=content_type)
+    except StorageConfigurationError as exc:
+        logger.error("Email banner upload failed: storage is misconfigured", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="File storage is not set up correctly (check the AWS credentials), so the banner was not saved.",
+        ) from exc
+    except StorageOperationError as exc:
+        logger.error("Email banner upload failed", exc_info=True)
+        raise HTTPException(status_code=502, detail="Failed to store the banner image") from exc
+
+    # A new extension means a new key; remove the old file so it is not left behind.
+    if previous_banner is not None and previous_banner["object_key"] != object_key:
+        try:
+            delete_object(object_key=previous_banner["object_key"])
+        except (StorageConfigurationError, StorageOperationError):
+            pass
+
+    stored = dict((profile.custom_fields or {}).get("communication") or {})
+    stored["banner"] = {"object_key": object_key, "file_name": payload.file_name, "content_type": content_type}
+    _save_communication_settings(profile, stored)
+
+    db.add(profile)
+    log_activity(
+        db,
+        organization_id=auth.organization_id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="email_banner",
+        entity_id=auth.user_id,
+        new_values={"file_name": payload.file_name, "content_type": content_type},
+    )
+    db.commit()
+    return _communication_settings_response(db, auth)
+
+
+@router.delete("/communication-settings/banner", response_model=LawyerCommunicationSettingsResponse)
+def delete_email_banner(
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> LawyerCommunicationSettingsResponse:
+    profile = db.scalar(select(UserProfile).where(UserProfile.user_id == auth.user_id))
+    banner = lawyer_communication_settings(profile.custom_fields)["banner"] if profile is not None else None
+    if profile is None or banner is None:
+        return _communication_settings_response(db, auth)
+
+    try:
+        delete_object(object_key=banner["object_key"])
+    except (StorageConfigurationError, StorageOperationError):
+        # The reference is removed either way, so the banner stops appearing in emails.
+        pass
+
+    stored = dict((profile.custom_fields or {}).get("communication") or {})
+    stored.pop("banner", None)
+    _save_communication_settings(profile, stored)
+
+    db.add(profile)
+    log_activity(
+        db,
+        organization_id=auth.organization_id,
+        user_id=auth.user_id,
+        action="deleted",
+        entity_type="email_banner",
+        entity_id=auth.user_id,
+    )
+    db.commit()
+    return _communication_settings_response(db, auth)
 
 
 @router.get("/cases", response_model=list[CaseListItem])

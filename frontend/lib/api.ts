@@ -1317,6 +1317,137 @@ export async function saveInvitationTemplate(body: string, styles: InvitationSty
   });
 }
 
+// ── Notification email templates and communication settings ─────────────────
+
+export type NotificationTemplateKey = 'case_status_update' | 'document_request' | 'reminder';
+export type BannerPosition = 'top' | 'bottom';
+
+export type NotificationTemplate = {
+  key: NotificationTemplateKey;
+  label: string;
+  description: string;
+  body: string;
+  default_body: string;
+  subject: string;
+  default_subject: string;
+  is_custom: boolean;
+  enabled: boolean;
+  variables: string[];
+};
+
+export type EmailTemplatesOverview = {
+  banner_position: BannerPosition;
+  /** Whether invitation links can be emailed from the app. */
+  invitation_enabled: boolean;
+  invitation_variables: string[];
+  templates: NotificationTemplate[];
+};
+
+export type LawyerCommunicationSettings = {
+  banner: { file_name: string; content_type: string; url: string | null } | null;
+  banner_position: BannerPosition;
+  templates: Array<{
+    key: NotificationTemplateKey;
+    label: string;
+    description: string;
+    org_enabled: boolean;
+    enabled: boolean;
+  }>;
+};
+
+/** Reads a file as base64 (without the data: URL prefix) so it can be sent in a JSON body. */
+async function fileToBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  // Build the string in chunks; spreading a large array into fromCharCode overflows the stack.
+  for (let start = 0; start < bytes.length; start += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+  }
+  return btoa(binary);
+}
+
+export async function getEmailTemplates(): Promise<EmailTemplatesOverview> {
+  return requestJson<EmailTemplatesOverview>('/api/v1/admin/email-templates');
+}
+
+/** Saves a notification template. An empty body or subject resets it to the default. */
+export async function saveEmailTemplate(key: NotificationTemplateKey, body: string, subject = ''): Promise<void> {
+  return requestVoid(`/api/v1/admin/email-templates/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ body, subject }),
+  });
+}
+
+export async function saveEmailSettings(input: {
+  banner_position: BannerPosition;
+  enabled_templates: Partial<Record<NotificationTemplateKey, boolean>>;
+  invitation_enabled?: boolean;
+}): Promise<void> {
+  return requestVoid('/api/v1/admin/email-settings', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export type OrganizationGeneralSettings = {
+  /** Main contact email, the {organization_main_email} template variable. */
+  contact_email: string;
+  /** Support email, the {organization_support_email} variable. Empty means "use the main contact email". */
+  support_email: string;
+  timezone: string;
+  available_timezones: string[];
+};
+
+export async function getGeneralSettings(): Promise<OrganizationGeneralSettings> {
+  return requestJson<OrganizationGeneralSettings>('/api/v1/admin/general-settings');
+}
+
+export async function saveGeneralSettings(input: {
+  contact_email: string;
+  support_email: string;
+  timezone: string;
+}): Promise<OrganizationGeneralSettings> {
+  return requestJson<OrganizationGeneralSettings>('/api/v1/admin/general-settings', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+/** Sends a .txt or .pdf file to the server and returns its text for use as a template body. */
+export async function extractTemplateText(file: File): Promise<string> {
+  const result = await requestJson<{ text: string }>('/api/v1/admin/email-templates/extract-text', {
+    method: 'POST',
+    body: JSON.stringify({ file_name: file.name, content_base64: await fileToBase64(file) }),
+  });
+  return result.text;
+}
+
+export async function getCommunicationSettings(): Promise<LawyerCommunicationSettings> {
+  return requestJson<LawyerCommunicationSettings>('/api/v1/lawyer/communication-settings');
+}
+
+export async function updateCommunicationSettings(
+  enabledTemplates: Partial<Record<NotificationTemplateKey, boolean>>
+): Promise<LawyerCommunicationSettings> {
+  return requestJson<LawyerCommunicationSettings>('/api/v1/lawyer/communication-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled_templates: enabledTemplates }),
+  });
+}
+
+export async function uploadEmailBanner(file: File): Promise<LawyerCommunicationSettings> {
+  return requestJson<LawyerCommunicationSettings>('/api/v1/lawyer/communication-settings/banner', {
+    method: 'PUT',
+    body: JSON.stringify({ file_name: file.name, content_base64: await fileToBase64(file) }),
+  });
+}
+
+export async function deleteEmailBanner(): Promise<LawyerCommunicationSettings> {
+  return requestJson<LawyerCommunicationSettings>('/api/v1/lawyer/communication-settings/banner', {
+    method: 'DELETE',
+  });
+}
+
 export async function getCaseSummaryByNumber(caseNumber: string): Promise<CaseSummary> {
   return requestJson<CaseSummary>(`/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}`);
 }
@@ -1368,6 +1499,16 @@ export async function deleteCaseMilestone(caseNumber: string, milestoneId: strin
     {
       method: 'DELETE',
     }
+  );
+}
+
+/** Emails the client one Document Request listing every outstanding (requested or rejected) document. */
+export async function sendDocumentRequestEmail(
+  caseNumber: string
+): Promise<{ sent: boolean; document_names: string[] }> {
+  return requestJson<{ sent: boolean; document_names: string[] }>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/documents/request-email`,
+    { method: 'POST' }
   );
 }
 

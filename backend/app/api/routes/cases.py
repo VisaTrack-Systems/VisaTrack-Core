@@ -26,6 +26,7 @@ from app.schemas.case import (
     CaseCustomDocumentCreateRequest,
     CaseDocumentRenameRequest,
     CaseDocumentRenameResponse,
+    CaseDocumentRequestEmailResponse,
     CaseDocumentDownloadResponse,
     CaseDocumentLegalHoldRequest,
     CaseDocumentUploadCompleteRequest,
@@ -57,6 +58,7 @@ from app.schemas.case import (
     MilestoneSummary,
 )
 from app.services.audit import log_activity, log_document_access
+from app.services.email_notifications import document_list_text, notify_case_client
 from app.services.jobs import enqueue_job
 from app.services.storage import (
     StorageConfigurationError,
@@ -1015,6 +1017,16 @@ def update_case_details_by_number(
     db.commit()
     db.refresh(case)
 
+    if new_values["status"] != old_values["status"]:
+        notify_case_client(
+            db,
+            case=case,
+            template_key="case_status_update",
+            # {case_status} is filled from the case, which already has the new status.
+            values={},
+            fallback_lawyer_id=auth.user_id,
+        )
+
     return CaseDetailsUpdateResponse(
         case_number=case.case_number,
         case_type=case.case_type,
@@ -1430,6 +1442,16 @@ def create_case_reminder(
     )
 
     db.commit()
+
+    if payload.send_email_notification and payload.visible_to_client:
+        notify_case_client(
+            db,
+            case=case,
+            template_key="reminder",
+            values={"reminder_title": title, "reminder_body": body},
+            fallback_lawyer_id=auth.user_id,
+        )
+
     return CaseWorkspaceReminder(
         id=inserted_row["id"],
         sender_name=sender_name,
@@ -2379,6 +2401,15 @@ def create_case_custom_document(
     db.add(case)
     db.commit()
 
+    # Every new document request is emailed to the client, required or optional.
+    notify_case_client(
+        db,
+        case=case,
+        template_key="document_request",
+        values={"document_name": name},
+        fallback_lawyer_id=auth.user_id,
+    )
+
     return CaseWorkspaceDocument(
         id=new_document_id,
         name=name,
@@ -2388,6 +2419,52 @@ def create_case_custom_document(
         uploaded_at=None,
         instructions=new_document["instructions"],
     )
+
+
+# Documents the client still has to provide: never uploaded, or rejected and needing a new file.
+_OUTSTANDING_DOCUMENT_STATUSES = ("requested", "rejected")
+
+
+@router.post(
+    "/by-number/{case_number}/documents/request-email",
+    response_model=CaseDocumentRequestEmailResponse,
+)
+def send_document_request_email(
+    case_number: str,
+    auth: AuthContext = Depends(require_roles("lawyer", "org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> CaseDocumentRequestEmailResponse:
+    """Send the client one Document Request email listing every outstanding document."""
+    case = _get_case_with_write_access(case_number=case_number, auth=auth, db=db)
+    # Reuse the workspace so the list matches exactly what the Document Requests view shows.
+    workspace = get_case_workspace_by_number(case_number=case_number, auth=auth, db=db)
+    document_names = [
+        document.name for document in workspace.documents if document.status in _OUTSTANDING_DOCUMENT_STATUSES
+    ]
+    if not document_names:
+        raise HTTPException(status_code=400, detail="There are no outstanding document requests to email")
+
+    sent = notify_case_client(
+        db,
+        case=case,
+        template_key="document_request",
+        values={"document_name": document_list_text(document_names)},
+        fallback_lawyer_id=auth.user_id,
+    )
+    if sent:
+        log_activity(
+            db,
+            organization_id=case.organization_id,
+            user_id=auth.user_id,
+            action="emailed",
+            entity_type="document_request",
+            entity_id=None,
+            case_id=case.id,
+            client_id=case.client_id,
+            new_values={"document_names": document_names},
+        )
+        db.commit()
+    return CaseDocumentRequestEmailResponse(sent=sent, document_names=document_names)
 
 
 @router.patch(

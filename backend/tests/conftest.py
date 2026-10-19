@@ -17,6 +17,13 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.api.deps.auth import AuthContext
+from app.core.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _no_real_emails(monkeypatch):
+    """A local .env may hold a real Resend key; tests that send email set a fake one themselves."""
+    monkeypatch.setattr(settings, 'resend_api_key', '')
 
 
 @pytest.fixture

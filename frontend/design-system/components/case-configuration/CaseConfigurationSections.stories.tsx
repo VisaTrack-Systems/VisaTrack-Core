@@ -88,6 +88,8 @@ export const Documents: Story = {
       onApplySuite={() => {}}
       onSendReminders={async () => {}}
       sendingBulkReminders={false}
+      onEmailDocumentRequests={async () => {}}
+      emailingDocumentRequests={false}
       onDownloadAll={() => {}}
       onRenameDocument={async () => true}
       renamingDocumentId={null}
@@ -182,12 +184,14 @@ export const Reminders: Story = {
       canvas.getByPlaceholderText('Write the reminder for the client...'),
       'Please upload the revised employer letter.'
     );
+    // Emailing the client is on by default.
+    await expect(canvas.getByRole('checkbox', { name: 'Also email the client' })).toBeChecked();
     await userEvent.click(canvas.getByRole('button', { name: 'Post Reminder' }));
 
     await expect(createReminder).toHaveBeenCalledWith({
       title: 'Portal Follow-up',
       body: 'Please upload the revised employer letter.',
-      sendEmail: false,
+      sendEmail: true,
     });
   },
 };

@@ -257,6 +257,13 @@ class CaseDocumentRenameResponse(BaseModel):
     name: str
 
 
+class CaseDocumentRequestEmailResponse(BaseModel):
+    # False when the email was not sent: turned off by the admin or lawyer, the client
+    # unsubscribed or has no email, or email is not configured.
+    sent: bool
+    document_names: list[str]
+
+
 class CaseDetailsUpdateRequest(BaseModel):
     case_type: str
     priority: str

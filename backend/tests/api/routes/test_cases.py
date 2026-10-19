@@ -1222,3 +1222,145 @@ def test_download_all_case_documents_returns_zip(monkeypatch, make_auth_context)
 
     assert response.media_type == 'application/zip'
     assert response.headers['Content-Disposition'].endswith('"C-2026-001-documents.zip"')
+
+
+def test_update_case_details_emails_client_only_when_status_changes(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        client_id=uuid4(),
+        case_number='C-2026-001',
+        case_type='Express Entry',
+        priority='high',
+        status='intake',
+        target_filing_date=None,
+        description=None,
+        internal_notes=None,
+        updated_at=datetime.now(timezone.utc),
+    )
+    db = MagicMock()
+    notifications = []
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'notify_case_client', lambda db, **kwargs: notifications.append(kwargs))
+
+    def update(status):
+        cases.update_case_details_by_number(
+            case_number='C-2026-001',
+            payload=CaseDetailsUpdateRequest(case_type='Express Entry', priority='high', status=status),
+            auth=auth,
+            db=db,
+        )
+
+    update('awaiting_client')
+    update('awaiting_client')
+
+    assert len(notifications) == 1
+    assert notifications[0]['template_key'] == 'case_status_update'
+    assert notifications[0]['values'] == {}
+
+
+def test_create_case_reminder_emails_client_when_requested(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, client_id=uuid4())
+    inserted_row = {
+        'id': uuid4(),
+        'title': 'Need passport',
+        'body': 'Please upload it.',
+        'sent_at': datetime.now(timezone.utc),
+        'read_at': None,
+        'acknowledged_at': None,
+    }
+    db = MagicMock()
+    db.execute.return_value = FakeResult(rows=[inserted_row])
+    notifications = []
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'notify_case_client', lambda db, **kwargs: notifications.append(kwargs))
+
+    for send_email in (False, True):
+        cases.create_case_reminder(
+            case_number='C-2026-001',
+            payload=CaseReminderCreateRequest(
+                title='Need passport', body='Please upload it.', send_email_notification=send_email
+            ),
+            auth=auth,
+            db=db,
+        )
+
+    assert [n['template_key'] for n in notifications] == ['reminder']
+    assert notifications[0]['values'] == {'reminder_title': 'Need passport', 'reminder_body': 'Please upload it.'}
+
+
+def test_create_case_custom_document_emails_client_for_every_request(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, client_id=uuid4(), custom_fields={})
+    notifications = []
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'notify_case_client', lambda db, **kwargs: notifications.append(kwargs))
+
+    for name, required in (('Optional photo', False), ('Passport', True)):
+        cases.create_case_custom_document(
+            case_number='C-2026-001',
+            payload=CaseCustomDocumentCreateRequest(name=name, required=required),
+            auth=auth,
+            db=MagicMock(),
+        )
+
+    assert [n['values'] for n in notifications] == [
+        {'document_name': 'Optional photo'},
+        {'document_name': 'Passport'},
+    ]
+    assert all(n['template_key'] == 'document_request' for n in notifications)
+
+
+def _workspace_with_documents(*statuses):
+    documents = [row(name=f'Doc {index}', status=status) for index, status in enumerate(statuses, start=1)]
+    return row(documents=documents)
+
+
+def test_send_document_request_email_lists_outstanding_documents(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    case = row(id=uuid4(), organization_id=auth.organization_id, client_id=uuid4())
+    workspace = _workspace_with_documents('requested', 'accepted', 'rejected', 'received', 'not_requested')
+    notifications = []
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: case)
+    monkeypatch.setattr(cases, 'get_case_workspace_by_number', lambda **kwargs: workspace)
+    monkeypatch.setattr(cases, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(cases, 'notify_case_client', lambda db, **kwargs: notifications.append(kwargs) or True)
+
+    result = cases.send_document_request_email(case_number='C-2026-001', auth=auth, db=MagicMock())
+
+    assert result.sent is True
+    assert result.document_names == ['Doc 1', 'Doc 3']
+    assert notifications[0]['template_key'] == 'document_request'
+    assert notifications[0]['values'] == {'document_name': '- Doc 1\n- Doc 3'}
+
+
+def test_send_document_request_email_reports_when_not_sent(monkeypatch, make_auth_context):
+    db = MagicMock()
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: row(id=uuid4()))
+    monkeypatch.setattr(cases, 'get_case_workspace_by_number', lambda **kwargs: _workspace_with_documents('requested'))
+    monkeypatch.setattr(cases, 'notify_case_client', lambda db, **kwargs: False)
+
+    result = cases.send_document_request_email(
+        case_number='C-2026-001', auth=make_auth_context(roles=['lawyer']), db=db
+    )
+
+    assert result.sent is False
+    assert result.document_names == ['Doc 1']
+    db.commit.assert_not_called()
+
+
+def test_send_document_request_email_rejects_when_nothing_is_outstanding(monkeypatch, make_auth_context):
+    monkeypatch.setattr(cases, '_get_case_with_write_access', lambda **kwargs: row(id=uuid4()))
+    monkeypatch.setattr(cases, 'get_case_workspace_by_number', lambda **kwargs: _workspace_with_documents('accepted'))
+
+    with pytest.raises(HTTPException) as exc:
+        cases.send_document_request_email(
+            case_number='C-2026-001', auth=make_auth_context(roles=['lawyer']), db=MagicMock()
+        )
+
+    assert exc.value.status_code == 400

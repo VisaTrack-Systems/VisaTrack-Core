@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Plus, Send, StickyNote, Trash2, Upload, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Eye, FolderPlus, Mail, Plus, Send, StickyNote, Trash2, Upload, X } from 'lucide-react';
 
 import type { CaseDocumentStatus, CaseWorkspace } from '@/lib/api';
 import { DialogPanel } from '../../DialogPanel';
@@ -28,6 +28,9 @@ type DocumentsSectionProps = {
   onApplySuite: () => void;
   onSendReminders: () => Promise<void>;
   sendingBulkReminders: boolean;
+  /** Emails the client one message listing every outstanding document request. */
+  onEmailDocumentRequests: () => Promise<void>;
+  emailingDocumentRequests: boolean;
   onDownloadAll: () => void;
   onRenameDocument: (documentId: string, name: string) => Promise<boolean>;
   renamingDocumentId: string | null;
@@ -60,6 +63,8 @@ export function DocumentsSection({
   onApplySuite,
   onSendReminders,
   sendingBulkReminders,
+  onEmailDocumentRequests,
+  emailingDocumentRequests,
   onDownloadAll,
   onRenameDocument,
   renamingDocumentId,
@@ -87,6 +92,10 @@ export function DocumentsSection({
     note: string;
   } | null>(null);
   const [rejectionError, setRejectionError] = useState<string | null>(null);
+  // Same rule as the server: requested, or rejected and needing a new file.
+  const outstandingCount = workspace.documents.filter(
+    (document) => document.status === 'requested' || document.status === 'rejected'
+  ).length;
 
   const handleCreateSuite = async (input: NewDocumentSuiteInput): Promise<boolean> => {
     setIsCreatingSuite(true);
@@ -454,6 +463,26 @@ export function DocumentsSection({
               ) : null}
             </div>
           ))}
+        </div>
+
+        {/* One email to the client listing everything still outstanding (requested or rejected). */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-gray-200 rounded-md shadow-card p-4">
+          <p className="text-sm text-gray-600">
+            {outstandingCount === 0
+              ? 'No outstanding document requests.'
+              : `${outstandingCount} document${outstandingCount === 1 ? ' is' : 's are'} still outstanding.`}
+          </p>
+          <button
+            type="button"
+            className={buttonClasses('primary')}
+            onClick={() => {
+              void onEmailDocumentRequests();
+            }}
+            disabled={emailingDocumentRequests || outstandingCount === 0}
+          >
+            <Mail className="w-4 h-4" />
+            {emailingDocumentRequests ? 'Sending...' : 'Email All Requests to Client'}
+          </button>
         </div>
       </div>
 

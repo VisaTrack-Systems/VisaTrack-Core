@@ -23,6 +23,20 @@ class StorageOperationError(RuntimeError):
     pass
 
 
+# S3 error codes that mean the AWS credentials themselves are wrong, expired or revoked.
+_CREDENTIAL_ERROR_CODES = {
+    "InvalidAccessKeyId",
+    "SignatureDoesNotMatch",
+    "ExpiredToken",
+    "InvalidToken",
+    "TokenRefreshRequired",
+}
+
+
+def _is_credential_error(exc: Exception) -> bool:
+    return isinstance(exc, ClientError) and exc.response.get("Error", {}).get("Code") in _CREDENTIAL_ERROR_CODES
+
+
 @dataclass(frozen=True)
 class PresignedUpload:
     url: str
@@ -274,4 +288,6 @@ def put_object_bytes(*, object_key: str, payload: bytes, content_type: str) -> N
             "AWS credentials are not configured for generated documents"
         ) from exc
     except (BotoCoreError, ClientError) as exc:
+        if _is_credential_error(exc):
+            raise StorageConfigurationError("AWS credentials were rejected by S3") from exc
         raise StorageOperationError("Failed to store generated document") from exc

@@ -38,8 +38,9 @@ import { NewCaseDialog, type NewCaseDialogSubmitPayload } from './components/New
 import { PortalAuthGate } from './components/PortalAuthGate';
 import { ProfileSettingsDialog } from './components/ProfileSettingsDialog';
 import { LawyerDashboard } from './components/LawyerDashboard';
+import { LawyerSettings } from './components/LawyerSettings';
 
-type AppView = 'login' | 'lawyer' | 'client' | 'admin' | 'active-cases' | 'case-config';
+type AppView = 'login' | 'lawyer' | 'client' | 'admin' | 'active-cases' | 'case-config' | 'lawyer-settings';
 
 function getDefaultViewForUser(user: CurrentUser | null): AppView {
   if (!user) {
@@ -85,6 +86,10 @@ function canAccessView(user: CurrentUser | null, view: AppView): boolean {
 
   if (view === 'lawyer' || view === 'active-cases' || view === 'case-config') {
     return isLawyer || isAdmin;
+  }
+
+  if (view === 'lawyer-settings') {
+    return isLawyer;
   }
 
   return false;
@@ -266,8 +271,7 @@ export default function App() {
     }
   };
 
-  const handleOpenProfileDialog = () => {
-    setIsProfileDialogOpen(true);
+  const loadProfileSettings = () => {
     setProfileSettingsError(null);
     setLoadingProfileSettings(true);
     setProfileSettings(null);
@@ -283,6 +287,22 @@ export default function App() {
       .finally(() => {
         setLoadingProfileSettings(false);
       });
+  };
+
+  const handleOpenLawyerSettings = () => {
+    setSelectedCaseId(null);
+    setCurrentView('lawyer-settings');
+    loadProfileSettings();
+  };
+
+  const handleOpenProfileDialog = () => {
+    // Lawyers manage their profile on the Settings page; other roles use the dialog.
+    if (currentUser?.active_role === 'lawyer') {
+      handleOpenLawyerSettings();
+      return;
+    }
+    setIsProfileDialogOpen(true);
+    loadProfileSettings();
   };
 
   const handleSwitchRole = async (nextRole: string) => {
@@ -346,7 +366,8 @@ export default function App() {
     setProfileSettingsError(null);
   };
 
-  const handleSubmitProfileSettings = async (payload: UpdateCurrentUserSettingsInput) => {
+  /** Resolves to true when the profile was saved, so the Settings page can confirm it. */
+  const handleSubmitProfileSettings = async (payload: UpdateCurrentUserSettingsInput): Promise<boolean> => {
     setSavingProfileSettings(true);
     setProfileSettingsError(null);
     try {
@@ -355,9 +376,11 @@ export default function App() {
       const updatedCurrentUser = await getCurrentUser();
       setCurrentUser(updatedCurrentUser);
       setIsProfileDialogOpen(false);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setProfileSettingsError(`Failed to save profile settings: ${message}`);
+      return false;
     } finally {
       setSavingProfileSettings(false);
     }
@@ -421,6 +444,12 @@ export default function App() {
             icon={FolderOpen}
             active={currentView === 'active-cases' || currentView === 'case-config'}
             onClick={() => goToView('active-cases')}
+          />
+          <SidebarNavItem
+            label="Settings"
+            icon={Settings}
+            active={currentView === 'lawyer-settings'}
+            onClick={handleOpenLawyerSettings}
           />
         </SidebarGroup>
       );
@@ -514,6 +543,16 @@ export default function App() {
         )
       ) : null}
 
+      {currentView === 'lawyer-settings' ? (
+        <LawyerSettings
+          profileSettings={profileSettings}
+          loadingProfile={loadingProfileSettings}
+          savingProfile={savingProfileSettings}
+          profileError={profileSettingsError}
+          onSubmitProfile={handleSubmitProfileSettings}
+        />
+      ) : null}
+
       {currentView === 'client' ? <ClientDashboard /> : null}
       {currentView === 'admin' ? (
         <AdminDashboard
@@ -560,7 +599,9 @@ export default function App() {
           submitting={savingProfileSettings}
           errorMessage={profileSettingsError}
           onClose={handleCloseProfileDialog}
-          onSubmit={handleSubmitProfileSettings}
+          onSubmit={async (payload) => {
+            await handleSubmitProfileSettings(payload);
+          }}
         />
       ) : null}
     </AppShell>

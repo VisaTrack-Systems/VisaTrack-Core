@@ -27,9 +27,17 @@ from app.schemas.admin import (
     AdminCreateUserRequest,
     AdminCreateUserResponse,
     AdminOperationsResponse,
+    EmailNotificationSettingsRequest,
+    EmailTemplatesOverviewResponse,
     InvitationStyles,
     InvitationTemplateRequest,
     InvitationTemplateResponse,
+    NotificationTemplateItem,
+    NotificationTemplateRequest,
+    OrganizationGeneralSettingsRequest,
+    OrganizationGeneralSettingsResponse,
+    TemplateFileExtractRequest,
+    TemplateFileExtractResponse,
     ResendInvitationResponse,
     SendInvitationEmailRequest,
     AdminOpsCaseItem,
@@ -47,7 +55,24 @@ from app.schemas.user import UserListItem
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.services.audit import log_activity
-from app.services.email import DEFAULT_INVITATION_TEMPLATE, EmailNotConfiguredError, send_invitation_email
+from app.services.email import (
+    DEFAULT_INVITATION_TEMPLATE,
+    DEFAULT_NOTIFICATION_TEMPLATES,
+    INVITATION_VARIABLES,
+    EmailNotConfiguredError,
+    sanitize_template_html,
+    send_invitation_email,
+)
+from app.services.email_notifications import (
+    UploadValidationError,
+    decode_upload,
+    extract_template_text,
+    org_notification_settings,
+    org_template_body,
+    org_support_email,
+    org_template_subject,
+    unknown_notification_keys,
+)
 from app.services.rbac import assign_role_to_user, canonical_role_slug, revoke_role_from_user
 from app.services.sessions import revoke_all_user_sessions
 
@@ -686,10 +711,11 @@ def send_invitation_email_endpoint(
     normalized_email = _normalize_email(payload.to_email)
     plain_token = _invitation_token_from_url(payload.invitation_url)
     now = datetime.now(timezone.utc)
+    # Find the invitation by its token only. The sender may choose a different address
+    # than the one the user was invited with (e.g. a personal email), so to_email is not matched.
     invitation = db.scalar(
         select(UserInvitation).where(
             UserInvitation.organization_id == auth.organization_id,
-            cast(UserInvitation.email, String) == normalized_email,
             UserInvitation.token_hash == hash_invitation_token(plain_token),
             UserInvitation.accepted_at.is_(None),
             UserInvitation.revoked_at.is_(None),
@@ -711,6 +737,11 @@ def send_invitation_email_endpoint(
 
     # Look up the org's custom invitation template and style options.
     org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    if org is not None and not org_notification_settings(org.settings)["invitation_enabled"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Invitation emails are turned off for your organization. Copy the link and share it instead.",
+        )
     body_template: str | None = None
     styles_data: dict = {}
     if org is not None:
@@ -720,6 +751,7 @@ def send_invitation_email_endpoint(
 
     org_name = org.name if org is not None else "VisaTrack"
     recipient_name = f"{invited_user.first_name} {invited_user.last_name}".strip()
+    inviter_name = f"{auth.user.first_name} {auth.user.last_name}".strip() if auth.user else ""
 
     try:
         send_invitation_email(
@@ -732,6 +764,10 @@ def send_invitation_email_endpoint(
             button_label=styles_data.get("button_label", "Activate my account"),
             subject_template=styles_data.get("subject") or None,
             bold_org_name=styles_data.get("bold_org_name", True),
+            inviter_name=inviter_name,
+            organization_main_email=org.contact_email if org is not None else "",
+            organization_support_email=org_support_email(org.settings) if org is not None else "",
+            organization_phone_number=(getattr(org, "contact_phone", None) or "") if org is not None else "",
         )
     except EmailNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail="Invitation email is unavailable") from exc
@@ -782,16 +818,16 @@ def save_invitation_template(
     new_settings = dict(org.settings or {})
     new_settings["email_templates"] = dict(new_settings.get("email_templates", {}))
 
-    raw_body = payload.body.strip()
+    raw_body = sanitize_template_html(payload.body.strip())
     if raw_body:
         new_settings["email_templates"]["invitation"] = raw_body
         new_settings["email_templates"]["invitation_type"] = "plain"
-        new_settings["email_templates"]["invitation_styles"] = payload.styles.model_dump()
     else:
-        # Empty body means "reset to default" — remove body, type, and styles.
+        # Empty body means "reset to default" — remove the custom body and its type.
         new_settings["email_templates"].pop("invitation", None)
         new_settings["email_templates"].pop("invitation_type", None)
-        new_settings["email_templates"].pop("invitation_styles", None)
+    # Styles (including the subject line) apply to the default body too, so they are always kept.
+    new_settings["email_templates"]["invitation_styles"] = payload.styles.model_dump()
 
     org.settings = new_settings
     flag_modified(org, "settings")
@@ -806,6 +842,234 @@ def save_invitation_template(
         new_values={"template": "invitation", "is_custom": bool(raw_body)},
     )
     db.commit()
+
+
+def _get_admin_org(auth: AuthContext, db: Session) -> Organization:
+    org = db.scalar(select(Organization).where(Organization.id == auth.organization_id))
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    return org
+
+
+# Timezones an organization can choose. Kept as a fixed list (rather than every IANA zone)
+# so the dropdown stays short; add more here when a firm needs one.
+ORGANIZATION_TIMEZONES = (
+    "America/St_Johns",
+    "America/Halifax",
+    "America/Toronto",
+    "America/Winnipeg",
+    "America/Regina",
+    "America/Edmonton",
+    "America/Vancouver",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Europe/London",
+    "Europe/Paris",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Asia/Manila",
+    "Asia/Shanghai",
+    "Australia/Sydney",
+    "UTC",
+)
+DEFAULT_ORGANIZATION_TIMEZONE = "America/Toronto"
+
+
+def _general_settings_response(org: Organization) -> OrganizationGeneralSettingsResponse:
+    return OrganizationGeneralSettingsResponse(
+        contact_email=org.contact_email,
+        support_email=org_support_email(org.settings),
+        timezone=(org.settings or {}).get("timezone") or DEFAULT_ORGANIZATION_TIMEZONE,
+        available_timezones=list(ORGANIZATION_TIMEZONES),
+    )
+
+
+@router.get("/general-settings", response_model=OrganizationGeneralSettingsResponse)
+def get_general_settings(
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> OrganizationGeneralSettingsResponse:
+    """The organization's main contact email, support email and timezone."""
+    return _general_settings_response(_get_admin_org(auth, db))
+
+
+@router.put("/general-settings", response_model=OrganizationGeneralSettingsResponse)
+def save_general_settings(
+    payload: OrganizationGeneralSettingsRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> OrganizationGeneralSettingsResponse:
+    """Update the organization's main contact email, support email and timezone."""
+    contact_email = _normalize_email(payload.contact_email)
+    support_email = _normalize_email(payload.support_email) if payload.support_email.strip() else ""
+    if payload.timezone not in ORGANIZATION_TIMEZONES:
+        raise HTTPException(status_code=400, detail="Unsupported timezone")
+    org = _get_admin_org(auth, db)
+
+    old_values = {
+        "contact_email": org.contact_email,
+        "support_email": org_support_email(org.settings),
+        "timezone": (org.settings or {}).get("timezone") or DEFAULT_ORGANIZATION_TIMEZONE,
+    }
+    org.contact_email = contact_email
+    # The timezone and support email live in the settings JSON so no migration is needed.
+    new_settings = dict(org.settings or {})
+    new_settings["timezone"] = payload.timezone
+    if support_email:
+        new_settings["support_email"] = support_email
+    else:
+        new_settings.pop("support_email", None)
+    org.settings = new_settings
+    flag_modified(org, "settings")
+    db.add(org)
+    log_activity(
+        db,
+        organization_id=org.id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="organization_settings",
+        entity_id=org.id,
+        old_values=old_values,
+        new_values={"contact_email": contact_email, "support_email": support_email, "timezone": payload.timezone},
+    )
+    db.commit()
+    return _general_settings_response(org)
+
+
+@router.get("/email-templates", response_model=EmailTemplatesOverviewResponse)
+def list_notification_templates(
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> EmailTemplatesOverviewResponse:
+    """Notification templates (all except the invitation, which has its own endpoints) and their toggles."""
+    org = _get_admin_org(auth, db)
+    org_config = org_notification_settings(org.settings)
+
+    templates = []
+    for key, default in DEFAULT_NOTIFICATION_TEMPLATES.items():
+        custom_body = org_template_body(org.settings, key)
+        templates.append(
+            NotificationTemplateItem(
+                key=key,
+                label=default["label"],
+                description=default["description"],
+                body=custom_body or default["body"],
+                default_body=default["body"],
+                subject=org_template_subject(org.settings, key) or default["subject"],
+                default_subject=default["subject"],
+                is_custom=custom_body is not None,
+                enabled=org_config["enabled"][key],
+                variables=default["variables"],
+            )
+        )
+    return EmailTemplatesOverviewResponse(
+        banner_position=org_config["banner_position"],
+        invitation_enabled=org_config["invitation_enabled"],
+        invitation_variables=INVITATION_VARIABLES,
+        templates=templates,
+    )
+
+
+@router.put("/email-templates/{template_key}", status_code=status.HTTP_204_NO_CONTENT)
+def save_notification_template(
+    template_key: str,
+    payload: NotificationTemplateRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    if template_key not in DEFAULT_NOTIFICATION_TEMPLATES:
+        raise HTTPException(status_code=404, detail="Email template not found")
+    org = _get_admin_org(auth, db)
+
+    # Build fresh dicts so SQLAlchemy detects the mutation on the JSONB column.
+    new_settings = dict(org.settings or {})
+    new_settings["email_templates"] = dict(new_settings.get("email_templates", {}))
+    raw_body = sanitize_template_html(payload.body.strip())
+    if raw_body:
+        new_settings["email_templates"][template_key] = raw_body
+    else:
+        # Empty body means "reset to default".
+        new_settings["email_templates"].pop(template_key, None)
+
+    subjects = dict(new_settings["email_templates"].get("subjects") or {})
+    subject = payload.subject.strip()
+    if subject and subject != DEFAULT_NOTIFICATION_TEMPLATES[template_key]["subject"]:
+        subjects[template_key] = subject
+    else:
+        subjects.pop(template_key, None)
+    if subjects:
+        new_settings["email_templates"]["subjects"] = subjects
+    else:
+        new_settings["email_templates"].pop("subjects", None)
+
+    org.settings = new_settings
+    flag_modified(org, "settings")
+    db.add(org)
+    log_activity(
+        db,
+        organization_id=org.id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="email_template",
+        entity_id=org.id,
+        new_values={"template": template_key, "is_custom": bool(raw_body)},
+    )
+    db.commit()
+
+
+@router.put("/email-settings", status_code=status.HTTP_204_NO_CONTENT)
+def save_email_notification_settings(
+    payload: EmailNotificationSettingsRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+    db: Session = Depends(get_db),
+) -> None:
+    """Turn notification types on or off for the whole organization and set the banner position."""
+    unknown = unknown_notification_keys(payload.enabled_templates)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown email template: {', '.join(unknown)}")
+    org = _get_admin_org(auth, db)
+
+    current = org_notification_settings(org.settings)
+    enabled = {**current["enabled"], **payload.enabled_templates}
+    invitation_enabled = (
+        current["invitation_enabled"] if payload.invitation_enabled is None else payload.invitation_enabled
+    )
+    new_settings = dict(org.settings or {})
+    new_settings["email_notifications"] = {
+        "enabled": enabled,
+        "banner_position": payload.banner_position,
+        "invitation_enabled": invitation_enabled,
+    }
+
+    org.settings = new_settings
+    flag_modified(org, "settings")
+    db.add(org)
+    log_activity(
+        db,
+        organization_id=org.id,
+        user_id=auth.user_id,
+        action="updated",
+        entity_type="email_settings",
+        entity_id=org.id,
+        old_values=current,
+        new_values=new_settings["email_notifications"],
+    )
+    db.commit()
+
+
+@router.post("/email-templates/extract-text", response_model=TemplateFileExtractResponse)
+def extract_template_file_text(
+    payload: TemplateFileExtractRequest,
+    auth: AuthContext = Depends(require_roles("org_admin", "super_admin")),
+) -> TemplateFileExtractResponse:
+    """Read the text of an uploaded .txt or .pdf file. Nothing is saved; the admin reviews it first."""
+    try:
+        text = extract_template_text(payload.file_name, decode_upload(payload.content_base64))
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return TemplateFileExtractResponse(text=text)
 
 
 @router.get("/roles", response_model=list[AdminRoleItem])

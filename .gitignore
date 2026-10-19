@@ -16,3 +16,7 @@ __pycache__/
 # Logs
 /.logs
 *.log
+
+# Live regression reports can contain synthetic account/session data.
+frontend/regression-results/
+frontend/regression-report/

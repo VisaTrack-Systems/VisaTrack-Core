@@ -1,6 +1,6 @@
 """Admin Schemas: Pydantic models for administrator-specific operations. Handles org management and user administration requests."""
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -143,6 +143,10 @@ class ResendInvitationResponse(BaseModel):
     invitation_url: str
 
 
+# Rich-text templates are HTML, which is several times longer than the text it shows.
+MAX_TEMPLATE_HTML_CHARS = 20000
+
+
 class InvitationStyles(BaseModel):
     button_color: str = Field(default="#dc2626", max_length=7)
     button_label: str = Field(default="Activate my account", max_length=100)
@@ -160,10 +164,75 @@ class InvitationTemplateResponse(BaseModel):
 
 
 class InvitationTemplateRequest(BaseModel):
-    # The full template body. Use {recipient_name}, {organization_name},
-    # {invitation_url} as placeholders. Send an empty string to reset to default.
-    body: str = Field(max_length=5000)
+    # The full template body: plain text, or HTML from the rich-text editor (sanitized on save).
+    # Use {recipient_name}, {organization_name}, {invitation_url} as placeholders.
+    # Send an empty string to reset to default.
+    body: str = Field(max_length=MAX_TEMPLATE_HTML_CHARS)
     styles: InvitationStyles = Field(default_factory=InvitationStyles)
+
+
+class NotificationTemplateItem(BaseModel):
+    key: str
+    label: str
+    description: str
+    body: str
+    default_body: str
+    subject: str
+    default_subject: str
+    is_custom: bool
+    enabled: bool
+    variables: list[str]
+
+
+class EmailTemplatesOverviewResponse(BaseModel):
+    banner_position: Literal["top", "bottom"]
+    # Whether lawyers and admins can email invitation links from the app.
+    invitation_enabled: bool = True
+    # Placeholders the invitation template may use (it has its own endpoints for the body).
+    invitation_variables: list[str] = Field(default_factory=list)
+    templates: list[NotificationTemplateItem]
+
+
+class NotificationTemplateRequest(BaseModel):
+    # Plain text or rich-text HTML (sanitized on save). Send an empty string to reset to the default body.
+    body: str = Field(max_length=MAX_TEMPLATE_HTML_CHARS)
+    # Send an empty string to use the default subject line.
+    subject: str = Field(default="", max_length=255)
+
+
+class EmailNotificationSettingsRequest(BaseModel):
+    banner_position: Literal["top", "bottom"]
+    # Notification key -> enabled for the whole organization. Unknown keys are rejected.
+    enabled_templates: dict[str, bool]
+    # Leave out to keep the current setting.
+    invitation_enabled: bool | None = None
+
+
+class TemplateFileExtractRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    # Base64 of a .txt or .pdf file, up to 2 MB before encoding.
+    content_base64: str = Field(min_length=1, max_length=3_000_000)
+
+
+class TemplateFileExtractResponse(BaseModel):
+    text: str
+
+
+class OrganizationGeneralSettingsResponse(BaseModel):
+    # The organization's main contact email ({organization_main_email} in templates).
+    contact_email: str
+    # Where clients go for help ({organization_support_email}); "" means use the main contact email.
+    support_email: str = ""
+    timezone: str
+    # The timezones an admin can pick from, so the frontend list matches what the server accepts.
+    available_timezones: list[str]
+
+
+class OrganizationGeneralSettingsRequest(BaseModel):
+    contact_email: str = Field(min_length=3, max_length=255)
+    # Optional; leave empty to use the main contact email.
+    support_email: str = Field(default="", max_length=255)
+    timezone: str = Field(min_length=1, max_length=50)
 
 
 class AdminOperationsResponse(BaseModel):

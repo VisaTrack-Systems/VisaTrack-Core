@@ -1,6 +1,6 @@
 """Lawyer Schemas: Pydantic models for lawyer/legal professional profile and workload related API validation."""
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,6 +23,40 @@ class LawyerProfileUpsertRequest(BaseModel):
     years_experience: Optional[int] = Field(default=None, ge=0, le=80)
     bio: Optional[str] = None
     hourly_rate: Optional[float] = Field(default=None, ge=0)
+
+
+class LawyerCommunicationTemplateItem(BaseModel):
+    key: str
+    label: str
+    description: str
+    # False when an admin has turned this email type off for the whole organization.
+    org_enabled: bool
+    # The lawyer's own opt-in. Emails go out only when org_enabled and enabled are both true.
+    enabled: bool
+
+
+class LawyerEmailBanner(BaseModel):
+    file_name: str
+    content_type: str
+    # Short-lived link for previewing the image; None if storage is unavailable.
+    url: Optional[str] = None
+
+
+class LawyerCommunicationSettingsResponse(BaseModel):
+    banner: Optional[LawyerEmailBanner]
+    banner_position: Literal["top", "bottom"]
+    templates: list[LawyerCommunicationTemplateItem]
+
+
+class LawyerCommunicationSettingsUpdateRequest(BaseModel):
+    # Notification key -> the lawyer's opt-in. Unknown keys are rejected.
+    enabled_templates: dict[str, bool]
+
+
+class LawyerEmailBannerUploadRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    # Base64 of a .png, .jpg, .jpeg, or .webp image, up to 1 MB before encoding.
+    content_base64: str = Field(min_length=1, max_length=1_500_000)
 
 
 class LawyerCaseCreateRequest(BaseModel):
