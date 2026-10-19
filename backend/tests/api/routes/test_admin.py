@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -13,7 +14,11 @@ from app.schemas.admin import (
     AdminCaseAssignmentRequest,
     AdminCreateOrganizationRequest,
     AdminCreateUserRequest,
+    EmailNotificationSettingsRequest,
+    NotificationTemplateRequest,
+    OrganizationGeneralSettingsRequest,
     SendInvitationEmailRequest,
+    TemplateFileExtractRequest,
 )
 from tests.support import FakeResult, row
 
@@ -362,6 +367,7 @@ def test_send_invitation_email_requires_server_issued_invitation(
     organization = row(
         id=auth.organization_id,
         name='Acme Law',
+        contact_email='hello@acme.law',
         settings={},
     )
     db = MagicMock()
@@ -386,6 +392,164 @@ def test_send_invitation_email_requires_server_issued_invitation(
 
     assert fake_send.call_args.kwargs['recipient_name'] == 'Invited User'
     assert fake_send.call_args.kwargs['organization_name'] == 'Acme Law'
+    assert fake_send.call_args.kwargs['organization_main_email'] == 'hello@acme.law'
+    assert fake_send.call_args.kwargs['organization_support_email'] == ''
+
+
+def test_send_invitation_email_is_blocked_when_admin_turned_it_off(monkeypatch, make_auth_context, make_user):
+    auth = make_auth_context(roles=['org_admin'])
+    token = 'valid-invitation-token'
+    invitation = row(id=uuid4(), organization_id=auth.organization_id, user_id=uuid4())
+    invited_user = make_user(id=invitation.user_id, organization_id=auth.organization_id)
+    organization = row(
+        id=auth.organization_id,
+        name='Acme Law',
+        contact_email='hello@acme.law',
+        settings={'email_notifications': {'invitation_enabled': False}},
+    )
+    db = MagicMock()
+    db.scalar.side_effect = [invitation, invited_user, organization]
+    fake_send = MagicMock()
+    monkeypatch.setattr(admin, 'send_invitation_email', fake_send)
+    monkeypatch.setattr(admin.settings, 'frontend_origin', 'http://localhost:3000')
+
+    with pytest.raises(HTTPException) as exc:
+        admin.send_invitation_email_endpoint(
+            payload=SendInvitationEmailRequest(
+                to_email='invite@example.com',
+                recipient_name='Invited User',
+                invitation_url=f'http://localhost:3000/invite?token={token}',
+            ),
+            auth=auth,
+            db=db,
+        )
+
+    assert exc.value.status_code == 403
+    fake_send.assert_not_called()
+
+
+def test_send_invitation_email_allows_a_different_recipient_address(
+    monkeypatch,
+    make_auth_context,
+    make_user,
+):
+    auth = make_auth_context(roles=['org_admin'])
+    token = 'valid-invitation-token'
+    invitation = row(
+        id=uuid4(),
+        organization_id=auth.organization_id,
+        user_id=uuid4(),
+        email='invite@example.com',
+        token_hash=admin.hash_invitation_token(token),
+    )
+    invited_user = make_user(id=invitation.user_id, organization_id=auth.organization_id)
+    db = MagicMock()
+    db.scalar.side_effect = [
+        invitation,
+        invited_user,
+        row(id=auth.organization_id, name='Acme Law', contact_email='hello@acme.law', settings={}),
+    ]
+    fake_send = MagicMock()
+    monkeypatch.setattr(admin, 'send_invitation_email', fake_send)
+    monkeypatch.setattr(admin.settings, 'frontend_origin', 'http://localhost:3000')
+
+    admin.send_invitation_email_endpoint(
+        payload=SendInvitationEmailRequest(
+            to_email='Personal@Example.org',
+            recipient_name='Invitee',
+            invitation_url=f'http://localhost:3000/invite#token={token}',
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    assert fake_send.call_args.kwargs['to_email'] == 'personal@example.org'
+    # The lookup matches the token, not the address the user was invited with.
+    where_clause = str(db.scalar.call_args_list[0].args[0]).split('WHERE', 1)[1]
+    assert 'user_invitations.email' not in where_clause
+
+
+def test_save_general_settings_updates_contact_email_and_timezone(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    organization = row(id=auth.organization_id, contact_email='old@firm.com', settings={'email_templates': {}})
+    db = MagicMock()
+    db.scalar.return_value = organization
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(admin, 'flag_modified', lambda *args: None)
+
+    result = admin.save_general_settings(
+        payload=OrganizationGeneralSettingsRequest(
+            contact_email=' Hello@Firm.com ', support_email=' Help@Firm.com ', timezone='America/Vancouver'
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    assert organization.contact_email == 'hello@firm.com'
+    assert organization.settings == {
+        'email_templates': {},
+        'timezone': 'America/Vancouver',
+        'support_email': 'help@firm.com',
+    }
+    assert result.timezone == 'America/Vancouver'
+    assert result.support_email == 'help@firm.com'
+    assert 'America/Toronto' in result.available_timezones
+    db.commit.assert_called_once()
+
+    # An empty support email clears it, so emails fall back to the main contact email.
+    result = admin.save_general_settings(
+        payload=OrganizationGeneralSettingsRequest(contact_email='hello@firm.com', timezone='America/Vancouver'),
+        auth=auth,
+        db=db,
+    )
+    assert 'support_email' not in organization.settings
+    assert result.support_email == ''
+
+
+def test_save_general_settings_rejects_invalid_support_email(make_auth_context):
+    db = MagicMock()
+
+    with pytest.raises(HTTPException) as exc:
+        admin.save_general_settings(
+            payload=OrganizationGeneralSettingsRequest(
+                contact_email='hello@firm.com', support_email='not-an-email', timezone='America/Toronto'
+            ),
+            auth=make_auth_context(roles=['org_admin']),
+            db=db,
+        )
+
+    assert exc.value.status_code == 400
+    db.commit.assert_not_called()
+
+
+def test_get_general_settings_defaults_timezone(make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    db = MagicMock()
+    db.scalar.return_value = row(id=auth.organization_id, contact_email='hello@firm.com', settings={})
+
+    result = admin.get_general_settings(auth=auth, db=db)
+
+    assert result.contact_email == 'hello@firm.com'
+    assert result.support_email == ''
+    assert result.timezone == 'America/Toronto'
+
+
+@pytest.mark.parametrize(
+    ('contact_email', 'timezone_name'),
+    [('not-an-email', 'America/Toronto'), ('hello@firm.com', 'Mars/Olympus_Mons')],
+)
+def test_save_general_settings_rejects_bad_input(make_auth_context, contact_email, timezone_name):
+    db = MagicMock()
+
+    with pytest.raises(HTTPException) as exc:
+        admin.save_general_settings(
+            payload=OrganizationGeneralSettingsRequest(contact_email=contact_email, timezone=timezone_name),
+            auth=make_auth_context(roles=['org_admin']),
+            db=db,
+        )
+
+    assert exc.value.status_code == 400
+    db.commit.assert_not_called()
 
 
 def test_send_invitation_email_rejects_untrusted_origin(make_auth_context):
@@ -437,3 +601,150 @@ def test_delete_organization_soft_deletes_org(monkeypatch, make_auth_context):
     assert organization.deleted_at is not None
     assert "encrypted_api_key = ''" in str(db.execute.call_args_list[0].args[0])
     db.commit.assert_called_once()
+
+
+def test_list_notification_templates_returns_defaults_and_custom_bodies(make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    organization = row(
+        id=auth.organization_id,
+        settings={
+            'email_templates': {'reminder': 'Custom reminder'},
+            'email_notifications': {'enabled': {'document_request': False}, 'banner_position': 'bottom'},
+        },
+    )
+    db = MagicMock()
+    db.scalar.return_value = organization
+
+    result = admin.list_notification_templates(auth=auth, db=db)
+
+    by_key = {item.key: item for item in result.templates}
+    assert result.banner_position == 'bottom'
+    assert by_key['case_status_update'].body == "Your case status has been updated to '{case_status}'."
+    assert by_key['case_status_update'].is_custom is False
+    assert by_key['reminder'].body == 'Custom reminder'
+    assert by_key['reminder'].is_custom is True
+    assert by_key['document_request'].enabled is False
+    assert by_key['reminder'].subject == by_key['reminder'].default_subject == 'Reminder: {reminder_title}'
+    assert result.invitation_enabled is True
+    assert '{invitation_url}' in result.invitation_variables
+
+
+def test_save_notification_template_stores_and_resets_body(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    organization = row(id=auth.organization_id, settings={'email_templates': {'invitation': 'Keep me'}})
+    db = MagicMock()
+    db.scalar.return_value = organization
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(admin, 'flag_modified', lambda *args: None)
+
+    admin.save_notification_template(
+        template_key='reminder', payload=NotificationTemplateRequest(body='  New body  '), auth=auth, db=db
+    )
+    assert organization.settings['email_templates'] == {'invitation': 'Keep me', 'reminder': 'New body'}
+
+    admin.save_notification_template(
+        template_key='reminder', payload=NotificationTemplateRequest(body=''), auth=auth, db=db
+    )
+    assert organization.settings['email_templates'] == {'invitation': 'Keep me'}
+
+
+def test_save_notification_template_sanitizes_html_and_stores_subject(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    organization = row(id=auth.organization_id, settings={})
+    db = MagicMock()
+    db.scalar.return_value = organization
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(admin, 'flag_modified', lambda *args: None)
+
+    admin.save_notification_template(
+        template_key='reminder',
+        payload=NotificationTemplateRequest(
+            body='<p onclick="steal()"><b>Hi</b> {client_name}<script>alert(1)</script></p>',
+            subject='Heads up: {reminder_title}',
+        ),
+        auth=auth,
+        db=db,
+    )
+    templates = organization.settings['email_templates']
+    assert templates['reminder'] == '<p><b>Hi</b> {client_name}</p>'
+    assert templates['subjects'] == {'reminder': 'Heads up: {reminder_title}'}
+
+    # Saving the default subject removes the custom one.
+    admin.save_notification_template(
+        template_key='reminder',
+        payload=NotificationTemplateRequest(body='<p>Hi</p>', subject='Reminder: {reminder_title}'),
+        auth=auth,
+        db=db,
+    )
+    assert 'subjects' not in organization.settings['email_templates']
+
+
+def test_save_notification_template_rejects_unknown_key(make_auth_context):
+    with pytest.raises(HTTPException) as exc:
+        admin.save_notification_template(
+            template_key='invoice',
+            payload=NotificationTemplateRequest(body='x'),
+            auth=make_auth_context(roles=['org_admin']),
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 404
+
+
+def test_save_email_settings_merges_toggles_and_position(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    organization = row(id=auth.organization_id, settings={})
+    db = MagicMock()
+    db.scalar.return_value = organization
+    monkeypatch.setattr(admin, 'log_activity', lambda *args, **kwargs: None)
+    monkeypatch.setattr(admin, 'flag_modified', lambda *args: None)
+
+    admin.save_email_notification_settings(
+        payload=EmailNotificationSettingsRequest(banner_position='bottom', enabled_templates={'reminder': False}),
+        auth=auth,
+        db=db,
+    )
+
+    assert organization.settings['email_notifications'] == {
+        'enabled': {'case_status_update': True, 'document_request': True, 'reminder': False},
+        'banner_position': 'bottom',
+        'invitation_enabled': True,
+    }
+    db.commit.assert_called_once()
+
+    admin.save_email_notification_settings(
+        payload=EmailNotificationSettingsRequest(
+            banner_position='bottom', enabled_templates={}, invitation_enabled=False
+        ),
+        auth=auth,
+        db=db,
+    )
+    assert organization.settings['email_notifications']['invitation_enabled'] is False
+    assert organization.settings['email_notifications']['enabled']['reminder'] is False
+
+
+def test_save_email_settings_rejects_unknown_template(make_auth_context):
+    with pytest.raises(HTTPException) as exc:
+        admin.save_email_notification_settings(
+            payload=EmailNotificationSettingsRequest(banner_position='top', enabled_templates={'invoice': True}),
+            auth=make_auth_context(roles=['org_admin']),
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_extract_template_text_returns_text_or_400(make_auth_context):
+    auth = make_auth_context(roles=['org_admin'])
+    content = base64.b64encode(b'Status is {status}').decode()
+
+    result = admin.extract_template_file_text(
+        payload=TemplateFileExtractRequest(file_name='status.txt', content_base64=content), auth=auth
+    )
+    assert result.text == 'Status is {status}'
+
+    with pytest.raises(HTTPException) as exc:
+        admin.extract_template_file_text(
+            payload=TemplateFileExtractRequest(file_name='status.docx', content_base64=content), auth=auth
+        )
+    assert exc.value.status_code == 400

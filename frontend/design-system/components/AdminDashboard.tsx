@@ -515,12 +515,8 @@ export function AdminDashboard({
 
         {/* ── SETTINGS: GENERAL ─────────────────────────────────── */}
         {activeSection === 'settings-general' ? (
-          <>
-            {sectionHeader('General Settings', 'Branding, organization configuration, and email templates.')}
-            <div className="px-4 sm:px-6 lg:px-8 py-6">
-              <AdminSettingsGeneral />
-            </div>
-          </>
+          // Renders its own header so it can hold the General & Branding / Communication tabs.
+          <AdminSettingsGeneral headerActions={refreshButton} />
         ) : null}
 
         {/* ── SETTINGS: BILLING ─────────────────────────────────── */}

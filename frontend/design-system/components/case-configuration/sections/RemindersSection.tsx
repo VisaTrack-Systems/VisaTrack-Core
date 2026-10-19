@@ -55,6 +55,7 @@ export function RemindersSection({ workspace, creating, onCreateReminder, onNoti
   const [templateLabel, setTemplateLabel] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [sendEmail, setSendEmail] = useState(true);
 
   const handleTemplateChange = (nextLabel: string) => {
     setTemplateLabel(nextLabel);
@@ -77,7 +78,7 @@ export function RemindersSection({ workspace, creating, onCreateReminder, onNoti
     const success = await onCreateReminder({
       title: normalizedTitle,
       body: normalizedBody,
-      sendEmail: false,
+      sendEmail,
     });
     if (!success) {
       return;
@@ -135,6 +136,16 @@ export function RemindersSection({ workspace, creating, onCreateReminder, onNoti
             onChange={(event) => setBody(event.target.value)}
           />
         </div>
+
+        <label className="mb-4 flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={sendEmail}
+            onChange={(event) => setSendEmail(event.target.checked)}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Also email the client
+        </label>
 
         <div className="flex items-center gap-3">
           <button

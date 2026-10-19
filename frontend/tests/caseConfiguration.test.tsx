@@ -17,6 +17,7 @@ vi.mock('@/lib/api', () => ({
   updateCaseDetails: vi.fn(),
   updateCaseDocumentStatus: vi.fn(),
   createCaseReminder: vi.fn(),
+  sendDocumentRequestEmail: vi.fn(),
   getCaseDocumentDownloadUrl: vi.fn(),
   getCaseDocumentViewUrl: vi.fn(),
   renameCaseDocument: vi.fn(async () => ({})),
@@ -46,6 +47,7 @@ import {
   getCaseWorkspaceByNumber,
   initiateCaseDocumentUpload,
   renameCaseDocument,
+  sendDocumentRequestEmail,
   updateCaseDetails,
   updateCaseDocumentStatus,
   updateCaseMilestone,
@@ -285,6 +287,29 @@ describe('CaseConfiguration documents', () => {
       visible_to_client: true,
     });
     expect(await screen.findByText('Reminder sent for 2 required documents.')).toBeInTheDocument();
+  });
+
+  it('CT-CASECFG-37: emails the client one message with every outstanding request', async () => {
+    vi.mocked(sendDocumentRequestEmail).mockResolvedValue({
+      sent: true,
+      document_names: ['Employer Reference Letter', 'Travel History Summary'],
+    });
+    const { user } = await openDocuments();
+
+    expect(screen.getByText('2 documents are still outstanding.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Email All Requests to Client' }));
+
+    expect(sendDocumentRequestEmail).toHaveBeenCalledWith(CASE_NUMBER);
+    expect(await screen.findByText('Emailed the client a request for 2 documents.')).toBeInTheDocument();
+  });
+
+  it('CT-CASECFG-38: explains when the document request email was not sent', async () => {
+    vi.mocked(sendDocumentRequestEmail).mockResolvedValue({ sent: false, document_names: ['Travel History Summary'] });
+    const { user } = await openDocuments();
+
+    await user.click(screen.getByRole('button', { name: 'Email All Requests to Client' }));
+
+    expect(await screen.findByText(/No email was sent/)).toBeInTheDocument();
   });
 
   it('CT-CASECFG-12: downloads an uploaded document', async () => {
@@ -659,6 +684,7 @@ describe('CaseConfiguration reminders and permissions', () => {
 
     await user.selectOptions(screen.getByRole('combobox'), 'Payment Reminder');
     expect(screen.getByPlaceholderText('e.g., Document Submission Reminder')).toHaveValue('Payment Reminder');
+    await user.click(screen.getByLabelText('Also email the client'));
     await user.click(screen.getByRole('button', { name: 'Post Reminder' }));
 
     expect(createCaseReminder).toHaveBeenCalledWith(CASE_NUMBER, {
@@ -669,6 +695,33 @@ describe('CaseConfiguration reminders and permissions', () => {
     });
     expect(await screen.findByText('Reminder posted to client portal.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('e.g., Document Submission Reminder')).toHaveValue('');
+  });
+
+  it('CT-CASECFG-36: emails the client with the reminder by default', async () => {
+    vi.mocked(createCaseReminder).mockResolvedValue({
+      id: 'msg-email',
+      sender_name: 'Avery Counsel',
+      title: 'Case Update',
+      body: 'Please check your portal.',
+      sent_at: '2026-03-01T12:00:00Z',
+      read_at: null,
+      acknowledged_at: null,
+    });
+    const { user } = await renderCase();
+    await openSection(user, 'Reminders');
+
+    expect(screen.getByLabelText('Also email the client')).toBeChecked();
+    await user.type(screen.getByPlaceholderText('e.g., Document Submission Reminder'), 'Case Update');
+    await user.type(screen.getByPlaceholderText('Write the reminder for the client...'), 'Please check your portal.');
+    await user.click(screen.getByRole('button', { name: 'Post Reminder' }));
+
+    expect(createCaseReminder).toHaveBeenCalledWith(CASE_NUMBER, {
+      title: 'Case Update',
+      body: 'Please check your portal.',
+      send_email_notification: true,
+      visible_to_client: true,
+    });
+    expect(await screen.findByText('Reminder posted to client portal and email notification queued.')).toBeInTheDocument();
   });
 
   it('CT-CASECFG-34: requires a title and text before posting', async () => {

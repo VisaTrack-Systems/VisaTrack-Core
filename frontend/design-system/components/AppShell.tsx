@@ -8,7 +8,7 @@
  * the account callbacks.
  */
 
-import { FileText, LogOut, Menu, Settings, ShieldCheck, X, type LucideIcon } from 'lucide-react';
+import { FileText, LogOut, Menu, ShieldCheck, UserCircle, X, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useState } from 'react';
 
@@ -109,7 +109,7 @@ export function AppShell({
             onClick={onOpenProfile}
             className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sm text-white/85 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <Settings className="h-4 w-4" aria-hidden="true" />
+            <UserCircle className="h-4 w-4" aria-hidden="true" />
             Profile
           </button>
           <Link

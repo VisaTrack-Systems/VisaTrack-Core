@@ -88,6 +88,8 @@ export const Documents: Story = {
       onApplySuite={() => {}}
       onSendReminders={async () => {}}
       sendingBulkReminders={false}
+      onEmailDocumentRequests={async () => {}}
+      emailingDocumentRequests={false}
       onDownloadAll={() => {}}
       onRenameDocument={async () => true}
       renamingDocumentId={null}

@@ -2110,6 +2110,27 @@
         "title": "CaseDocumentRenameResponse",
         "type": "object"
       },
+      "CaseDocumentRequestEmailResponse": {
+        "properties": {
+          "document_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Names",
+            "type": "array"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sent",
+          "document_names"
+        ],
+        "title": "CaseDocumentRequestEmailResponse",
+        "type": "object"
+      },
       "CaseDocumentStatusUpdateRequest": {
         "properties": {
           "rejection_note": {
@@ -3876,6 +3897,79 @@
         "title": "DashboardStats",
         "type": "object"
       },
+      "EmailNotificationSettingsRequest": {
+        "properties": {
+          "banner_position": {
+            "enum": [
+              "top",
+              "bottom"
+            ],
+            "title": "Banner Position",
+            "type": "string"
+          },
+          "enabled_templates": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Enabled Templates",
+            "type": "object"
+          },
+          "invitation_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Enabled"
+          }
+        },
+        "required": [
+          "banner_position",
+          "enabled_templates"
+        ],
+        "title": "EmailNotificationSettingsRequest",
+        "type": "object"
+      },
+      "EmailTemplatesOverviewResponse": {
+        "properties": {
+          "banner_position": {
+            "enum": [
+              "top",
+              "bottom"
+            ],
+            "title": "Banner Position",
+            "type": "string"
+          },
+          "invitation_enabled": {
+            "default": true,
+            "title": "Invitation Enabled",
+            "type": "boolean"
+          },
+          "invitation_variables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Invitation Variables",
+            "type": "array"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationTemplateItem"
+            },
+            "title": "Templates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "banner_position",
+          "templates"
+        ],
+        "title": "EmailTemplatesOverviewResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3921,7 +4015,7 @@
       "InvitationTemplateRequest": {
         "properties": {
           "body": {
-            "maxLength": 5000,
+            "maxLength": 20000,
             "title": "Body",
             "type": "string"
           },
@@ -4347,6 +4441,142 @@
         "title": "LawyerClientCreateResponse",
         "type": "object"
       },
+      "LawyerCommunicationSettingsResponse": {
+        "properties": {
+          "banner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LawyerEmailBanner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "banner_position": {
+            "enum": [
+              "top",
+              "bottom"
+            ],
+            "title": "Banner Position",
+            "type": "string"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/LawyerCommunicationTemplateItem"
+            },
+            "title": "Templates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "banner",
+          "banner_position",
+          "templates"
+        ],
+        "title": "LawyerCommunicationSettingsResponse",
+        "type": "object"
+      },
+      "LawyerCommunicationSettingsUpdateRequest": {
+        "properties": {
+          "enabled_templates": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Enabled Templates",
+            "type": "object"
+          }
+        },
+        "required": [
+          "enabled_templates"
+        ],
+        "title": "LawyerCommunicationSettingsUpdateRequest",
+        "type": "object"
+      },
+      "LawyerCommunicationTemplateItem": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "org_enabled": {
+            "title": "Org Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "org_enabled",
+          "enabled"
+        ],
+        "title": "LawyerCommunicationTemplateItem",
+        "type": "object"
+      },
+      "LawyerEmailBanner": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "file_name": {
+            "title": "File Name",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "file_name",
+          "content_type"
+        ],
+        "title": "LawyerEmailBanner",
+        "type": "object"
+      },
+      "LawyerEmailBannerUploadRequest": {
+        "properties": {
+          "content_base64": {
+            "maxLength": 1500000,
+            "minLength": 1,
+            "title": "Content Base64",
+            "type": "string"
+          },
+          "file_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "File Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_name",
+          "content_base64"
+        ],
+        "title": "LawyerEmailBannerUploadRequest",
+        "type": "object"
+      },
       "LawyerProfileResponse": {
         "properties": {
           "bar_number": {
@@ -4657,6 +4887,146 @@
           "completion_percentage"
         ],
         "title": "MilestoneSummary",
+        "type": "object"
+      },
+      "NotificationTemplateItem": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "default_body": {
+            "title": "Default Body",
+            "type": "string"
+          },
+          "default_subject": {
+            "title": "Default Subject",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "is_custom": {
+            "title": "Is Custom",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "variables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Variables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "body",
+          "default_body",
+          "subject",
+          "default_subject",
+          "is_custom",
+          "enabled",
+          "variables"
+        ],
+        "title": "NotificationTemplateItem",
+        "type": "object"
+      },
+      "NotificationTemplateRequest": {
+        "properties": {
+          "body": {
+            "maxLength": 20000,
+            "title": "Body",
+            "type": "string"
+          },
+          "subject": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "NotificationTemplateRequest",
+        "type": "object"
+      },
+      "OrganizationGeneralSettingsRequest": {
+        "properties": {
+          "contact_email": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Contact Email",
+            "type": "string"
+          },
+          "support_email": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Support Email",
+            "type": "string"
+          },
+          "timezone": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contact_email",
+          "timezone"
+        ],
+        "title": "OrganizationGeneralSettingsRequest",
+        "type": "object"
+      },
+      "OrganizationGeneralSettingsResponse": {
+        "properties": {
+          "available_timezones": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Timezones",
+            "type": "array"
+          },
+          "contact_email": {
+            "title": "Contact Email",
+            "type": "string"
+          },
+          "support_email": {
+            "default": "",
+            "title": "Support Email",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contact_email",
+          "timezone",
+          "available_timezones"
+        ],
+        "title": "OrganizationGeneralSettingsResponse",
         "type": "object"
       },
       "OrganizationRead": {
@@ -5057,6 +5427,41 @@
         "title": "SwitchActiveRoleResponse",
         "type": "object"
       },
+      "TemplateFileExtractRequest": {
+        "properties": {
+          "content_base64": {
+            "maxLength": 3000000,
+            "minLength": 1,
+            "title": "Content Base64",
+            "type": "string"
+          },
+          "file_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "File Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_name",
+          "content_base64"
+        ],
+        "title": "TemplateFileExtractRequest",
+        "type": "object"
+      },
+      "TemplateFileExtractResponse": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TemplateFileExtractResponse",
+        "type": "object"
+      },
       "UnsubscribeRequest": {
         "properties": {
           "email": {
@@ -5440,6 +5845,120 @@
         ]
       }
     },
+    "/api/v1/admin/email-settings": {
+      "put": {
+        "description": "Turn notification types on or off for the whole organization and set the banner position.",
+        "operationId": "save_email_notification_settings_api_v1_admin_email_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailNotificationSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Email Notification Settings",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/email-templates": {
+      "get": {
+        "description": "Notification templates (all except the invitation, which has its own endpoints) and their toggles.",
+        "operationId": "list_notification_templates_api_v1_admin_email_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplatesOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Notification Templates",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/email-templates/extract-text": {
+      "post": {
+        "description": "Read the text of an uploaded .txt or .pdf file. Nothing is saved; the admin reviews it first.",
+        "operationId": "extract_template_file_text_api_v1_admin_email_templates_extract_text_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateFileExtractRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateFileExtractResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Extract Template File Text",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/email-templates/invitation": {
       "get": {
         "operationId": "get_invitation_template_api_v1_admin_email_templates_invitation_get",
@@ -5498,6 +6017,128 @@
           }
         ],
         "summary": "Save Invitation Template",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/email-templates/{template_key}": {
+      "put": {
+        "operationId": "save_notification_template_api_v1_admin_email_templates__template_key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_key",
+            "required": true,
+            "schema": {
+              "title": "Template Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Notification Template",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/general-settings": {
+      "get": {
+        "description": "The organization's main contact email, support email and timezone.",
+        "operationId": "get_general_settings_api_v1_admin_general_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationGeneralSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get General Settings",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Update the organization's main contact email, support email and timezone.",
+        "operationId": "save_general_settings_api_v1_admin_general_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationGeneralSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationGeneralSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save General Settings",
         "tags": [
           "admin"
         ]
@@ -8028,6 +8669,54 @@
         ]
       }
     },
+    "/api/v1/cases/by-number/{case_number}/documents/request-email": {
+      "post": {
+        "description": "Send the client one Document Request email listing every outstanding document.",
+        "operationId": "send_document_request_email_api_v1_cases_by_number__case_number__documents_request_email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDocumentRequestEmailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Send Document Request Email",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/api/v1/cases/by-number/{case_number}/documents/{document_id}": {
       "delete": {
         "operationId": "delete_case_document_api_v1_cases_by_number__case_number__documents__document_id__delete",
@@ -9433,6 +10122,148 @@
           }
         ],
         "summary": "Create Lawyer Client",
+        "tags": [
+          "lawyer"
+        ]
+      }
+    },
+    "/api/v1/lawyer/communication-settings": {
+      "get": {
+        "operationId": "get_communication_settings_api_v1_lawyer_communication_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawyerCommunicationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Communication Settings",
+        "tags": [
+          "lawyer"
+        ]
+      },
+      "put": {
+        "description": "Save the lawyer's email opt-ins. Admin-disabled types stay off regardless of this choice.",
+        "operationId": "update_communication_settings_api_v1_lawyer_communication_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LawyerCommunicationSettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawyerCommunicationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Communication Settings",
+        "tags": [
+          "lawyer"
+        ]
+      }
+    },
+    "/api/v1/lawyer/communication-settings/banner": {
+      "delete": {
+        "operationId": "delete_email_banner_api_v1_lawyer_communication_settings_banner_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawyerCommunicationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Email Banner",
+        "tags": [
+          "lawyer"
+        ]
+      },
+      "put": {
+        "description": "Store the lawyer's branding banner (logo and contact info) shown in their notification emails.",
+        "operationId": "upload_email_banner_api_v1_lawyer_communication_settings_banner_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LawyerEmailBannerUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawyerCommunicationSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upload Email Banner",
         "tags": [
           "lawyer"
         ]

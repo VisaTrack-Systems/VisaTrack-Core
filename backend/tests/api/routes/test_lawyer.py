@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 
 from app.api.routes import lawyer
 from app.schemas.lawyer import (
     InviteClientRequest,
     LawyerCaseCreateRequest,
     LawyerClientCreateRequest,
+    LawyerCommunicationSettingsUpdateRequest,
+    LawyerEmailBannerUploadRequest,
     LawyerProfileUpsertRequest,
 )
 from tests.support import FakeResult, row
@@ -221,3 +225,107 @@ def test_invite_client_to_case_returns_invitation(monkeypatch, make_auth_context
     assert result.case_number == 'C-2026-001'
     assert result.client_email == 'client@example.com'
     assert result.invitation_url.endswith('invite#token=invite-token')
+
+
+def test_update_communication_settings_saves_opt_ins(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    profile = row(custom_fields={'other': 1}, updated_at=None)
+    organization = row(settings={'email_notifications': {'enabled': {'reminder': False}}})
+    db = MagicMock()
+    # Profile lookup for the update, then organization + profile for the response.
+    db.scalar.side_effect = [profile, organization, profile]
+    monkeypatch.setattr(lawyer, 'log_activity', lambda *args, **kwargs: None)
+
+    result = lawyer.update_communication_settings(
+        payload=LawyerCommunicationSettingsUpdateRequest(enabled_templates={'case_status_update': False}),
+        auth=auth,
+        db=db,
+    )
+
+    assert profile.custom_fields['other'] == 1
+    assert profile.custom_fields['communication']['enabled_templates'] == {
+        'case_status_update': False,
+        'document_request': True,
+        'reminder': True,
+    }
+    by_key = {item.key: item for item in result.templates}
+    assert by_key['case_status_update'].enabled is False
+    # The admin turned reminders off; the lawyer's own choice is still reported separately.
+    assert by_key['reminder'].org_enabled is False
+    assert by_key['reminder'].enabled is True
+    db.commit.assert_called_once()
+
+
+def test_update_communication_settings_rejects_unknown_template(make_auth_context):
+    with pytest.raises(HTTPException) as exc:
+        lawyer.update_communication_settings(
+            payload=LawyerCommunicationSettingsUpdateRequest(enabled_templates={'invoice': True}),
+            auth=make_auth_context(roles=['lawyer']),
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_upload_email_banner_stores_image_and_reference(monkeypatch, make_auth_context):
+    auth = make_auth_context(roles=['lawyer'])
+    profile = row(custom_fields={}, updated_at=None)
+    db = MagicMock()
+    db.scalar.side_effect = [profile, row(settings={}), profile]
+    stored = {}
+    monkeypatch.setattr(lawyer, 'put_object_bytes', lambda **kwargs: stored.update(kwargs))
+    monkeypatch.setattr(lawyer, 'create_presigned_download', lambda **kwargs: 'https://storage.example/banner')
+    monkeypatch.setattr(lawyer, 'log_activity', lambda *args, **kwargs: None)
+    png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 16
+
+    result = lawyer.upload_email_banner(
+        payload=LawyerEmailBannerUploadRequest(
+            file_name='logo.png', content_base64=base64.b64encode(png).decode()
+        ),
+        auth=auth,
+        db=db,
+    )
+
+    assert stored['payload'] == png
+    assert stored['content_type'] == 'image/png'
+    assert stored['object_key'].endswith(f'/users/{auth.user_id}/email-banner.png')
+    assert profile.custom_fields['communication']['banner']['object_key'] == stored['object_key']
+    assert result.banner.url == 'https://storage.example/banner'
+
+
+def test_upload_email_banner_returns_503_when_storage_credentials_are_bad(monkeypatch, make_auth_context):
+    from app.services.storage import StorageConfigurationError
+
+    profile = row(custom_fields={}, updated_at=None)
+    db = MagicMock()
+    db.scalar.return_value = profile
+
+    def reject(**kwargs):
+        raise StorageConfigurationError('AWS credentials were rejected by S3')
+
+    monkeypatch.setattr(lawyer, 'put_object_bytes', reject)
+    png = b'\x89PNG\r\n\x1a\n' + b'\x00' * 16
+
+    with pytest.raises(HTTPException) as exc:
+        lawyer.upload_email_banner(
+            payload=LawyerEmailBannerUploadRequest(file_name='logo.png', content_base64=base64.b64encode(png).decode()),
+            auth=make_auth_context(roles=['lawyer']),
+            db=db,
+        )
+
+    assert exc.value.status_code == 503
+    assert 'AWS credentials' in exc.value.detail
+    db.commit.assert_not_called()
+
+
+def test_upload_email_banner_rejects_non_image(make_auth_context):
+    with pytest.raises(HTTPException) as exc:
+        lawyer.upload_email_banner(
+            payload=LawyerEmailBannerUploadRequest(
+                file_name='logo.png', content_base64=base64.b64encode(b'<svg/>').decode()
+            ),
+            auth=make_auth_context(roles=['lawyer']),
+            db=MagicMock(),
+        )
+
+    assert exc.value.status_code == 400
