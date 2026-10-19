@@ -62,7 +62,11 @@ export function CaseSectionNav({ activeSection, caseId, onBack, onSectionChange,
         </p>
       </div>
 
-      <nav aria-label="Case sections" className="mt-3 overflow-x-auto px-4 sm:px-6 lg:px-8">
+      {/* Still scrolls sideways on narrow screens (swipe or trackpad), but the scrollbar is hidden. */}
+      <nav
+        aria-label="Case sections"
+        className="mt-3 overflow-x-auto px-4 sm:px-6 lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <div className="flex gap-1">
           {SECTIONS.map((section) => {
             const isActive = activeSection === section.id;

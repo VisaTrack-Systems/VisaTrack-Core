@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
 import html as html_lib
 import logging
+import re
+from html.parser import HTMLParser
 
 import resend
 
@@ -14,8 +17,15 @@ from app.services.email_compliance import (
 
 logger = logging.getLogger(__name__)
 
-# The default invitation email body. Supports three placeholders:
-#   {recipient_name}, {organization_name}, {invitation_url}
+# Placeholders an invitation template may use. {invitation_link} is an alias of {invitation_url},
+# and templates saved before the rename may still use {support_email} (same as {organization_main_email}).
+INVITATION_VARIABLES = [
+    "{recipient_name}", "{organization_name}", "{organization_phone_number}",
+    "{organization_main_email}", "{organization_support_email}", "{invitation_url}",
+    "{inviter_name}", "{expiration_time_hours}", "{portal_url}",
+]
+
+# The default invitation email body.
 DEFAULT_INVITATION_TEMPLATE = (
     "Hi {recipient_name},\n\n"
     "You have been invited to join {organization_name} on VisaTrack. "
@@ -26,9 +36,365 @@ DEFAULT_INVITATION_TEMPLATE = (
     "— The {organization_name} Team"
 )
 
+# Placeholders every case email may use. Older templates may still use {recipient_name}
+# (same as {client_name}) and {status} (same as {case_status}); both keep working.
+CASE_EMAIL_VARIABLES = [
+    "{client_name}", "{case_number}", "{case_status}", "{lawyer_name}", "{lawyer_phone_number}",
+    "{document_name}", "{organization_name}", "{organization_phone_number}",
+    "{organization_main_email}", "{organization_support_email}", "{portal_url}",
+]
+
+# Notification emails sent to clients about their case. Each entry holds the
+# default body (used until an admin saves a custom one), the subject line, and
+# the placeholders the body may use. The keys are also the names stored in
+# Organization.settings["email_templates"] and in the toggle settings.
+DEFAULT_NOTIFICATION_TEMPLATES: dict[str, dict] = {
+    "case_status_update": {
+        "label": "Case status update",
+        "description": "Sent to clients when their case status changes.",
+        "subject": "Case {case_number}: status updated",
+        "body": "Your case status has been updated to '{case_status}'.",
+        "variables": CASE_EMAIL_VARIABLES,
+    },
+    "document_request": {
+        "label": "Document request",
+        "description": "Sent to clients when documents are requested on their case.",
+        "subject": "Case {case_number}: documents requested",
+        "body": (
+            "Hi {client_name},\n\n"
+            "Please upload the following for case {case_number}:\n{document_name}\n\n"
+            "You can upload them securely from your client portal.\n\n"
+            "— {lawyer_name}, {organization_name}"
+        ),
+        "variables": CASE_EMAIL_VARIABLES,
+    },
+    "reminder": {
+        "label": "Reminder",
+        "description": "Sent to clients when a reminder with email notification is posted on their case.",
+        "subject": "Reminder: {reminder_title}",
+        "body": (
+            "Hi {client_name},\n\n"
+            "{reminder_title}\n\n"
+            "{reminder_body}\n\n"
+            "— {lawyer_name}, {organization_name}"
+        ),
+        "variables": [*CASE_EMAIL_VARIABLES, "{reminder_title}", "{reminder_body}"],
+    },
+}
+
+# Where a lawyer's banner image goes in notification emails. Admins choose per organization.
+BANNER_POSITIONS = ("top", "bottom")
+DEFAULT_BANNER_POSITION = "top"
+
+# Content ID that ties the inline banner attachment to the <img> tag in the HTML body.
+_BANNER_CONTENT_ID = "email-banner"
+
 
 class EmailNotConfiguredError(Exception):
     pass
+
+
+_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+_SUBJECT_LINE = re.compile(r"^[ \t]*subject[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
+
+
+def portal_url() -> str:
+    """The {portal_url} value: the app's landing page, where clients and staff sign in."""
+    return settings.frontend_origin.split(",")[0].strip().rstrip("/") + "/"
+
+
+def fill_placeholders(template: str, values: dict[str, str]) -> str:
+    """Replace {name} placeholders in one pass. Unknown names and stray braces are left as
+    written, and a value that itself contains braces is never substituted again."""
+    return _PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), template)
+
+
+def split_subject_line(template: str) -> tuple[str | None, str]:
+    """Pull a "Subject: ..." line out of an uploaded template.
+
+    Returns (subject, body without that line), or (None, template) if there is no such line.
+    """
+    match = _SUBJECT_LINE.search(template)
+    if match is None:
+        return None, template
+    body = template[: match.start()] + template[match.end():]
+    return match.group(1), body.strip("\n")
+
+
+def _placeholder_html(
+    name: str,
+    value: str,
+    *,
+    link_names: tuple[str, ...],
+    bold_names: tuple[str, ...],
+    allow_links: bool = True,
+) -> str:
+    """One filled placeholder as HTML: escaped, and linked or bolded if its name is listed."""
+    escaped = html_lib.escape(value)
+    if allow_links and name in link_names:
+        return f'<a href="{escaped}" style="color:#2563eb;">{escaped}</a>'
+    if name in bold_names:
+        return f"<strong>{escaped}</strong>"
+    return escaped
+
+
+def _custom_body_html(
+    template: str,
+    values: dict[str, str],
+    *,
+    link_names: tuple[str, ...] = (),
+    bold_names: tuple[str, ...] = (),
+) -> str:
+    """HTML for a plain-text template: escaped, placeholders filled, line breaks kept.
+
+    Values named in link_names become clickable links; values in bold_names are bolded.
+    """
+    def replacement(match: re.Match) -> str:
+        name = match.group(1)
+        if name not in values:
+            return match.group(0)
+        return _placeholder_html(name, values[name], link_names=link_names, bold_names=bold_names)
+
+    return _PLACEHOLDER.sub(replacement, html_lib.escape(template)).replace("\n", "<br>")
+
+
+# ── Rich-text (HTML) templates ───────────────────────────────────────────────
+# The admin settings editor saves templates as HTML. Only the tags, attributes and CSS
+# properties below are kept; everything else (scripts, event handlers, images, unknown
+# styles) is dropped, both when a template is saved and again when it is sent.
+
+_ALLOWED_TAGS = {
+    "p", "div", "br", "span", "strong", "b", "em", "i", "u", "s", "a",
+    "ul", "ol", "li", "font", "blockquote", "h1", "h2", "h3",
+}
+_VOID_TAGS = {"br"}
+# Tags whose text content is dropped along with the tag itself.
+_DROPPED_CONTENT_TAGS = {"script", "style", "head", "title", "template"}
+_BLOCK_TAGS = {"p", "div", "li", "blockquote", "h1", "h2", "h3"}
+_ALLOWED_STYLES = {
+    "color", "background-color", "font-family", "font-size", "font-weight",
+    "font-style", "text-decoration", "text-decoration-line", "text-align",
+}
+_FONT_ATTRIBUTES = {"color", "face", "size"}
+# rgb()/rgba() is the only CSS function allowed; it is what browsers write for picked colors.
+_CSS_COLOR_FUNCTION = re.compile(r"rgba?\([\d\s.,%]+\)", re.IGNORECASE)
+_SAFE_CSS_VALUE = re.compile(r"[\w\s#,.%'\"-]+")
+_SAFE_LINK = re.compile(r"^(https?://|mailto:)", re.IGNORECASE)
+_LINK_PLACEHOLDER = re.compile(r"^\{\w+\}$")
+_HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
+
+
+def is_html_template(template: str) -> bool:
+    """True for a template saved by the rich-text editor; False for older plain-text ones."""
+    return bool(_HTML_TAG.search(template))
+
+
+def _is_safe_css_value(value: str) -> bool:
+    return bool(_SAFE_CSS_VALUE.fullmatch(_CSS_COLOR_FUNCTION.sub("0", value)))
+
+
+def _clean_style(style: str) -> str:
+    """Keep only allowed CSS properties whose values have no url(), expression() or similar."""
+    rules = []
+    for declaration in style.split(";"):
+        prop, _, value = declaration.partition(":")
+        prop = prop.strip().lower()
+        value = value.strip()
+        if prop in _ALLOWED_STYLES and _is_safe_css_value(value):
+            rules.append(f"{prop}: {value}")
+    return "; ".join(rules)
+
+
+class _TemplateHtmlRenderer(HTMLParser):
+    """Rebuilds template HTML from an allowlist of tags, attributes and styles.
+
+    With values given, {placeholders} are filled as well (escaped, like plain-text templates).
+    Without values, the placeholders are kept, which is how templates are cleaned before saving.
+    The output is always balanced: unclosed tags are closed at the end.
+    """
+
+    def __init__(
+        self,
+        values: dict[str, str] | None = None,
+        *,
+        link_names: tuple[str, ...] = (),
+        bold_names: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(convert_charrefs=True)
+        self.values = values
+        self.link_names = link_names
+        self.bold_names = bold_names
+        self.parts: list[str] = []
+        self.open_tags: list[str] = []
+        self.dropped_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in _DROPPED_CONTENT_TAGS:
+            self.dropped_depth += 1
+            return
+        if tag not in _ALLOWED_TAGS or self.dropped_depth:
+            return
+        self.parts.append(f"<{tag}{self._clean_attributes(tag, attrs)}>")
+        if tag not in _VOID_TAGS:
+            self.open_tags.append(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _DROPPED_CONTENT_TAGS:
+            self.dropped_depth = max(0, self.dropped_depth - 1)
+            return
+        if tag not in self.open_tags:
+            return
+        # Close anything opened inside this tag too, so the output stays well formed.
+        while self.open_tags:
+            open_tag = self.open_tags.pop()
+            self.parts.append(f"</{open_tag}>")
+            if open_tag == tag:
+                break
+
+    def handle_data(self, data: str) -> None:
+        if self.dropped_depth:
+            return
+        if self.values is None:
+            self.parts.append(html_lib.escape(data, quote=False))
+            return
+        values = self.values
+        inside_link = "a" in self.open_tags
+
+        def replacement(match: re.Match) -> str:
+            name = match.group(1)
+            if name not in values:
+                return match.group(0)
+            filled = _placeholder_html(
+                name,
+                values[name],
+                link_names=self.link_names,
+                bold_names=self.bold_names,
+                allow_links=not inside_link,
+            )
+            return filled.replace("\n", "<br>")
+
+        # Escape the text between placeholders; braces and names are unchanged by escaping.
+        self.parts.append(_PLACEHOLDER.sub(replacement, html_lib.escape(data, quote=False)))
+
+    def _clean_attributes(self, tag: str, attrs: list[tuple[str, str | None]]) -> str:
+        kept: list[tuple[str, str]] = []
+        for name, raw_value in attrs:
+            value = (raw_value or "").strip()
+            if tag == "a" and name == "href":
+                href = self._link(value)
+                if href:
+                    kept.append(("href", href))
+            elif name == "style":
+                style = _clean_style(value)
+                if style:
+                    kept.append(("style", style))
+            elif tag == "font" and name in _FONT_ATTRIBUTES and _is_safe_css_value(value):
+                kept.append((name, value))
+        return "".join(f' {name}="{html_lib.escape(value)}"' for name, value in kept)
+
+    def _link(self, href: str) -> str | None:
+        """The href to keep, or None. A lone {placeholder} is allowed and filled when sending."""
+        if self.values is None:
+            return href if _SAFE_LINK.match(href) or _LINK_PLACEHOLDER.match(href) else None
+        filled = fill_placeholders(href, self.values)
+        return filled if _SAFE_LINK.match(filled) else None
+
+    def result(self) -> str:
+        self.close()
+        closing = "".join(f"</{tag}>" for tag in reversed(self.open_tags))
+        self.open_tags = []
+        return "".join(self.parts) + closing
+
+
+class _HtmlToText(HTMLParser):
+    """Plain-text version of a template, for the text part of the email."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.link_stack: list[str] = []
+        self.dropped_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in _DROPPED_CONTENT_TAGS:
+            self.dropped_depth += 1
+        elif tag == "br":
+            self.parts.append("\n")
+        elif tag == "li":
+            self.parts.append("- ")
+        elif tag == "a":
+            self.link_stack.append(dict(attrs).get("href") or "")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _DROPPED_CONTENT_TAGS:
+            self.dropped_depth = max(0, self.dropped_depth - 1)
+        elif tag in _BLOCK_TAGS:
+            self.parts.append("\n")
+        elif tag == "a" and self.link_stack:
+            # Keep the address visible, since plain text cannot hold a link.
+            href = self.link_stack.pop()
+            if href:
+                self.parts.append(f" ({href})")
+
+    def handle_data(self, data: str) -> None:
+        if not self.dropped_depth:
+            self.parts.append(data)
+
+    def result(self) -> str:
+        self.close()
+        text = "".join(self.parts).replace("\xa0", " ")
+        lines = [line.rstrip() for line in text.split("\n")]
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def sanitize_template_html(template: str) -> str:
+    """Clean a template before saving it. Plain-text templates are returned unchanged."""
+    if not is_html_template(template):
+        return template
+    renderer = _TemplateHtmlRenderer()
+    renderer.feed(template)
+    return renderer.result()
+
+
+def html_template_to_text(template: str) -> str:
+    """The text of an HTML template, with its {placeholders} kept."""
+    converter = _HtmlToText()
+    converter.feed(template)
+    return converter.result()
+
+
+def render_template_body(
+    template: str,
+    values: dict[str, str],
+    *,
+    link_names: tuple[str, ...] = (),
+    bold_names: tuple[str, ...] = (),
+) -> tuple[str, str]:
+    """Return (html, plain text) for a custom template, which may be HTML or plain text."""
+    if is_html_template(template):
+        renderer = _TemplateHtmlRenderer(values, link_names=link_names, bold_names=bold_names)
+        renderer.feed(template)
+        return renderer.result(), fill_placeholders(html_template_to_text(template), values)
+    html = _custom_body_html(template, values, link_names=link_names, bold_names=bold_names)
+    return html, fill_placeholders(template, values)
+
+
+def _standalone_email_html(content_html: str, to_email: str, *, top: str = "", bottom: str = "") -> str:
+    """A minimal page for custom templates: the admin's text only, with no header, card, or
+    button around it. The unsubscribe footer is always kept (required for compliance)."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
+  {top}
+  <div style="max-width:600px;">{content_html}</div>
+  {compliance_html_footer(to_email)}
+  {bottom}
+</body>
+</html>"""
 
 
 def _darken_hex(hex_color: str, factor: float = 0.8) -> str:
@@ -55,14 +421,21 @@ def send_invitation_email(
     button_label: str = "Activate my account",
     subject_template: str | None = None,
     bold_org_name: bool = True,
+    inviter_name: str = "",
+    organization_main_email: str = "",
+    organization_support_email: str = "",
+    organization_phone_number: str = "",
 ) -> None:
     """Send an invitation email via Resend.
 
-    If body_template is provided it replaces the default message body.
-    Supports {recipient_name}, {organization_name}, and {invitation_url} placeholders.
+    If body_template is provided it replaces the whole default email (header, button and
+    layout), not just the message text. See INVITATION_VARIABLES for its placeholders. A
+    custom template without {invitation_url} gets the link appended so the invite always
+    works, and a "Subject: ..." line in a plain-text one is used as the subject. A template
+    saved by the rich-text editor is HTML and is sanitized before sending.
 
-    Style parameters (button_color, button_label, subject_template, bold_org_name)
-    apply to both custom and default templates.
+    button_color and button_label apply only to the default template; subject_template
+    and bold_org_name apply to both.
 
     Raises EmailNotConfiguredError if RESEND_API_KEY is not set.
     Raises resend.exceptions.ResendError on API/delivery failure.
@@ -76,21 +449,53 @@ def send_invitation_email(
 
     from_address = f"{settings.resend_from_name} <{settings.resend_from_email}>"
 
-    template = body_template if body_template else DEFAULT_INVITATION_TEMPLATE
+    main_email = organization_main_email or settings.resend_from_email
+    values = {
+        "recipient_name": recipient_name,
+        "organization_name": organization_name,
+        "invitation_url": invitation_url,
+        "invitation_link": invitation_url,
+        "inviter_name": inviter_name or organization_name,
+        "expiration_time_hours": str(settings.invitation_expiry_hours),
+        "organization_main_email": main_email,
+        "organization_support_email": organization_support_email or main_email,
+        # Older templates may still use {support_email}.
+        "support_email": main_email,
+        "organization_phone_number": organization_phone_number,
+        "portal_url": portal_url(),
+    }
+    subject = fill_placeholders(subject_template or "You have been invited to join {organization_name}", values)
 
-    # Plain text version — explicit replacements to avoid KeyError on stray braces.
-    plain = (
-        template
-        .replace("{recipient_name}", recipient_name)
-        .replace("{organization_name}", organization_name)
-        .replace("{invitation_url}", invitation_url)
-        + compliance_plain_footer(to_email)
-    )
+    if body_template:
+        is_html = is_html_template(body_template)
+        if "{invitation_url}" not in body_template and "{invitation_link}" not in body_template:
+            logger.warning("Custom invitation template has no {invitation_url}; appending the link.")
+            link_line = "<p>{invitation_url}</p>" if is_html else "\n\n{invitation_url}"
+            body_template = body_template.rstrip() + link_line
+        if not is_html:
+            file_subject, body_template = split_subject_line(body_template)
+            if file_subject:
+                subject = fill_placeholders(file_subject, values)
 
-    # Resolved subject line.
-    subject = (
-        subject_template or "You have been invited to join {organization_name}"
-    ).replace("{organization_name}", organization_name)
+        content_html, content_text = render_template_body(
+            body_template,
+            values,
+            link_names=("invitation_url", "invitation_link"),
+            bold_names=("organization_name",) if bold_org_name else (),
+        )
+        resend.Emails.send({
+            "from": from_address,
+            "to": [to_email],
+            "subject": subject,
+            "text": content_text + compliance_plain_footer(to_email),
+            "html": _standalone_email_html(content_html, to_email),
+            "click_tracking": False,
+            "headers": {"List-Unsubscribe": f"<{unsubscribe_url(to_email)}>"},
+        })
+        logger.info("Invitation email (custom template) sent to %s via Resend", to_email)
+        return
+
+    plain = fill_placeholders(DEFAULT_INVITATION_TEMPLATE, values) + compliance_plain_footer(to_email)
 
     # Pre-escape values shared across both HTML paths.
     darker = _darken_hex(button_color)
@@ -120,23 +525,7 @@ def send_invitation_email(
         f'</td></tr></table>'
     )
 
-    if body_template:
-        # Custom plain-text template: escape each segment around {invitation_url},
-        # substituting variables, then join with the button.
-        def escape_part(text: str) -> str:
-            # Escape HTML-special characters first, then replace our placeholders.
-            out = html_lib.escape(text)
-            out = out.replace("{recipient_name}", escaped_recipient)
-            out = out.replace("{organization_name}", org_display)
-            return out.replace("\n", "<br>")
-
-        parts = body_template.split("{invitation_url}")
-        body_content = button_html.join(escape_part(p) for p in parts)
-
-        body_html = f'<p style="color:#374151;line-height:1.65;margin:0;">{body_content}</p>'
-
-    else:
-        body_html = f"""
+    body_html = f"""
       <h2 style="margin:0 0 16px;color:#111827;font-size:20px;font-weight:600;font-family:Arial,Helvetica,sans-serif;">Hello, {escaped_recipient}!</h2>
       <p style="margin:0 0 16px;color:#374151;line-height:1.65;">
         You have been invited to join {org_display} on VisaTrack.
@@ -178,6 +567,98 @@ def send_invitation_email(
     })
 
     logger.info("Invitation email sent to %s via Resend", to_email)
+
+
+def send_notification_email(
+    *,
+    to_email: str,
+    subject_template: str,
+    body_template: str,
+    values: dict[str, str],
+    banner_bytes: bytes | None = None,
+    banner_content_type: str | None = None,
+    banner_position: str = DEFAULT_BANNER_POSITION,
+    use_default_layout: bool = True,
+) -> None:
+    """Send a case notification email (status update, document request, reminder) via Resend.
+
+    The body is plain text or (from the rich-text editor) HTML with {placeholders}; values
+    are substituted and HTML-escaped, and HTML bodies are sanitized.
+    If banner_bytes is given, the image is attached inline and shown at the top or bottom.
+    With use_default_layout=False (an admin's custom template) the body is sent on its own,
+    without the default card layout, and a "Subject: ..." line in a plain-text body becomes
+    the subject.
+
+    Raises EmailNotConfiguredError if RESEND_API_KEY is not set.
+    Raises resend.exceptions.ResendError on API/delivery failure.
+    """
+    if not settings.resend_api_key:
+        raise EmailNotConfiguredError(
+            "Resend is not configured. Set RESEND_API_KEY in your environment."
+        )
+
+    resend.api_key = settings.resend_api_key
+
+    from_address = f"{settings.resend_from_name} <{settings.resend_from_email}>"
+    if not use_default_layout and not is_html_template(body_template):
+        file_subject, body_template = split_subject_line(body_template)
+        subject_template = file_subject or subject_template
+    subject = fill_placeholders(subject_template, values)
+    body_html, body_text = render_template_body(body_template, values)
+    plain = body_text + compliance_plain_footer(to_email)
+
+    banner_html = ""
+    if banner_bytes:
+        banner_html = (
+            f'<img src="cid:{_BANNER_CONTENT_ID}" alt="" '
+            'style="display:block;width:100%;max-width:600px;height:auto;border:0;">'
+        )
+    top_banner = banner_html if banner_position == "top" else ""
+    bottom_banner = banner_html if banner_position == "bottom" else ""
+
+    if not use_default_layout:
+        html = _standalone_email_html(body_html, to_email, top=top_banner, bottom=bottom_banner)
+    else:
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0;padding:32px 16px;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
+    {top_banner}
+    <div style="padding:28px 28px 32px;">
+      <div style="color:#374151;line-height:1.65;margin:0;">{body_html}</div>
+      {compliance_html_footer(to_email)}
+    </div>
+    {bottom_banner}
+  </div>
+</body>
+</html>"""
+
+    send_params: dict = {
+        "from": from_address,
+        "to": [to_email],
+        "subject": subject,
+        "text": plain,
+        "html": html,
+        "click_tracking": False,
+        "headers": {"List-Unsubscribe": f"<{unsubscribe_url(to_email)}>"},
+    }
+    if banner_bytes:
+        send_params["attachments"] = [
+            {
+                "filename": "banner",
+                "content": base64.b64encode(banner_bytes).decode("ascii"),
+                "content_type": banner_content_type or "image/png",
+                "content_id": _BANNER_CONTENT_ID,
+            }
+        ]
+
+    resend.Emails.send(send_params)
+
+    logger.info("Notification email '%s' sent to %s via Resend", subject, to_email)
 
 
 def send_bug_report_email(

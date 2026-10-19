@@ -18,6 +18,7 @@ import {
   type CaseWorkspace,
   renameCaseDocument,
   createCaseReminder,
+  sendDocumentRequestEmail,
   updateCaseMilestone,
   getCaseWorkspaceByNumber,
   updateCaseDetails,
@@ -122,6 +123,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [isCreatingDocumentSuite, setIsCreatingDocumentSuite] = useState(false);
   const [isAddingDocument, setIsAddingDocument] = useState(false);
   const [isSendingBulkReminders, setIsSendingBulkReminders] = useState(false);
+  const [isEmailingDocumentRequests, setIsEmailingDocumentRequests] = useState(false);
   const [renamingDocumentId, setRenamingDocumentId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [downloadingDocumentId, setDownloadingDocumentId] = useState<string | null>(null);
@@ -441,6 +443,32 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return false;
     } finally {
       setIsCreatingDocumentSuite(false);
+    }
+  };
+
+  const handleEmailDocumentRequests = async (): Promise<void> => {
+    if (!workspace) {
+      return;
+    }
+
+    setIsEmailingDocumentRequests(true);
+    try {
+      const result = await sendDocumentRequestEmail(workspace.case.case_number);
+      const count = result.document_names.length;
+      if (result.sent) {
+        showNotice('success', `Emailed the client a request for ${count} document${count === 1 ? '' : 's'}.`);
+      } else {
+        showNotice(
+          'error',
+          'No email was sent. Document request emails may be turned off in Settings, the client may have ' +
+            'unsubscribed, or email is not configured.'
+        );
+      }
+    } catch (emailError) {
+      const message = emailError instanceof Error ? emailError.message : 'Unknown error';
+      showNotice('error', `Failed to email document requests: ${message}`);
+    } finally {
+      setIsEmailingDocumentRequests(false);
     }
   };
 
@@ -924,6 +952,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           onApplySuite={handleApplySuite}
           onSendReminders={handleSendReminders}
           sendingBulkReminders={isSendingBulkReminders}
+          onEmailDocumentRequests={handleEmailDocumentRequests}
+          emailingDocumentRequests={isEmailingDocumentRequests}
           onDownloadAll={handleDownloadAllDocuments}
           onRenameDocument={handleRenameDocument}
           renamingDocumentId={renamingDocumentId}

@@ -103,3 +103,21 @@ def test_download_name_strips_header_control_characters(monkeypatch):
     assert '\r' not in disposition
     assert '\n' not in disposition
     assert disposition.count('"') == 2
+
+
+@pytest.mark.parametrize(
+    ('code', 'expected'),
+    [
+        ('InvalidAccessKeyId', storage.StorageConfigurationError),
+        ('AccessDenied', storage.StorageOperationError),
+    ],
+)
+def test_put_object_bytes_reports_rejected_credentials_as_configuration_error(monkeypatch, code, expected):
+    from botocore.exceptions import ClientError
+
+    client = MagicMock()
+    client.put_object.side_effect = ClientError({'Error': {'Code': code, 'Message': 'nope'}}, 'PutObject')
+    monkeypatch.setattr(storage, '_s3_client', lambda: client)
+
+    with pytest.raises(expected):
+        storage.put_object_bytes(object_key='k', payload=b'x', content_type='image/png')

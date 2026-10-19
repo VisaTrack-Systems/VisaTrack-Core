@@ -38,6 +38,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/email-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Email Notification Settings
+         * @description Turn notification types on or off for the whole organization and set the banner position.
+         */
+        put: operations["save_email_notification_settings_api_v1_admin_email_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notification Templates
+         * @description Notification templates (all except the invitation, which has its own endpoints) and their toggles.
+         */
+        get: operations["list_notification_templates_api_v1_admin_email_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/email-templates/extract-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extract Template File Text
+         * @description Read the text of an uploaded .txt or .pdf file. Nothing is saved; the admin reviews it first.
+         */
+        post: operations["extract_template_file_text_api_v1_admin_email_templates_extract_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/email-templates/invitation": {
         parameters: {
             query?: never;
@@ -49,6 +109,47 @@ export interface paths {
         get: operations["get_invitation_template_api_v1_admin_email_templates_invitation_get"];
         /** Save Invitation Template */
         put: operations["save_invitation_template_api_v1_admin_email_templates_invitation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/email-templates/{template_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Notification Template */
+        put: operations["save_notification_template_api_v1_admin_email_templates__template_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/general-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get General Settings
+         * @description The organization's main contact email, support email and timezone.
+         */
+        get: operations["get_general_settings_api_v1_admin_general_settings_get"];
+        /**
+         * Save General Settings
+         * @description Update the organization's main contact email, support email and timezone.
+         */
+        put: operations["save_general_settings_api_v1_admin_general_settings_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -830,6 +931,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/by-number/{case_number}/documents/request-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Document Request Email
+         * @description Send the client one Document Request email listing every outstanding document.
+         */
+        post: operations["send_document_request_email_api_v1_cases_by_number__case_number__documents_request_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases/by-number/{case_number}/documents/{document_id}": {
         parameters: {
             query?: never;
@@ -1210,6 +1331,48 @@ export interface paths {
         /** Create Lawyer Client */
         post: operations["create_lawyer_client_api_v1_lawyer_clients_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lawyer/communication-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Communication Settings */
+        get: operations["get_communication_settings_api_v1_lawyer_communication_settings_get"];
+        /**
+         * Update Communication Settings
+         * @description Save the lawyer's email opt-ins. Admin-disabled types stay off regardless of this choice.
+         */
+        put: operations["update_communication_settings_api_v1_lawyer_communication_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lawyer/communication-settings/banner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload Email Banner
+         * @description Store the lawyer's branding banner (logo and contact info) shown in their notification emails.
+         */
+        put: operations["upload_email_banner_api_v1_lawyer_communication_settings_banner_put"];
+        post?: never;
+        /** Delete Email Banner */
+        delete: operations["delete_email_banner_api_v1_lawyer_communication_settings_banner_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2216,6 +2379,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CaseDocumentRequestEmailResponse */
+        CaseDocumentRequestEmailResponse: {
+            /** Document Names */
+            document_names: string[];
+            /** Sent */
+            sent: boolean;
+        };
         /** CaseDocumentStatusUpdateRequest */
         CaseDocumentStatusUpdateRequest: {
             /** Rejection Note */
@@ -2837,6 +3007,37 @@ export interface components {
             /** Users */
             users: number;
         };
+        /** EmailNotificationSettingsRequest */
+        EmailNotificationSettingsRequest: {
+            /**
+             * Banner Position
+             * @enum {string}
+             */
+            banner_position: "top" | "bottom";
+            /** Enabled Templates */
+            enabled_templates: {
+                [key: string]: boolean;
+            };
+            /** Invitation Enabled */
+            invitation_enabled?: boolean | null;
+        };
+        /** EmailTemplatesOverviewResponse */
+        EmailTemplatesOverviewResponse: {
+            /**
+             * Banner Position
+             * @enum {string}
+             */
+            banner_position: "top" | "bottom";
+            /**
+             * Invitation Enabled
+             * @default true
+             */
+            invitation_enabled: boolean;
+            /** Invitation Variables */
+            invitation_variables?: string[];
+            /** Templates */
+            templates: components["schemas"]["NotificationTemplateItem"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3027,6 +3228,53 @@ export interface components {
              */
             user_id: string;
         };
+        /** LawyerCommunicationSettingsResponse */
+        LawyerCommunicationSettingsResponse: {
+            banner: components["schemas"]["LawyerEmailBanner"] | null;
+            /**
+             * Banner Position
+             * @enum {string}
+             */
+            banner_position: "top" | "bottom";
+            /** Templates */
+            templates: components["schemas"]["LawyerCommunicationTemplateItem"][];
+        };
+        /** LawyerCommunicationSettingsUpdateRequest */
+        LawyerCommunicationSettingsUpdateRequest: {
+            /** Enabled Templates */
+            enabled_templates: {
+                [key: string]: boolean;
+            };
+        };
+        /** LawyerCommunicationTemplateItem */
+        LawyerCommunicationTemplateItem: {
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Org Enabled */
+            org_enabled: boolean;
+        };
+        /** LawyerEmailBanner */
+        LawyerEmailBanner: {
+            /** Content Type */
+            content_type: string;
+            /** File Name */
+            file_name: string;
+            /** Url */
+            url?: string | null;
+        };
+        /** LawyerEmailBannerUploadRequest */
+        LawyerEmailBannerUploadRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** File Name */
+            file_name: string;
+        };
         /** LawyerProfileResponse */
         LawyerProfileResponse: {
             /** Bar Number */
@@ -3120,6 +3368,65 @@ export interface components {
             name: string;
             /** Status */
             status: string;
+        };
+        /** NotificationTemplateItem */
+        NotificationTemplateItem: {
+            /** Body */
+            body: string;
+            /** Default Body */
+            default_body: string;
+            /** Default Subject */
+            default_subject: string;
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Is Custom */
+            is_custom: boolean;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Subject */
+            subject: string;
+            /** Variables */
+            variables: string[];
+        };
+        /** NotificationTemplateRequest */
+        NotificationTemplateRequest: {
+            /** Body */
+            body: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+        };
+        /** OrganizationGeneralSettingsRequest */
+        OrganizationGeneralSettingsRequest: {
+            /** Contact Email */
+            contact_email: string;
+            /**
+             * Support Email
+             * @default
+             */
+            support_email: string;
+            /** Timezone */
+            timezone: string;
+        };
+        /** OrganizationGeneralSettingsResponse */
+        OrganizationGeneralSettingsResponse: {
+            /** Available Timezones */
+            available_timezones: string[];
+            /** Contact Email */
+            contact_email: string;
+            /**
+             * Support Email
+             * @default
+             */
+            support_email: string;
+            /** Timezone */
+            timezone: string;
         };
         /** OrganizationRead */
         OrganizationRead: {
@@ -3288,6 +3595,18 @@ export interface components {
              */
             token_type: string;
         };
+        /** TemplateFileExtractRequest */
+        TemplateFileExtractRequest: {
+            /** Content Base64 */
+            content_base64: string;
+            /** File Name */
+            file_name: string;
+        };
+        /** TemplateFileExtractResponse */
+        TemplateFileExtractResponse: {
+            /** Text */
+            text: string;
+        };
         /** UnsubscribeRequest */
         UnsubscribeRequest: {
             /** Email */
@@ -3448,6 +3767,90 @@ export interface operations {
             };
         };
     };
+    save_email_notification_settings_api_v1_admin_email_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailNotificationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notification_templates_api_v1_admin_email_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplatesOverviewResponse"];
+                };
+            };
+        };
+    };
+    extract_template_file_text_api_v1_admin_email_templates_extract_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateFileExtractRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateFileExtractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_invitation_template_api_v1_admin_email_templates_invitation_get: {
         parameters: {
             query?: never;
@@ -3487,6 +3890,92 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_notification_template_api_v1_admin_email_templates__template_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_general_settings_api_v1_admin_general_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationGeneralSettingsResponse"];
+                };
+            };
+        };
+    };
+    save_general_settings_api_v1_admin_general_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationGeneralSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationGeneralSettingsResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5145,6 +5634,37 @@ export interface operations {
             };
         };
     };
+    send_document_request_email_api_v1_cases_by_number__case_number__documents_request_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseDocumentRequestEmailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_case_document_api_v1_cases_by_number__case_number__documents__document_id__delete: {
         parameters: {
             query?: never;
@@ -5977,6 +6497,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_communication_settings_api_v1_lawyer_communication_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerCommunicationSettingsResponse"];
+                };
+            };
+        };
+    };
+    update_communication_settings_api_v1_lawyer_communication_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LawyerCommunicationSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerCommunicationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_email_banner_api_v1_lawyer_communication_settings_banner_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LawyerEmailBannerUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerCommunicationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_email_banner_api_v1_lawyer_communication_settings_banner_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerCommunicationSettingsResponse"];
                 };
             };
         };
