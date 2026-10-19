@@ -1,8 +1,10 @@
 /** useActiveCasesData: React hook for handling activecasesdata logic and state management. */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { getLawyerCases } from '@/lib/api';
+import { loadAllLawyerCases, sortFlaggedCases } from '@/lib/lawyerCases';
+
+import { useCaseFlagging } from '../useCaseFlagging';
 
 import type { UiCase } from './types';
 import { completionFromStatus, relativeTime, titleize } from './utils';
@@ -12,6 +14,12 @@ export function useActiveCasesData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const onFlagSaved = useCallback((caseNumber: string, isFlagged: boolean) => {
+    setCases((current) => sortFlaggedCases(current.map((entry) =>
+      entry.id === caseNumber ? { ...entry, isFlagged } : entry
+    )));
+  }, []);
+  const flagging = useCaseFlagging(onFlagSaved);
 
   useEffect(() => {
     let ignore = false;
@@ -20,18 +28,20 @@ export function useActiveCasesData() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getLawyerCases(100);
+        const data = await loadAllLawyerCases();
         if (ignore) {
           return;
         }
 
         setCases(
-          data.map((entry) => ({
+          sortFlaggedCases(data.map((entry) => ({
             id: entry.case_number,
             clientName: entry.client_name,
             caseType: entry.case_type,
             status: titleize(entry.status),
             priority: entry.priority,
+            isFlagged: entry.is_flagged ?? false,
+            createdAt: entry.created_at,
             lawyerName: entry.primary_lawyer_name ?? 'Unassigned',
             lastActivity: relativeTime(entry.created_at),
             nextMilestone: `Status: ${titleize(entry.status)}`,
@@ -45,7 +55,7 @@ export function useActiveCasesData() {
             outstandingDocs: 0,
             outstandingPayments: 0,
             completionPercent: completionFromStatus(entry.status),
-          }))
+          })))
         );
       } catch {
         if (!ignore) {
@@ -70,5 +80,5 @@ export function useActiveCasesData() {
     setReloadToken((current) => current + 1);
   };
 
-  return { cases, isLoading, error, retry };
+  return { cases, isLoading, error, retry, ...flagging };
 }

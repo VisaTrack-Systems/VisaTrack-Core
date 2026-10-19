@@ -519,7 +519,11 @@ export default function App() {
       ) : null}
 
       {currentView === 'active-cases' ? (
-        <ActiveCases onSelectCase={handleSelectCase} onBack={handleBackToDashboard} />
+        <ActiveCases
+          onSelectCase={handleSelectCase}
+          onBack={handleBackToDashboard}
+          enablePersonalFlags={currentUser.active_role === 'lawyer'}
+        />
       ) : null}
 
       {currentView === 'case-config' ? (

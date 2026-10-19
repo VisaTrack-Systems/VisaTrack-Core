@@ -35,6 +35,7 @@ export type CaseListItem = {
   case_type: string;
   status: string;
   priority: string;
+  is_flagged?: boolean;
   client_name: string;
   primary_lawyer_name: string | null;
   target_filing_date: string | null;
@@ -1108,8 +1109,19 @@ export async function getUsers(limit = 10): Promise<UserListItem[]> {
   return requestJson<UserListItem[]>(`/api/v1/users?limit=${limit}`);
 }
 
-export async function getLawyerCases(limit = 100): Promise<CaseListItem[]> {
-  return requestJson<CaseListItem[]>(`/api/v1/lawyer/cases?limit=${limit}`);
+export async function getLawyerCases(limit = 100, offset = 0): Promise<CaseListItem[]> {
+  const pagination = offset > 0 ? `&offset=${offset}` : '';
+  return requestJson<CaseListItem[]>(`/api/v1/lawyer/cases?limit=${limit}${pagination}`);
+}
+
+export async function setLawyerCaseFlag(
+  caseNumber: string,
+  isFlagged: boolean
+): Promise<{ case_number: string; is_flagged: boolean }> {
+  return requestJson(`/api/v1/lawyer/cases/${encodeURIComponent(caseNumber)}/flag`, {
+    method: 'PUT',
+    body: JSON.stringify({ is_flagged: isFlagged }),
+  });
 }
 
 export async function getLawyerClients(limit = 200, search?: string): Promise<UserListItem[]> {

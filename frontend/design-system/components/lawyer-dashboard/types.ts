@@ -7,6 +7,8 @@ export type DashboardCase = {
   status: string;
   lastUpdate: string;
   priority: string;
+  isFlagged?: boolean;
+  createdAt?: string;
   nextDeadline: string;
 };
 

@@ -8,6 +8,7 @@ and never grant access.
 | --- | --- | --- | --- | --- |
 | Read own/member case portal | related case only | assigned/created case | own organization | permitted platform scope |
 | Modify case workflow | denied | assigned/created case | own organization | permitted platform scope |
+| Set/remove personal case flag | denied | own flag + assigned/created case in own organization | denied | denied |
 | Upload requested document | related case + portal enabled | assigned/created case | own organization | permitted platform scope |
 | Download document | related case + portal visible + scan clean | assigned/created + scan clean | own org + scan clean | scan clean |
 | Manage users | denied | denied | own organization, below privilege ceiling | permitted platform scope |
@@ -45,3 +46,10 @@ and never grant access.
 
 Route-specific exceptions must be documented here and tested. Inline role checks that are
 not represented in this matrix are defects.
+
+Personal case flags are private preferences keyed by the authenticated user and case.
+Only the active `lawyer` role may change them through `PUT /lawyer/cases/{case_number}/flag`;
+inaccessible, deleted, unassigned, and foreign-tenant cases return `404`. Callers cannot
+specify another user. Flags never change shared case priority, workflow, or activity.
+`GET /lawyer/cases` returns only the caller's flags and sorts them before pagination;
+admin roles receive `is_flagged=false` and cannot inspect another user's flags.

@@ -9,6 +9,7 @@ from app.models.organization import Organization
 from app.models.privacy_request import PrivacyRequest
 from app.models.role import Role
 from app.models.user import User
+from app.models.user_case_flag import UserCaseFlag
 from app.models.user_invitation import UserInvitation
 from app.models.user_profile import UserProfile
 from app.models.user_role import UserRole
@@ -19,6 +20,7 @@ __all__ = [
     "Organization",
     "PrivacyRequest",
     "User",
+    "UserCaseFlag",
     "Case",
     "Milestone",
     "MfaRecoveryCode",

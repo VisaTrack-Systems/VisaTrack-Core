@@ -134,12 +134,13 @@ def test_list_lawyer_cases_returns_case_rows(make_auth_context):
         created_at=datetime.now(timezone.utc),
     )
     db = MagicMock()
-    db.execute.return_value.all.return_value = [(case, 'Client', 'One', 'Lawyer', 'Smith')]
+    db.execute.return_value.all.return_value = [(case, 'Client', 'One', 'Lawyer', 'Smith', True)]
 
     result = lawyer.list_lawyer_cases(limit=50, offset=0, auth=auth, db=db)
 
     assert result[0].case_number == 'C-2026-001'
     assert result[0].client_name == 'Client One'
+    assert result[0].is_flagged is True
 
 
 def test_create_lawyer_case_creates_case_and_primary_case_client(monkeypatch, make_auth_context):
