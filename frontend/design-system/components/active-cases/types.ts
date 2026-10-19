@@ -6,6 +6,8 @@ export type UiCase = {
   caseType: string;
   status: string;
   priority: string;
+  isFlagged?: boolean;
+  createdAt?: string;
   lawyerName: string;
   lastActivity: string;
   nextMilestone: string;

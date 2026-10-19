@@ -1318,6 +1318,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lawyer/cases/{case_number}/flag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Lawyer Case Flag */
+        put: operations["set_lawyer_case_flag_api_v1_lawyer_cases__case_number__flag_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/lawyer/clients": {
         parameters: {
             query?: never;
@@ -2485,6 +2502,11 @@ export interface components {
              */
             id: string;
             /**
+             * Is Flagged
+             * @default false
+             */
+            is_flagged: boolean;
+            /**
              * Organization Id
              * Format: uuid
              */
@@ -3195,6 +3217,18 @@ export interface components {
             priority: string;
             /** Target Filing Date */
             target_filing_date?: string | null;
+        };
+        /** LawyerCaseFlagRequest */
+        LawyerCaseFlagRequest: {
+            /** Is Flagged */
+            is_flagged: boolean;
+        };
+        /** LawyerCaseFlagResponse */
+        LawyerCaseFlagResponse: {
+            /** Case Number */
+            case_number: string;
+            /** Is Flagged */
+            is_flagged: boolean;
         };
         /** LawyerClientCreateRequest */
         LawyerClientCreateRequest: {
@@ -6422,6 +6456,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InviteClientResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_lawyer_case_flag_api_v1_lawyer_cases__case_number__flag_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LawyerCaseFlagRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LawyerCaseFlagResponse"];
                 };
             };
             /** @description Validation Error */

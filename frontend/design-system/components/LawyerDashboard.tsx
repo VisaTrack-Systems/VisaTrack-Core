@@ -23,7 +23,8 @@ export function LawyerDashboard({
   onCreateCase,
   lawyerName,
 }: LawyerDashboardProps) {
-  const { cases, stats, derivedActivity, isLoading, error, retry } = useLawyerDashboardData();
+  const { cases, stats, derivedActivity, isLoading, error, retry,
+    flagError, flaggingCaseNumbers, toggleFlag } = useLawyerDashboardData();
   const displayName = lawyerName?.trim().split(/\s+/)[0] || 'Attorney';
   const showNoClients = !isLoading && !error && stats.totalUsers === 0;
 
@@ -55,6 +56,8 @@ export function LawyerDashboard({
           </Alert>
         ) : null}
 
+        {flagError ? <Alert tone="danger">{flagError}</Alert> : null}
+
         <StatsGrid stats={stats} isLoading={isLoading} />
 
         {showNoClients ? (
@@ -68,6 +71,8 @@ export function LawyerDashboard({
               isLoading={isLoading}
               onViewActiveCases={onViewActiveCases}
               onSelectCase={onSelectCase}
+              onToggleFlag={(caseNumber, isFlagged) => { void toggleFlag(caseNumber, isFlagged); }}
+              flaggingCaseNumbers={flaggingCaseNumbers}
             />
             <RecentActivityPanel activityItems={derivedActivity} isLoading={isLoading} />
           </div>

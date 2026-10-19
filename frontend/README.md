@@ -7,9 +7,13 @@ The frontend is a responsive web app designed to work on both desktop and mobile
 **UI testing:** See [the Playwright guide and manual checklist](e2e/README.md)
 for interactive (`npm run test:e2e:ui`), headed, debug, and CI runs.
 
-**Live regression testing:** See [the full-stack regression guide](regression/README.md)
-to automate the running local website with real accounts, API responses, and database
-persistence. A Docker runner is provided for Macs without Node.js installed.
+**Personal case flags:** Lawyers can click **Flag** beside a case on their dashboard
+or case list. Flagged cases have a filled amber flag, a **Flagged** label, and appear
+first among the cases matching the current filters. Click **Flagged** again to remove
+the flag. Flags are saved for the individual lawyer across sessions; they do not
+change case priority or another lawyer's ordering. Every flagged case appears on the
+dashboard, including when there are more than eight. The backend requires its latest
+Alembic migration (`07b5e0ad9c21`).
 
 ---
 
