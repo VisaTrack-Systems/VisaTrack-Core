@@ -880,6 +880,26 @@ export interface paths {
         patch: operations["update_case_details_by_number_api_v1_cases_by_number__case_number__patch"];
         trace?: never;
     };
+    "/api/v1/cases/by-number/{case_number}/client-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Case Client Notes
+         * @description Save the lawyer's one-way notes for the client. Clients can read them but never write.
+         */
+        put: operations["update_case_client_notes_api_v1_cases_by_number__case_number__client_notes_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cases/by-number/{case_number}/custom-document-suites": {
         parameters: {
             query?: never;
@@ -2269,6 +2289,23 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** CaseClientNotesResponse */
+        CaseClientNotesResponse: {
+            /** Case Number */
+            case_number: string;
+            /** Client Notes */
+            client_notes: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CaseClientNotesUpdateRequest */
+        CaseClientNotesUpdateRequest: {
+            /** Client Notes */
+            client_notes?: string | null;
+        };
         /** CaseCreateRequest */
         CaseCreateRequest: {
             /** Case Number */
@@ -2759,6 +2796,8 @@ export interface components {
             client_id: string;
             /** Client Name */
             client_name: string;
+            /** Client Notes */
+            client_notes?: string | null;
             /** Completion Confidence */
             completion_confidence: number | null;
             /** Description */
@@ -5564,6 +5603,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseDetailsUpdateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_case_client_notes_api_v1_cases_by_number__case_number__client_notes_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseClientNotesUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseClientNotesResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,7 @@
 /**
  * ClientDashboard: Main dashboard view for client/applicant users, laid out like Clio's matter dashboard.
- * Left: billing summary, document checklist. Right: legal team, case details, milestone timeline, reminders, appointments.
+ * Left: billing summary (only while a balance is owing), notes from the legal team, document checklist.
+ * Right: legal team, case details, milestone timeline, reminders, appointments.
  * Each section is still gated by the portal capabilities the lawyer configured.
  */
 
@@ -11,6 +12,7 @@ import { createInvoiceCheckoutSession } from '@/lib/api';
 import { AppointmentsPanel } from './client-dashboard/AppointmentsPanel';
 import { BillingSummaryPanel } from './client-dashboard/BillingSummaryPanel';
 import { CaseSummaryCard, LegalTeamCard } from './client-dashboard/CaseSummaryCard';
+import { ClientNotesPanel } from './client-dashboard/ClientNotesPanel';
 import { DocumentChecklistPanel } from './client-dashboard/DocumentChecklistPanel';
 import { RemindersPanel } from './client-dashboard/RemindersPanel';
 import { MilestonesPanel } from './client-dashboard/MilestonesPanel';
@@ -37,6 +39,7 @@ export function ClientDashboard() {
     completedRequiredDocuments,
     capabilities,
     billingInfo,
+    clientNotes,
     uploadDocument,
     deleteUploadedDocument,
     downloadDocument,
@@ -65,12 +68,19 @@ export function ClientDashboard() {
   }
 
   const isPortalDisabled = capabilities.portalAccess === 'disabled';
+  // Billing only shows while something is owed: it stays hidden until the first invoice and goes away
+  // once the whole retainer is settled. Lawyers often bill again afterwards (disbursements, out-of-scope
+  // work, the next installment), so any new unpaid invoice brings billing back above the notes.
+  // Installments that have not been invoiced yet are not known here, so billing also hides between them.
+  const hasBalanceOwing = billingInfo.remaining > 0;
+  const showBilling = capabilities.canViewBilling && hasBalanceOwing;
   const hasVisibleSections =
     capabilities.canViewCaseStatus ||
     capabilities.canViewDocuments ||
     capabilities.canViewMilestones ||
     capabilities.canViewReminders ||
-    capabilities.canViewBilling;
+    showBilling ||
+    Boolean(clientNotes);
   const firstName = workspace.case.client_name.trim().split(/\s+/)[0] || workspace.case.client_name;
   const payableInvoice = workspace.payment_items.find(
     (invoice) => invoice.amount_due > 0 && !['draft', 'cancelled', 'paid', 'refunded'].includes(invoice.status)
@@ -140,7 +150,7 @@ export function ClientDashboard() {
           <div className="grid items-start gap-6 lg:grid-cols-3">
             {/* ── Main column ── */}
             <div className="space-y-6 lg:col-span-2">
-              {capabilities.canViewBilling ? (
+              {showBilling ? (
                 <BillingSummaryPanel
                   billingInfo={billingInfo}
                   canPay={Boolean(payableInvoice)}
@@ -149,6 +159,8 @@ export function ClientDashboard() {
                   onPay={makePayment}
                 />
               ) : null}
+
+              <ClientNotesPanel notes={clientNotes} />
 
               {capabilities.canViewDocuments ? (
                 <DocumentChecklistPanel

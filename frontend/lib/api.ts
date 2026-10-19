@@ -297,6 +297,7 @@ export type CaseWorkspace = {
     progress_percent: number;
     description: string | null;
     internal_notes: string | null;
+    client_notes: string | null;
   };
   document_suites: Array<{
     id: string;
@@ -427,6 +428,12 @@ export type CaseDetailsUpdateResponse = {
   target_filing_date: string | null;
   description: string | null;
   internal_notes: string | null;
+  updated_at: string;
+};
+
+export type CaseClientNotesResponse = {
+  case_number: string;
+  client_notes: string | null;
   updated_at: string;
 };
 
@@ -1467,6 +1474,19 @@ export async function updateCaseDetails(
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
+}
+
+export async function updateCaseClientNotes(
+  caseNumber: string,
+  clientNotes: string | null
+): Promise<CaseClientNotesResponse> {
+  return requestJson<CaseClientNotesResponse>(
+    `/api/v1/cases/by-number/${encodeURIComponent(caseNumber)}/client-notes`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ client_notes: clientNotes }),
+    }
+  );
 }
 
 export async function createCaseMilestone(

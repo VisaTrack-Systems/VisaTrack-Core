@@ -73,6 +73,7 @@ class CaseWorkspaceInfo(BaseModel):
     progress_percent: int
     description: Optional[str]
     internal_notes: Optional[str]
+    client_notes: Optional[str] = None
 
 
 class CaseWorkspaceDocument(BaseModel):
@@ -281,6 +282,16 @@ class CaseDetailsUpdateResponse(BaseModel):
     target_filing_date: Optional[date]
     description: Optional[str]
     internal_notes: Optional[str]
+    updated_at: datetime
+
+
+class CaseClientNotesUpdateRequest(BaseModel):
+    client_notes: Optional[str] = None
+
+
+class CaseClientNotesResponse(BaseModel):
+    case_number: str
+    client_notes: Optional[str]
     updated_at: datetime
 
 

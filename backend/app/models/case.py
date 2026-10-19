@@ -42,6 +42,7 @@ class Case(Base):
     completion_confidence: Mapped[Optional[int]] = mapped_column(Integer)
     description: Mapped[Optional[str]] = mapped_column(Text)
     internal_notes: Mapped[Optional[str]] = mapped_column(Text)
+    client_notes: Mapped[Optional[str]] = mapped_column(Text)
     priority: Mapped[str] = mapped_column(String(20), nullable=False, server_default="medium")
     complexity: Mapped[str] = mapped_column(String(20), nullable=False, server_default="standard")
     start_date: Mapped[Optional[date]] = mapped_column(Date)

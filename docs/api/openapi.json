@@ -1730,6 +1730,54 @@
         "title": "BugReportSubmitRequest",
         "type": "object"
       },
+      "CaseClientNotesResponse": {
+        "properties": {
+          "case_number": {
+            "title": "Case Number",
+            "type": "string"
+          },
+          "client_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Notes"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_number",
+          "client_notes",
+          "updated_at"
+        ],
+        "title": "CaseClientNotesResponse",
+        "type": "object"
+      },
+      "CaseClientNotesUpdateRequest": {
+        "properties": {
+          "client_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Notes"
+          }
+        },
+        "title": "CaseClientNotesUpdateRequest",
+        "type": "object"
+      },
       "CaseCreateRequest": {
         "properties": {
           "case_number": {
@@ -3126,6 +3174,17 @@
           "client_name": {
             "title": "Client Name",
             "type": "string"
+          },
+          "client_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Notes"
           },
           "completion_confidence": {
             "anyOf": [
@@ -8553,6 +8612,64 @@
           }
         ],
         "summary": "Update Case Details By Number",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/v1/cases/by-number/{case_number}/client-notes": {
+      "put": {
+        "description": "Save the lawyer's one-way notes for the client. Clients can read them but never write.",
+        "operationId": "update_case_client_notes_api_v1_cases_by_number__case_number__client_notes_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_number",
+            "required": true,
+            "schema": {
+              "title": "Case Number",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseClientNotesUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseClientNotesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Case Client Notes",
         "tags": [
           "cases"
         ]

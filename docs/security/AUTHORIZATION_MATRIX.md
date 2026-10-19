@@ -8,6 +8,7 @@ and never grant access.
 | --- | --- | --- | --- | --- |
 | Read own/member case portal | related case only | assigned/created case | own organization | permitted platform scope |
 | Modify case workflow | denied | assigned/created case | own organization | permitted platform scope |
+| Edit client-facing case notes (client reads only, cannot reply) | denied | assigned/created case | own organization | permitted platform scope |
 | Set/remove personal case flag | denied | own flag + assigned/created case in own organization | denied | denied |
 | Upload requested document | related case + portal enabled | assigned/created case | own organization | permitted platform scope |
 | Download document | related case + portal visible + scan clean | assigned/created + scan clean | own org + scan clean | scan clean |

@@ -21,6 +21,7 @@ import {
   sendDocumentRequestEmail,
   updateCaseMilestone,
   getCaseWorkspaceByNumber,
+  updateCaseClientNotes,
   updateCaseDetails,
   updateCaseDocumentStatus,
   updateCasePortalPermissions,
@@ -116,6 +117,7 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [isSavingCaseDetails, setIsSavingCaseDetails] = useState(false);
+  const [isSavingClientNotes, setIsSavingClientNotes] = useState(false);
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
   const [updatingMilestoneId, setUpdatingMilestoneId] = useState<string | null>(null);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(null);
@@ -366,6 +368,32 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
       return false;
     } finally {
       setIsSavingCaseDetails(false);
+    }
+  };
+
+  const handleSaveClientNotes = async (clientNotes: string | null): Promise<boolean> => {
+    if (!workspace) {
+      return false;
+    }
+
+    setIsSavingClientNotes(true);
+    try {
+      const saved = await updateCaseClientNotes(workspace.case.case_number, clientNotes);
+      updateWorkspace((current) => ({
+        ...current,
+        case: {
+          ...current.case,
+          client_notes: saved.client_notes,
+        },
+      }));
+      showNotice('success', 'Notes for the client updated.');
+      return true;
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : 'Unknown error';
+      showNotice('error', `Failed to update notes for the client: ${message}`);
+      return false;
+    } finally {
+      setIsSavingClientNotes(false);
     }
   };
 
@@ -933,6 +961,8 @@ export function CaseConfiguration({ caseId, onBack }: CaseConfigurationProps) {
           workspace={workspace}
           saving={isSavingCaseDetails}
           onSave={handleSaveCaseDetails}
+          savingClientNotes={isSavingClientNotes}
+          onSaveClientNotes={handleSaveClientNotes}
           onNotify={(message) => showNotice('info', message)}
         />
       );
